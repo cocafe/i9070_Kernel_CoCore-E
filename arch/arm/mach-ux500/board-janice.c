@@ -52,6 +52,7 @@
 #include <plat/pincfg.h>
 #include <plat/i2c.h>
 #include <plat/ste_dma40.h>
+#include <plat/gpio-nomadik.h>
 
 #include <mach/devices.h>
 #if defined(CONFIG_LIGHT_PROX_GP2A)
@@ -2215,4 +2216,3 @@ MACHINE_START(JANICE, "SAMSUNG JANICE")
 	.init_machine	= janice_init_machine,
 	.restart	= ux500_restart,
 MACHINE_END
-
