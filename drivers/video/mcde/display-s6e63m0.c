@@ -2301,7 +2301,7 @@ static void s6e63m0_mcde_panel_late_resume(struct early_suspend *earlysuspend)
 }
 #endif
 
-static struct mcde_display_driver s6e63m0_mcde = {
+static struct mcde_display_driver s6e63m0_mcde __refdata = {
 	.probe          = s6e63m0_mcde_panel_probe,
 	.remove         = s6e63m0_mcde_panel_remove,
 	#if 0
