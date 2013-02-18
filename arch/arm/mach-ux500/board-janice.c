@@ -389,7 +389,7 @@ static void gp2a_pwr(bool on)
 
 static int __init immvibe_setup( void );
 
-static struct isa1200_platform_data isa1200_plat_data = {
+static struct isa1200_platform_data isa1200_plat_data __refdata = {
 	.mot_hen_gpio = MOT_HEN_JANICE_R0_0,
 	.mot_len_gpio = MOT_LEN_JANICE_R0_0,
 	.mot_clk = NULL,
