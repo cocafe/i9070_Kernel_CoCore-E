@@ -1958,7 +1958,7 @@ err:
 	
 }
 
-static int __init s6e63m0_spi_probe(struct spi_device *spi)
+static int __devinit s6e63m0_spi_probe(struct spi_device *spi)
 {
 	int ret = 0;
 	struct s6e63m0 *lcd = container_of(spi->dev.driver, struct s6e63m0, spi_drv.driver);
