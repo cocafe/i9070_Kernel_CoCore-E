@@ -9,6 +9,8 @@
  *         Johan Bohlin <johan.bohlin@stericsson.com>
  *         for ST-Ericsson.
  *
+ * Modified: cocafe@xda-developers.com
+ *
  * License terms:
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -39,6 +41,10 @@
 #include <linux/mfd/abx500/ux500_sysctrl.h>
 #include <linux/mfd/dbx500-prcmu.h>
 #include "ab8500_audio.h"
+
+#ifdef CONFIG_ABB_CODEC_CONTROL
+#include "abb-codec-con.h"
+#endif
 
 /* To convert register definition shifts to masks */
 #define BMASK(bsft)	(1 << (bsft))
@@ -215,6 +221,238 @@ static const u8 ab850x_reg_cache[] = {
 };
 
 static struct snd_soc_codec *ab850x_codec;
+
+/* cocafe: Sound Control */
+
+static void ab850x_audio_control(bool power_on);
+static void ab850x_control_hs(void);
+static void ab850x_control_hf(void);
+static void ab850x_control_mic2(void);
+static void ab850x_control_earpiece(void);
+
+static bool is_headset = false;
+
+/* Chip id */
+/* AB8500
+ * AB8505 V1/V2/V3
+ */
+char * ab850x_chipid = "Not detected yet";
+module_param(ab850x_chipid, charp, 0444);
+
+/* Debug level */
+unsigned int debug_level = 0;
+module_param(debug_level, uint, 0644);
+
+/* AudSwReset */
+/* 0: Normal operation
+ * 1: Sets all the audio registers to their default state, including itself
+ */
+static const u8 audswreset_mask = BMASK(REG_AUDSWRESET_SWRESET);
+unsigned int const audswreset_w = 1;
+
+bool audswreset = false;
+module_param(audswreset, bool, 0644);
+
+/* ANAGAIN1 ANAGAIN2 */
+/* Mic1A or Mic1B Analog Gain:
+ * 00000: 0  dB gain
+ * 00001: 1  dB gain
+ * .....: +1 dB step
+ * 11101: 29 dB gain
+ * 11110: 30 dB gain
+ * 11111: 31 dB gain
+ */
+static const u8 micxgain_mask = BMASK(REG_ANAGAINX_MICXGAIN);
+
+bool micxgain_con = false;
+module_param(micxgain_con, bool, 0644);
+
+unsigned int micxgain_bit = 11111;
+module_param(micxgain_bit, uint, 0444);
+
+/* ANAGAIN3 */
+/* 0: maximum gain
+ * 34: medium gain
+ * 85: minimum gain
+ */
+bool anagain3_con = false;
+module_param(anagain3_con, bool, 0644);
+
+unsigned int anagain3_bit = 0;
+module_param(anagain3_bit, uint, 0644);
+
+/* ANAGAIN3 */
+/* HsL/HsR Gain */
+/* 0000: +4  dB gain
+ * 0001: +2  dB gain
+ * ....: -2  dB step
+ * 1011: -18 dB gain
+ * 1100: -20 dB gain
+ * 1101: -24 dB gain
+ * 1110: -28 dB gain
+ * 1111: -32 dB gain
+ */
+static const u8 hslgain_mask = BMASK(REG_ANAGAIN3_HSLGAIN);
+static const u8 hsrgain_mask = BMASK(REG_ANAGAIN3_HSRGAIN);
+
+bool hsxgain_con = false;
+module_param(hsxgain_con, bool, 0644);
+
+unsigned int hslgain_bit = 0000;
+module_param(hslgain_bit, uint, 0644);
+
+unsigned int hsrgain_bit = 0000;
+module_param(hsrgain_bit, uint, 0644);
+
+/* ANACONF1 */
+/* HsLowPow:
+ * 0: Normal Operation
+ * 1: Hs drivers in Low Power
+ */
+static const u8 hslowpow_mask = BMASK(REG_ANACONF1_HSLOWPOW);
+
+bool hslowpow_con = false;
+module_param(hslowpow_con, bool, 0644);
+
+unsigned int hslowpow_bit = 0;
+module_param(hslowpow_bit, uint, 0644);
+
+/* HsDACLowPow:
+ * 00: Normal Operation
+ * 01: Hs DAC drivers in Low Power
+ * 10: Hs DAC in Low Power
+ * 11: Hs DAC and Hs DAC drivers in Low Power
+ */
+static const u8 hsdaclowpow0_mask = BMASK(REG_ANACONF1_DACLOWPOW0);
+static const u8 hsdaclowpow1_mask = BMASK(REG_ANACONF1_DACLOWPOW1);
+
+bool hsdaclowpow_con = false;
+module_param(hsdaclowpow_con, bool, 0644);
+
+unsigned int hsdaclowpow_bit = 00;
+module_param(hsdaclowpow_bit, uint, 0644);
+
+/* HsHpEn:
+ * 0: Headset high pass filter disabled
+ * 1: Headset high pass filter enabled (offset cancellation enabled)
+ */
+static const u8 hshp_mask = BMASK(REG_ANACONF1_HSHPEN);
+
+bool hshp_con;
+module_param(hshp_con, bool, 0644);
+
+unsigned int hshp_bit = 0;
+module_param(hshp_bit, uint, 0644);
+
+/* HsLEarDigGain */
+/* HsL or Earpiece path digital gain
+ * 0000: +8 dB gain
+ * 0001: +7 dB gain
+ * ....: -1 dB step
+ * 0111: +1 dB gain
+ * 1000: 0 dB gain
+ * 1001 to 1111: -inf dB gain (mute)
+ */
+static const u8 hsldiggain_mask = BMASK(REG_HSLEARDIGGAIN_HSLDGAIN);
+
+bool eardiggain_con = false;
+module_param(eardiggain_con, bool, 0644);
+
+unsigned int eardiggain_bit = 0000;
+module_param(eardiggain_bit, uint, 0644);
+
+bool hsldiggain_con = false;
+module_param(hsldiggain_con, bool, 0644);
+
+unsigned int hsldiggain_bit = 0000;
+module_param(hsldiggain_bit, uint, 0644);
+
+/* HsRDigGain */
+/* HsR path digital gain
+ * 0000: +8 dB gain
+ * 0001: +7 dB gain
+ * ....: -1 dB step
+ * 0111: +1 dB gain
+ * 1000: 0 dB gain
+ * 1001 to 1111: -inf dB gain (mute)
+ */
+static const u8 hsrdiggain_mask = BMASK(REG_HSRDIGGAIN_HSRDGAIN);
+
+bool hsrdiggain_con = false;
+module_param(hsrdiggain_con, bool, 0644);
+
+unsigned int hsrdiggain_bit = 0000;
+module_param(hsrdiggain_bit, uint, 0644);
+
+/* ClassDConf3 */
+/* ClassDDithHPGain:
+ * Gain control for the high pass component of dithering filter
+ * 0000: Minimum gain
+ * ....:
+ * 1010: Maximum gain
+*/
+static const u8 classdhp_mask = BMASK(REG_CLASSDCONF3_DITHHPGAIN);
+
+bool classdhp_con = false;
+module_param(classdhp_con, bool, 0644);
+
+unsigned int classdhp_bit = 1010;
+module_param(classdhp_bit, uint, 0644);
+
+/* ClassDDithWGain:
+ * Gain control for the white component of dithering filter
+ * 0000: Minimum gain
+ * ....:
+ * 1010: Maximum gain
+ */
+static const u8 classdwg_mask = BMASK(REG_CLASSDCONF3_DITHWGAIN);
+
+bool classdwg_con = false;
+module_param(classdwg_con, bool, 0644);
+
+unsigned int classdwg_bit = 1010;
+module_param(classdwg_bit, uint, 0644);
+
+/* ClassDHighVolEn:
+ * 0000: High volume mode disabled
+ * xxx1: Left Hf channel in high volume mode (+2 dB)
+ * xx1x: Right Hf channel in high volume mode (+2 dB)
+ *
+ * Cannot be applied on the fly while HfX has been powered on
+ */
+static const u8 classdhivol0_mask = BMASK(REG_CLASSDCONF2_HIGHVOLEN0); 	/* HfL */
+static const u8 classdhivol1_mask = BMASK(REG_CLASSDCONF2_HIGHVOLEN1); 	/* HfR */
+
+bool classdhivol_con = false;
+module_param(classdhivol_con, bool, 0644);
+
+unsigned int classdhivolhfl_bit = 1;
+module_param(classdhivolhfl_bit, uint, 0644);
+
+unsigned int classdhivolhfr_bit = 1;
+module_param(classdhivolhfr_bit, uint, 0644);
+
+/* ADDigGain2
+ * AD2 path digital gain
+ * 000000:  31 dB gain
+ * 000001:  30 dB gain
+ * ......:   1 dB step
+ * 011111:   0 dB gain
+ * ......:   1 dB step
+ * 111101: -30 dB gain
+ * 111110: -31 dB gain
+ * 111111: -inf dB gain (mute)
+ */
+static const u8 addiggain2_mask = BMASK(REG_ADDIGGAINX_GAIN);
+
+bool addiggain2_con = false;
+module_param(addiggain2_con, bool, 0644);
+
+unsigned int addiggain2_ms = 500;
+module_param(addiggain2_ms, uint, 0644);
+
+unsigned int addiggain2_bit = 9;
+module_param(addiggain2_bit, uint, 0644);
 
 /* ADCM */
 static const u8 ADCM_ANACONF5_MASK = BMASK(REG_ANACONF5_ENCPHS);
@@ -561,17 +799,6 @@ static int digital_mute_control_get(struct snd_kcontrol *kcontrol,
             BMASK(REG_DAPATHENA_ENDA3) |
             BMASK(REG_DAPATHENA_ENDA4))) == 0));
 
-	return 0;
-}
-
-static int hs_disable_event(struct snd_soc_dapm_widget *w,
-		struct snd_kcontrol *kcontrol, int event)
-{
-	switch (event) {
-	case SND_SOC_DAPM_POST_PMD:
-		mdelay(10);
-		break;
-	}
 	return 0;
 }
 
@@ -1259,6 +1486,96 @@ static int if1_enable_event(struct snd_soc_dapm_widget *w,
 	return ret;
 }
 
+static int hs_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		is_headset = true;
+		ab850x_control_hs();
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: Hs power on\n");
+		}
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		mdelay(10);
+		is_headset = false;
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: Hs power off\n");
+		}
+		break;
+	}
+	return 0;
+}
+
+static int earpiece_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		if (!is_headset) {
+			ab850x_control_earpiece();
+		}
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: EarPiece power on\n");
+		}
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		if (is_headset) {
+			ab850x_control_hs();
+		}
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: EarPiece power off\n");
+		}
+		break;
+	}
+	return 0;
+}
+
+static int ihfr_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		ab850x_control_hf();
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: IHfR power on\n");
+		}
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		if (is_headset) {
+			ab850x_control_hs();
+		}
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: IHfR power off\n");
+		}
+		break;
+	}
+	return 0;
+}
+
+static int ad2_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		ab850x_control_mic2();
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: AD2 power on\n");
+		}
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		if (is_headset) {
+			ab850x_control_hs();
+		}
+		if (debug_level >= 2) {
+			pr_info("ab850x-codec: AD2 power off\n");
+		}
+		break;
+	}
+	return 0;
+}
+
 static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 
 	/* DA/AD */
@@ -1322,9 +1639,9 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER("HSR Mute", REG_MUTECONF, REG_MUTECONF_MUTHSR,
 			INVERT, NULL, 0),
 	SND_SOC_DAPM_PGA_E("HSL Enable", REG_ANACONF4, REG_ANACONF4_ENHSL,
-			NORMAL, NULL, 0, hs_disable_event, SND_SOC_DAPM_POST_PMD),
+			NORMAL, NULL, 0, hs_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_PGA_E("HSR Enable", REG_ANACONF4, REG_ANACONF4_ENHSR,
-			NORMAL, NULL, 0, hs_disable_event, SND_SOC_DAPM_POST_PMD),
+			NORMAL, NULL, 0, hs_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_PGA("HSL Gain", SND_SOC_NOPM, 0,
 			0, NULL, 0),
 	SND_SOC_DAPM_PGA("HSR Gain", SND_SOC_NOPM, 0,
@@ -1354,8 +1671,9 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("Earpiece or LineOut Mono Source",
 			SND_SOC_NOPM, 0, 0, dapm_ear_lineout_source),
 
-	SND_SOC_DAPM_MIXER("EAR DAC", REG_DAPATHCONF,
-			REG_DAPATHCONF_ENDACEAR, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER_E("EAR DAC", REG_DAPATHCONF,
+			REG_DAPATHCONF_ENDACEAR, 0, NULL, 0, 
+			earpiece_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MUX("Earpiece", SND_SOC_NOPM, 0, 0, &dapm_ear_mux),
 
@@ -1387,8 +1705,9 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 
 	SND_SOC_DAPM_MIXER("IHFL DAC", REG_DAPATHCONF,
 			REG_DAPATHCONF_ENDACHFL, 0, NULL, 0),
-	SND_SOC_DAPM_MIXER("IHFR DAC", REG_DAPATHCONF,
-			REG_DAPATHCONF_ENDACHFR, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER_E("IHFR DAC", REG_DAPATHCONF,
+			REG_DAPATHCONF_ENDACHFR, 0, NULL, 0, 
+			ihfr_dapm_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("DA4 or ANC path to HfR", REG_DIGMULTCONF2,
 			REG_DIGMULTCONF2_DATOHFREN, 0, NULL, 0),
@@ -1465,7 +1784,8 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 			SND_SOC_NOPM, 0, 0, dapm_ad2_select),
 
 	SND_SOC_DAPM_MIXER("AD1 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0),
-	SND_SOC_DAPM_MIXER("AD2 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER_E("AD2 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0, 
+			ad2_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("AD12 Enable", REG_ADPATHENA,
 			REG_ADPATHENA_ENAD12, 0, NULL, 0),
@@ -3089,6 +3409,103 @@ static void ab850x_codec_configure_audio_macrocell(struct snd_soc_codec *codec)
 
 /* Extended interface for codec-driver */
 
+/* cocafe: Sound control implementation */
+
+/* Headset */
+static void ab850x_control_hs(void) {
+	if (anagain3_con) {
+		snd_soc_write(ab850x_codec, REG_ANAGAIN3, anagain3_bit);
+		pr_info("ab850x-codec: AnaGain3 \n");
+	}
+
+	if (hsxgain_con) {
+		snd_soc_update_bits(ab850x_codec, REG_ANAGAIN3, hslgain_mask, hslgain_bit);
+		snd_soc_update_bits(ab850x_codec, REG_ANAGAIN3, hsrgain_mask, hsrgain_bit);
+		pr_info("ab850x-codec: HsL/HsR Gain \n");
+	}
+
+	if (hslowpow_con) {
+		snd_soc_update_bits(ab850x_codec, REG_ANACONF1, hslowpow_mask, hslowpow_bit);
+		pr_info("ab850x-codec: HsLowPow \n");
+	}
+
+	if (hsdaclowpow_con) {
+		snd_soc_update_bits(ab850x_codec, REG_ANACONF1, hsdaclowpow0_mask, hsdaclowpow_bit);
+		snd_soc_update_bits(ab850x_codec, REG_ANACONF1, hsdaclowpow1_mask, hsdaclowpow_bit);
+		pr_info("ab850x-codec: HsDACLowPow \n");
+	}
+
+	if (hshp_con) {
+		snd_soc_update_bits(ab850x_codec, REG_ANACONF1, hshp_mask, hshp_bit);
+		pr_info("ab850x-codec: HsHP \n");
+	}
+
+	if (hsldiggain_con) {
+		snd_soc_update_bits(ab850x_codec, REG_HSLEARDIGGAIN, hsldiggain_mask, hsldiggain_bit);
+		pr_info("ab850x-codec: HsL DigGain \n");
+	}
+	
+	if (hsrdiggain_con) {
+		snd_soc_update_bits(ab850x_codec, REG_HSRDIGGAIN, hsrdiggain_mask, hsrdiggain_bit);
+		pr_info("ab850x-codec: HsR DigGain \n");
+	}
+}
+
+/* Handsfree */
+static void ab850x_control_hf(void) {
+	if (classdhp_con) {
+		snd_soc_update_bits(ab850x_codec, REG_CLASSDCONF3, classdhp_mask, classdhp_bit);
+		pr_info("ab850x-codec: ClassD HP \n");
+	}
+	
+	if (classdwg_con) {
+		snd_soc_update_bits(ab850x_codec, REG_CLASSDCONF3, classdwg_mask, classdwg_bit);
+		pr_info("ab850x-codec: ClassD WG \n");
+	}
+
+	if (classdhivol_con) {
+		snd_soc_update_bits(ab850x_codec, REG_CLASSDCONF2, classdhivol0_mask, classdhivolhfl_bit);
+		snd_soc_update_bits(ab850x_codec, REG_CLASSDCONF2, classdhivol1_mask, classdhivolhfr_bit);
+		pr_info("ab850x-codec: ClassD HiVol HfL/R \n");
+	}
+}
+
+/* Mic2 */
+static void ab850x_control_mic2(void) {
+	if (addiggain2_con) {
+		/* FIXME: add a delay to overwirte systems defaults */
+		msleep(addiggain2_ms);
+		snd_soc_write(ab850x_codec, REG_ADDIGGAIN2, addiggain2_bit);
+		/*snd_soc_update_bits(ab850x_codec, REG_ADDIGGAIN2, addiggain2_mask, addiggain2_bit);*/
+		pr_info("ab850x-codec: ADDigGain2 \n");
+	}
+}
+
+/* Earpiece */
+static void ab850x_control_earpiece(void) {
+	/* Ear and HsL use the same diggain path */
+	if (eardiggain_con) {
+		snd_soc_update_bits(ab850x_codec, REG_HSLEARDIGGAIN, hsldiggain_mask, eardiggain_bit);
+		pr_info("ab850x-codec: EarDigGain \n");
+	}
+}
+
+/* Normal */
+static void ab850x_audio_control(bool power_on)
+{
+	if (audswreset && !power_on) {
+		snd_soc_update_bits(ab850x_codec, REG_AUDSWRESET, audswreset_mask, audswreset_w);
+		pr_info("ab850x-codec: Audio Driver SW Reset! \n");
+		audswreset = false;
+	}
+
+	if (micxgain_con && power_on) {
+		snd_soc_update_bits(ab850x_codec, REG_ANAGAIN1, micxgain_mask, micxgain_bit);
+		snd_soc_update_bits(ab850x_codec, REG_ANAGAIN2, micxgain_mask, micxgain_bit);
+		pr_info("ab850x-codec: MicX mask \n");
+	}
+}
+
 int ab850x_audio_power_control(bool power_on)
 {
 	int pwr_mask = BMASK(REG_POWERUP_POWERUP) | BMASK(REG_POWERUP_ENANA);
@@ -3099,7 +3516,9 @@ int ab850x_audio_power_control(bool power_on)
 		return -EIO;
 	}
 
-	pr_debug("%s ab850x.", (power_on) ? "Enabling" : "Disabling");
+	pr_info("ab850x-codec: %s \n", (power_on) ? "Power on" : "Power off");
+
+	ab850x_audio_control(power_on);
 
 	return snd_soc_update_bits(ab850x_codec, REG_POWERUP,
 		pwr_mask, (power_on) ? pwr_mask : REG_MASK_NONE);
@@ -3455,6 +3874,9 @@ static int ab850x_codec_add_widgets(struct snd_soc_codec *codec)
 	chipid = ab850x_audio_get_chipid(codec->dev);
 	switch (chipid) {
 	case AB850X_AUDIO_AB8500:
+		pr_info("ab850x-codec: chipid -> AB8500");
+		ab850x_chipid = "AB8500";
+
 		ret = snd_soc_dapm_new_controls(&codec->dapm,
 				ab8500_dapm_widgets,
 				ARRAY_SIZE(ab8500_dapm_widgets));
@@ -3477,6 +3899,9 @@ static int ab850x_codec_add_widgets(struct snd_soc_codec *codec)
 		}
 		switch (chipid) {
 		case AB850X_AUDIO_AB8505_V1:
+			pr_info("ab850x-codec: chipid -> AB8505 V1");
+			ab850x_chipid = "AB8505 V1";
+
 			ret = snd_soc_dapm_new_controls(&codec->dapm,
 					ab8505_v1_dapm_widgets,
 					ARRAY_SIZE(ab8505_v1_dapm_widgets));
@@ -3488,6 +3913,9 @@ static int ab850x_codec_add_widgets(struct snd_soc_codec *codec)
 			break;
 		case AB850X_AUDIO_AB8505_V2:
 		case AB850X_AUDIO_AB8505_V3:
+			pr_info("ab850x-codec: chipid -> AB8505 V2/V3");
+			ab850x_chipid = "AB8505 V2/V3";
+
 			ret = snd_soc_dapm_new_controls(&codec->dapm,
 					ab8505_v2_dapm_widgets,
 					ARRAY_SIZE(ab8505_v2_dapm_widgets));
@@ -3978,6 +4406,10 @@ controls_done:
 	}
 
 	ab850x_codec = codec;
+
+	#ifdef CONFIG_ABB_CODEC_CONTROL
+	abb_codec_register(ab850x_codec);
+	#endif
 
 	return ret;
 }
