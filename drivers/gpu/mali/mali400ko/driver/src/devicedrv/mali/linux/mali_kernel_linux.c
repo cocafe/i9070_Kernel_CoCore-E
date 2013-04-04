@@ -76,6 +76,10 @@ extern unsigned int mali_utilization_low_to_high;
 module_param(mali_utilization_low_to_high, uint, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_utilization_low_to_high, "The low-to-high utilization line");
 
+extern int mali_pm_sampling_rate;
+module_param(mali_pm_sampling_rate, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_pm_sampling_rate, "Mali light sleep sampling rate");
+
 #if MALI_TIMELINE_PROFILING_ENABLED
 extern int mali_boot_profiling;
 module_param(mali_boot_profiling, int, S_IRUSR | S_IRGRP | S_IROTH);
