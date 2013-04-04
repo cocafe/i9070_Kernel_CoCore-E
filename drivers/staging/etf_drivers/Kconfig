@@ -1,0 +1,5 @@
+config CWXXXX_ETF
+      tristate "ST-Ericsson CWxxxx Series HW Testing Driver"
+      depends on CW1200
+      help
+	This driver for Hardware testing on ST-Ericsson CWxxxx Series.
