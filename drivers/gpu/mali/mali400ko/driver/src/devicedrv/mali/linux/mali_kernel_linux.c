@@ -68,6 +68,14 @@ extern int mali_l2_max_reads;
 module_param(mali_l2_max_reads, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_l2_max_reads, "Maximum reads for Mali L2 cache");
 
+extern unsigned int mali_utilization_high_to_low;
+module_param(mali_utilization_high_to_low, uint, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_utilization_high_to_low, "The high-to-low utilization line");
+
+extern unsigned int mali_utilization_low_to_high;
+module_param(mali_utilization_low_to_high, uint, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_utilization_low_to_high, "The low-to-high utilization line");
+
 #if MALI_TIMELINE_PROFILING_ENABLED
 extern int mali_boot_profiling;
 module_param(mali_boot_profiling, int, S_IRUSR | S_IRGRP | S_IROTH);

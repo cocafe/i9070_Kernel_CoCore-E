@@ -36,6 +36,9 @@
 #define MALI_HIGH_TO_LOW_LEVEL_UTILIZATION_LIMIT 64
 #define MALI_LOW_TO_HIGH_LEVEL_UTILIZATION_LIMIT 192
 
+unsigned int mali_utilization_high_to_low = MALI_HIGH_TO_LOW_LEVEL_UTILIZATION_LIMIT;
+unsigned int mali_utilization_low_to_high = MALI_LOW_TO_HIGH_LEVEL_UTILIZATION_LIMIT;
+
 static bool is_running;
 static bool is_initialized;
 static struct regulator *regulator;
@@ -123,7 +126,7 @@ void mali_utilization_function(struct work_struct *ptr)
 	/*By default, platform start with 50% APE OPP and 25% DDR OPP*/
 	static u32 has_requested_low = 1;
 
-	if (last_utilization > MALI_LOW_TO_HIGH_LEVEL_UTILIZATION_LIMIT) {
+	if (last_utilization > mali_utilization_low_to_high) {
 		if (has_requested_low) {
 			MALI_DEBUG_PRINT(5, ("MALI GPU utilization: %u SIGNAL_HIGH\n", last_utilization));
 			/*Request 100% APE_OPP.*/
@@ -142,7 +145,7 @@ void mali_utilization_function(struct work_struct *ptr)
 			has_requested_low = 0;
 		}
 	} else {
-		if (last_utilization < MALI_HIGH_TO_LOW_LEVEL_UTILIZATION_LIMIT) {
+		if (last_utilization < mali_utilization_high_to_low) {
 			if (!has_requested_low) {
 				/*Remove APE_OPP and DDR_OPP requests*/
 				prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP, "mali");
