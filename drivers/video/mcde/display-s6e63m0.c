@@ -1958,7 +1958,7 @@ err:
 	
 }
 
-static int __init s6e63m0_spi_probe(struct spi_device *spi)
+static int __devinit s6e63m0_spi_probe(struct spi_device *spi)
 {
 	int ret = 0;
 	struct s6e63m0 *lcd = container_of(spi->dev.driver, struct s6e63m0, spi_drv.driver);
@@ -2301,7 +2301,7 @@ static void s6e63m0_mcde_panel_late_resume(struct early_suspend *earlysuspend)
 }
 #endif
 
-static struct mcde_display_driver s6e63m0_mcde = {
+static struct mcde_display_driver s6e63m0_mcde __refdata = {
 	.probe          = s6e63m0_mcde_panel_probe,
 	.remove         = s6e63m0_mcde_panel_remove,
 	#if 0

@@ -757,7 +757,7 @@ static int __init dbx500_prcmu_probe(struct platform_device *pdev)
 }
 
 /* No action required in suspend/resume, thus the lack of functions */
-static struct platform_driver dbx500_prcmu_driver = {
+static struct platform_driver dbx500_prcmu_driver __refdata = {
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "dbx500-prcmu",
