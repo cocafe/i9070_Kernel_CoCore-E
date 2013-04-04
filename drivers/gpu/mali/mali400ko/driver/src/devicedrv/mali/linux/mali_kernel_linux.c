@@ -65,7 +65,7 @@ module_param(mali_max_job_runtime, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | 
 MODULE_PARM_DESC(mali_max_job_runtime, "Maximum allowed job runtime in msecs.\nJobs will be killed after this no matter what");
 
 extern int mali_l2_max_reads;
-module_param(mali_l2_max_reads, int, S_IRUSR | S_IRGRP | S_IROTH);
+module_param(mali_l2_max_reads, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_l2_max_reads, "Maximum reads for Mali L2 cache");
 
 #if MALI_TIMELINE_PROFILING_ENABLED
