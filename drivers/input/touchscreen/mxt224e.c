@@ -1,6 +1,8 @@
 /*
  *  Copyright (C) 2010, Samsung Electronics Co. Ltd. All Rights Reserved.
  *
+ *  Modified: Huang Ji (cocafe@xda-developers.com)
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
@@ -94,6 +96,19 @@
 #define MXT224_STATE_MOVE		2
 
 #define MAX_USING_FINGER_NUM 10
+
+/* cocafe: Touch Booster Control */
+bool touch_boost = true;
+module_param(touch_boost, bool, 0644);
+
+bool touch_boost_ape = true;
+module_param(touch_boost_ape, bool, 0644);
+
+bool touch_boost_ddr = true;
+module_param(touch_boost_ddr, bool, 0644);
+
+unsigned int touch_boost_freq = 800000;
+module_param(touch_boost_freq, uint, 0644);
 
 struct object_t {
 	u8 object_type;
@@ -904,45 +919,63 @@ static void report_input_data(struct mxt224_data *data)
 	if (data->fingers[id].state == MXT224_STATE_INACTIVE)
 		goto out;
 
-#if defined(TOUCH_BOOSTER)
-	if (data->fingers[id].state == MXT224_STATE_PRESS) {
-		if (data->finger_cnt == 0) {
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_APE_OPP,
-				(char *)data->client->name,
-				PRCMU_QOS_APE_OPP_MAX);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_DDR_OPP,
-				(char *)data->client->name,
-				PRCMU_QOS_DDR_OPP_MAX);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_ARM_KHZ,
-				(char *)data->client->name,
-				800000);
-		}
+	#if defined(TOUCH_BOOSTER)
+	if (touch_boost) {
+		if (data->fingers[id].state == MXT224_STATE_PRESS) {
+			if (data->finger_cnt == 0) {
+				if (touch_boost_ape) {
+					prcmu_qos_update_requirement(
+						PRCMU_QOS_APE_OPP,
+						(char *)data->client->name,
+						PRCMU_QOS_APE_OPP_MAX);
+				}
+				if (touch_boost_ddr) {
+					prcmu_qos_update_requirement(
+						PRCMU_QOS_DDR_OPP,
+						(char *)data->client->name,
+						PRCMU_QOS_DDR_OPP_MAX);
+				}
+				if (touch_boost_freq == 200000 || 
+				touch_boost_freq == 400000 || 
+				touch_boost_freq == 800000 || 
+				touch_boost_freq == 1000000) {
+					prcmu_qos_update_requirement(
+						PRCMU_QOS_ARM_KHZ,
+						(char *)data->client->name,
+						touch_boost_freq);
+				} else {
+					printk("[TSP] freq is invalid.Revert 800Mhz(default).\n");
+					touch_boost_freq = 800000;
+					prcmu_qos_update_requirement(
+						PRCMU_QOS_ARM_KHZ,
+						(char *)data->client->name,
+						800000);
+				}
+			}
 
-		data->finger_cnt++;
+			data->finger_cnt++;
 
-	} else if (data->fingers[id].state == MXT224_STATE_RELEASE) {
-		if (data->finger_cnt > 0)
-			data->finger_cnt--;
-
-		if (data->finger_cnt == 0) {
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_APE_OPP,(
-				char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_DDR_OPP,
-				(char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_ARM_KHZ,
-				(char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
+		} else if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+			if (data->finger_cnt > 0)
+				data->finger_cnt--;
+	
+			if (data->finger_cnt == 0) {
+				prcmu_qos_update_requirement(
+					PRCMU_QOS_APE_OPP,(
+					char *)data->client->name,
+					PRCMU_QOS_DEFAULT_VALUE);
+				prcmu_qos_update_requirement(
+					PRCMU_QOS_DDR_OPP,
+					(char *)data->client->name,
+					PRCMU_QOS_DEFAULT_VALUE);
+				prcmu_qos_update_requirement(
+					PRCMU_QOS_ARM_KHZ,
+					(char *)data->client->name,
+					PRCMU_QOS_DEFAULT_VALUE);
+			}
 		}
 	}
-#endif
+	#endif /* TOUCH_BOOSTER */
 
 	input_mt_slot(data->input_dev, id);
 	input_mt_report_slot_state(data->input_dev,
@@ -1316,24 +1349,26 @@ static int mxt224_internal_suspend(struct mxt224_data *data)
 		report_input_data(data);
 	}
 
-#if defined(TOUCH_BOOSTER)
-	if (data->finger_cnt > 0) {
-		prcmu_qos_update_requirement(
-			PRCMU_QOS_APE_OPP,(
-			char *)data->client->name,
-			PRCMU_QOS_DEFAULT_VALUE);
-		prcmu_qos_update_requirement(
-			PRCMU_QOS_DDR_OPP,
-			(char *)data->client->name,
-			PRCMU_QOS_DEFAULT_VALUE);
-		prcmu_qos_update_requirement(
-			PRCMU_QOS_ARM_KHZ,
-			(char *)data->client->name,
-			PRCMU_QOS_DEFAULT_VALUE);
-
-		data->finger_cnt = 0;
+	#if defined(TOUCH_BOOSTER)
+	if (touch_boost) {
+		if (data->finger_cnt > 0) {
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_APE_OPP,(
+				char *)data->client->name,
+				PRCMU_QOS_DEFAULT_VALUE);
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_DDR_OPP,
+				(char *)data->client->name,
+				PRCMU_QOS_DEFAULT_VALUE);
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_ARM_KHZ,
+				(char *)data->client->name,
+				PRCMU_QOS_DEFAULT_VALUE);
+	
+			data->finger_cnt = 0;
+		}
 	}
-#endif
+	#endif
 
 	if (!tsp_deepsleep)
 		data->power_con(false);
