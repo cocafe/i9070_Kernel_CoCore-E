@@ -663,9 +663,9 @@ int ab850x_audio_set_adcm(enum ab850x_audio_adcm req_adcm);
 
 /* REG_SIDFIRCOEF1 */
 /* REG_SIDFIRCOEF2 */
-#define REG_SID_FIR_COEFF_MIN			0
-#define REG_SID_FIR_COEFF_MAX			0xFFFF
-#define REG_SID_FIR_COEFFS			128
+#define REG_SID_FIR_COEFF_MIN		0
+#define REG_SID_FIR_COEFF_MAX		0xFFFF
+#define REG_SID_FIR_COEFFS		128
 
 /* REG_SIDFIRCONF */
 #define REG_SIDFIRCONF_ENFIRSIDS		2
