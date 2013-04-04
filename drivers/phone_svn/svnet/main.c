@@ -44,7 +44,7 @@
 #ifdef SVNET_WAKELOCK_ENABLE
 #include <linux/wakelock.h>
 
-#define DEFAULT_RAW_WAKE_TIME (6*HZ)
+#define DEFAULT_RAW_WAKE_TIME (HZ/2)
 #define DEFAULT_FMT_WAKE_TIME (HZ/2)
 #endif
 
