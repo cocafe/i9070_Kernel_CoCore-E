@@ -135,7 +135,7 @@ $(error No configuration found for config $(CONFIG). Check that arch-$(CONFIG)/c
 else
 # Link arch to the selected arch-config directory
 $(shell [ -L $(DRIVER_DIR)/arch ] && rm $(DRIVER_DIR)/arch)
-$(shell ln -sf arch-$(CONFIG) $(DRIVER_DIR)/arch)
+$(shell ln -sf $(DRIVER_DIR)/arch-$(CONFIG) $(DRIVER_DIR)/arch)
 $(shell touch $(DRIVER_DIR)/arch/config.h)
 endif
 
