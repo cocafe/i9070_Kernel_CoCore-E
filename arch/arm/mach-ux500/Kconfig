@@ -342,6 +342,11 @@ config TARGET_LOCALE_CHN
 	help
           This enables 'Wlan CHN' feature.
 
+config DB8500_CLOCK_CONTROL
+	bool "DB8500 Clock Control Module"
+	depends on UX500_SOC_DB8500
+	default n
+
 source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
 source "arch/arm/mach-ux500/test/Kconfig"
