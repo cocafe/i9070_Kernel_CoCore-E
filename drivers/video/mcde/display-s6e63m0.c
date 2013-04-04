@@ -1636,7 +1636,7 @@ static struct lcd_ops s6e63m0_lcd_ops = {
 
 /* This structure defines all the properties of a backlight */
 struct backlight_properties s6e63m0_backlight_props = {
-	.brightness = MAX_REQ_BRIGHTNESS,
+	.brightness = DEFAULT_BRIGHTNESS,
 	.max_brightness = MAX_REQ_BRIGHTNESS,
 	.type = BACKLIGHT_RAW,
 };
