@@ -371,9 +371,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 	long i, i_next = 0;
 	int state = 0;
 
-	/* disable the SMPL feature */
-	ab8500_sysctrl_write(0x0F12, 0x1, 0x0);
-
 	/*
 	 * It's possible to come here directly from a panic-assertion and
 	 * not have preempt disabled. Some functions called from here want
