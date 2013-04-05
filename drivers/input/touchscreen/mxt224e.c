@@ -117,7 +117,7 @@ module_param(mxt224e_conf, uint, 0644);
 bool threshold_con = false;
 module_param(threshold_con, bool, 0644);
 
-unsigned int threshold_batt = 22;		/* pdata -> 22 */
+unsigned int threshold_batt = 11;		/* pdata -> 22 */
 module_param(threshold_batt, uint, 0644);
 
 bool movefilter_con = false;
