@@ -1037,7 +1037,7 @@ static void report_input_data(struct mxt224_data *data)
 	if (data->fingers[id].state == MXT224_STATE_PRESS
 		|| data->fingers[id].state == MXT224_STATE_RELEASE) {
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		printk("[TSP] id[%d],x=%d,y=%d,z=%d,w=%d\n",
+		printk("[TSP] id[%d] x=%d y=%d z=%d w=%d\n",
 			id , data->fingers[id].x, data->fingers[id].y,
 			data->fingers[id].z, data->fingers[id].w);
 #endif
@@ -1227,7 +1227,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 		if (msg[0] == 0x1) {
 			if ((msg[1]&0x10) == 0x00) {/* normal mode */
 				Doing_calibration_falg = 0;
-				printk(KERN_ERR"[TSP] Calibration End!!!!!!");
+				printk(KERN_ERR"[TSP] calibration End!!!!!!\n");
 				valid_touch = 1;
 				if (cal_check_flag == 1) {
 					mxt_timer_state = 0;
@@ -1242,7 +1242,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				reset = 1;
 			}
 			if ((msg[1]&0x10) == 0x10) /* calibration */
-				printk(KERN_ERR"[TSP] Calibration!!!!!!");
+				printk(KERN_ERR"[TSP] calibration!!!!!!\n");
 			if ((msg[1]&0x20) == 0x20) { /* signal error */
 				printk(KERN_ERR"[TSP] signal error\n");
 				reset = 1;
