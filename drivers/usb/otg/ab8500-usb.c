@@ -254,11 +254,12 @@ static void ab8500_usb_regulator_ctrl(struct ab8500_usb *ab, bool sel_host,
 	int ret = 0, volt = 0;
 
 	if (enable) {
+		pr_info("abb-otg: regulator enable called\n");
 		regulator_enable(ab->v_ape);
 		if (!is_ab8500_2p0_or_earlier(ab->ab8500)) {
 			ret = regulator_set_voltage(ab->v_ulpi,
 						1300000, 1350000);
-			if (ret < 0)
+			if (ret < 0) 
 				dev_err(ab->dev, "Failed to set the Vintcore"
 						" to 1.3V, ret=%d\n", ret);
 			ret = regulator_set_optimum_mode(ab->v_ulpi,
@@ -1099,11 +1100,119 @@ set_otg_state_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR(set_otg_state, 0644, set_otg_state_show, set_otg_state_store);
 
+static ssize_t
+set_usbmode_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct ab8500_usb *ab = dev_get_drvdata(dev);
+
+	char *regs_list = "USB_IDLE\t\t\t0x00\nUSB_PERIPHERAL\t\t\t0x01\nUSB_HOST\t\t\t0x02\nUSB_DEDICATED_CHG\t\t0x03\n";
+
+	u8 reg_curr;
+
+	reg_curr = ab->mode;
+
+	return sprintf(buf, "%s\nCurrent: %d\n", regs_list, reg_curr);
+}
+
+static ssize_t 
+set_usbmode_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	struct ab8500_usb *ab = dev_get_drvdata(dev);
+
+	unsigned int state_reg;
+
+	sscanf(buf, "%x", &state_reg);
+
+	pr_info("abb-otg: set usb mode %d \n", state_reg);
+
+	ab->mode = state_reg;
+	
+	return n;
+}
+static DEVICE_ATTR(set_usbmode, 0644, set_usbmode_show, set_usbmode_store);
+
+static ssize_t 
+enable_host_phy_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	struct ab8500_usb *ab = dev_get_drvdata(dev);
+
+	int tmpbuf;
+
+	sscanf(buf, "%d", &tmpbuf);
+
+	if (tmpbuf) {
+		pr_info("abb-otg: enabling host phy...\n");
+		ab8500_usb_host_phy_en(ab);
+	}
+
+	return n;
+}
+static DEVICE_ATTR(ena_host_phy, 0644, NULL, enable_host_phy_store);
+
+static ssize_t
+otg_vbus_show(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	struct ab8500_usb *ab = dev_get_drvdata(dev);
+
+	int mA;
+	
+	mA = ab->vbus_draw;
+
+	return sprintf(buf, "%dmA\n", mA);
+}
+
+static ssize_t 
+otg_vbus_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	struct ab8500_usb *ab = dev_get_drvdata(dev);
+
+	int mA;
+
+	sscanf(buf, "%d", &mA);
+
+	mA = ab8500_eyediagram_workaroud(ab, mA);
+
+	pr_info("abb-otg: write vbus %dmA\n", mA);
+	
+	ab->vbus_draw = mA;
+
+	return n;
+}
+static DEVICE_ATTR(otg_vbus, 0644, otg_vbus_show, otg_vbus_store);
+
+static ssize_t 
+ena_regulator_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	struct ab8500_usb *ab = dev_get_drvdata(dev);
+
+	int tmpbuf;
+
+	sscanf(buf, "%d", &tmpbuf);
+
+	if (tmpbuf) {
+		pr_info("abb-otg: enabling usb regulators...\n");
+		
+		ab8500_usb_regulator_ctrl(ab, 1, true);
+	}
+
+	return n;
+}
+static DEVICE_ATTR(ena_regulator, 0644, NULL, ena_regulator_store);
 
 static struct attribute *ab8500_usb_attributes[] = {
 	&dev_attr_serial_number.attr,
 	&dev_attr_boot_time_device.attr,
 	&dev_attr_set_otg_state.attr,
+	&dev_attr_set_usbmode.attr,
+	&dev_attr_ena_host_phy.attr,
+	&dev_attr_otg_vbus.attr,
+	&dev_attr_ena_regulator.attr,
 	NULL
 };
 static const struct attribute_group ab8500_attr_group = {
