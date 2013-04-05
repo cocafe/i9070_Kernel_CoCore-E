@@ -111,9 +111,6 @@ unsigned int touch_boost_freq = 800000;
 module_param(touch_boost_freq, uint, 0644);
 
 /* cocafe: Touch Sensitivity Control */
-unsigned int mxt224e_conf = 9;			/* default config to write */
-module_param(mxt224e_conf, uint, 0644);
-
 bool threshold_con = false;
 module_param(threshold_con, bool, 0644);
 
