@@ -72,7 +72,7 @@ static ssize_t abb_codec_update_bit_store(struct kobject *kobj, struct kobj_attr
 
 	bit_mask = BMASK(bit_wid);
 	
-	pr_info("abb-codec: Reg[0x%#04x] BMask[0x%#04x] Bit[0x%#08x] IS_locked[%d]\n", reg, bit_mask, bit, is_locked);
+	pr_info("abb-codec: Reg[%#04x] BMask[%#04x] Bit[%#08x] IS_locked[%d]\n", reg, bit_mask, bit, is_locked);
 
 	if (is_locked) {
 		ret = snd_soc_update_bits_locked(abb_codec, reg, bit_mask, bit);
