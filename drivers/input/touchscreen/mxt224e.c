@@ -210,7 +210,7 @@ extern u8 vbus_state;
 
 static u8 valid_touch;
 
-#undef CLEAR_MEDIAN_FILTER_ERROR
+#define CLEAR_MEDIAN_FILTER_ERROR
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
 enum {
@@ -526,6 +526,7 @@ static void mxt224_ta_probe(int __vbus_state)
 	if (copy_data->family_id == 0x81) { 	/* MXT224E */
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
+#if 0
 		if (!__vbus_state) {
 			ret = get_object_info(copy_data,
 				TOUCH_MULTITOUCHSCREEN_T9,
@@ -541,6 +542,7 @@ static void mxt224_ta_probe(int __vbus_state)
 			write_mem(copy_data, obj_address+13, 1, &value);
 			/* next di */
 		}
+#endif
 #endif
 
 		value = active_depth;
