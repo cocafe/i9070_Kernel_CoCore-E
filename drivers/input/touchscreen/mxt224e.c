@@ -210,7 +210,7 @@ extern u8 vbus_state;
 
 static u8 valid_touch;
 
-#define CLEAR_MEDIAN_FILTER_ERROR
+#undef CLEAR_MEDIAN_FILTER_ERROR
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
 enum {
