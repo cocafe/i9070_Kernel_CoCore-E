@@ -523,7 +523,6 @@ static void mxt224_ta_probe(int __vbus_state)
 	if (copy_data->family_id == 0x81) { 	/* MXT224E */
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
-#if 1
 		if (!__vbus_state) {
 			printk(KERN_INFO "[TSP] clear median filter error\n");
 			ret = get_object_info(copy_data,
@@ -540,7 +539,6 @@ static void mxt224_ta_probe(int __vbus_state)
 			write_mem(copy_data, obj_address+13, 1, &value);
 			/* next di */
 		}
-#endif
 #endif
 
 		value = active_depth;
