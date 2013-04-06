@@ -127,7 +127,20 @@ bool blen_con = false;
 module_param(blen_con, bool, 0644);
 
 unsigned int blen_batt = 32;			/* default: 32 */
-module_param(blen_batt, uint, 0644);	
+module_param(blen_batt, uint, 0644);
+
+/* cocafe: Touch Auto Calibration */
+/* Letf bottom corner */
+#define MXT224E_EDGE_X			50
+#define MXT224E_EDGE_Y			750
+
+bool calibration_auto = true;
+module_param(calibration_auto, bool, 0644);
+
+unsigned int calibration_thr = 11;
+module_param(calibration_thr, uint, 0644);
+
+unsigned int edgetouch_conter;
 
 struct object_t {
 	u8 object_type;
@@ -1039,13 +1052,30 @@ static void report_input_data(struct mxt224_data *data)
 			id , data->fingers[id].x, data->fingers[id].y,
 			data->fingers[id].z, data->fingers[id].w);
 #endif
+		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+			if (data->fingers[id].x < MXT224E_EDGE_X && 
+				data->fingers[id].y > MXT224E_EDGE_Y) {
+					edgetouch_conter++;
+					printk("[TSP] edge touch counter -> [%d]\n", edgetouch_conter);
+			}
+		}
 	}
 
-	if (data->fingers[id].state == MXT224_STATE_RELEASE)
+	if (data->fingers[id].state == MXT224_STATE_RELEASE) {
 		data->fingers[id].state = MXT224_STATE_INACTIVE;
-	else {
+	} else {
 		data->fingers[id].state = MXT224_STATE_MOVE;
 		count++;
+	}
+
+	if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
+		if (edgetouch_conter >= calibration_thr) {
+				/* Do calibration*/
+				printk("[TSP] auto calibration starts!\n");
+				mxt224_ta_probe(vbus_state);
+				calibrate_chip();
+				edgetouch_conter = 0;
+		}
 	}
 
 	input_sync(data->input_dev);
