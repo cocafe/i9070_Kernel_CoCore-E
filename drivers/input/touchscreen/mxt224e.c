@@ -1052,11 +1052,13 @@ static void report_input_data(struct mxt224_data *data)
 			id , data->fingers[id].x, data->fingers[id].y,
 			data->fingers[id].z, data->fingers[id].w);
 #endif
-		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
-			if (data->fingers[id].x < MXT224E_EDGE_X && 
-				data->fingers[id].y > MXT224E_EDGE_Y) {
-					edgetouch_conter++;
-					printk("[TSP] edge touch counter -> [%d]\n", edgetouch_conter);
+		if (calibration_auto) {
+			if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+				if (data->fingers[id].x < MXT224E_EDGE_X && 
+					data->fingers[id].y > MXT224E_EDGE_Y) {
+						edgetouch_conter++;
+						printk("[TSP] edge touch counter -> [%d]\n", edgetouch_conter);
+				}
 			}
 		}
 	}
@@ -1068,13 +1070,14 @@ static void report_input_data(struct mxt224_data *data)
 		count++;
 	}
 
-	if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
-		if (edgetouch_conter >= calibration_thr) {
-				/* Do calibration*/
-				printk("[TSP] auto calibration starts!\n");
-				mxt224_ta_probe(vbus_state);
-				calibrate_chip();
-				edgetouch_conter = 0;
+	if (calibration_auto) {
+		if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
+			if (edgetouch_conter >= calibration_thr) {
+					printk("[TSP] auto calibration ON!\n");
+					mxt224_ta_probe(vbus_state);
+					calibrate_chip();
+					edgetouch_conter = 0;
+			}
 		}
 	}
 
