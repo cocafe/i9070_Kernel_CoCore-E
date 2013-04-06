@@ -525,6 +525,7 @@ static void mxt224_ta_probe(int __vbus_state)
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
 #if 1
 		if (!__vbus_state) {
+			printk(KERN_INFO "[TSP] clear median filter error\n");
 			ret = get_object_info(copy_data,
 				TOUCH_MULTITOUCHSCREEN_T9,
 				&size_one, &obj_address);
