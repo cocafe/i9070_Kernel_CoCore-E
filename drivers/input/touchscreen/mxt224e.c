@@ -523,7 +523,7 @@ static void mxt224_ta_probe(int __vbus_state)
 	if (copy_data->family_id == 0x81) { 	/* MXT224E */
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
-#if 0
+#if 1
 		if (!__vbus_state) {
 			ret = get_object_info(copy_data,
 				TOUCH_MULTITOUCHSCREEN_T9,
