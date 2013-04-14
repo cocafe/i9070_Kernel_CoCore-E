@@ -201,7 +201,7 @@ static ssize_t abb_codec_update_bit_store(struct kobject *kobj, struct kobj_attr
 
 	reg_b = snd_soc_read(abb_codec, reg);
 
-	pr_info("abb-codec: REG[%#04x] %#04x -> %#04x\n", reg_a, reg_b);
+	pr_info("abb-codec: REG[%#04x] %#04x -> %#04x\n", reg, reg_a, reg_b);
 	
 	if (!ret) {
 		pr_info("abb-codec: return errors or no change \n");
@@ -238,11 +238,7 @@ static ssize_t abb_codec_reset_reg_store(struct kobject *kobj, struct kobj_attri
 
 	reg_b = snd_soc_read(abb_codec, reg);
 
-	pr_info("abb-codec: REG[%#04x] %#04x -> %#04x\n", reg_a, reg_b);
-	
-	if (!ret) {
-		pr_info("abb-codec: return errors or no change \n");
-	}
+	pr_info("abb-codec: REG[%#04x] %#04x -> %#04x\n", reg, reg_a, reg_b);
 
 	return count;
 }
