@@ -21,7 +21,7 @@
 #include <linux/moduleparam.h>
 
 bool fbdelay = false;
-unsigned int fbdelay_ms = 50;
+unsigned int fbdelay_ms = 350;
 
 module_param(fbdelay, bool, 0644);
 module_param(fbdelay_ms, uint, 0644);
