@@ -1070,13 +1070,6 @@ static void report_input_data(struct mxt224_data *data)
 #endif
 	}
 
-	if (data->fingers[id].state == MXT224_STATE_RELEASE)
-		data->fingers[id].state = MXT224_STATE_INACTIVE;
-	else {
-		data->fingers[id].state = MXT224_STATE_MOVE;
-		count++;
-	}
-
 	if (calibration_auto >= MXT224E_DETECT_EDGE) {
 		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
 			if (data->fingers[id].x < edgetouch_x && 
@@ -1085,6 +1078,23 @@ static void report_input_data(struct mxt224_data *data)
 				printk("[TSP] edgetouch counter -> [%d]\n", edgetouch_counter);
 			}
 		}
+	}
+	if (calibration_auto >= MXT224E_DETECT_FULL) {
+		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+			nortouch_counter++;
+			printk("[TSP] nortouch counter -> [%d]\n", nortouch_counter);
+		}
+	}
+
+
+	if (data->fingers[id].state == MXT224_STATE_RELEASE)
+		data->fingers[id].state = MXT224_STATE_INACTIVE;
+	else {
+		data->fingers[id].state = MXT224_STATE_MOVE;
+		count++;
+	}
+
+	if (calibration_auto >= MXT224E_DETECT_EDGE) {
 		if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
 			if (edgetouch_counter >= calibration_edge) {
 				printk("[TSP] auto calibration ON!\n");
@@ -1095,10 +1105,6 @@ static void report_input_data(struct mxt224_data *data)
 		}
 	}
 	if (calibration_auto >= MXT224E_DETECT_FULL) {
-		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
-			nortouch_counter++;
-			printk("[TSP] nortouch counter -> [%d]\n", nortouch_counter);
-		}
 		if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
 			if (nortouch_counter >= calibration_nor) {
 				printk("[TSP] auto calibration ON!\n");
