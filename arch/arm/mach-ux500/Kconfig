@@ -128,12 +128,12 @@ config MACH_JANICE_KOR
 	bool "Janice_kor"
 	help
 	  Supports Janice_kor boards
-config MACH_JANICE_CHN
-	bool "Janice_chn"
-	help
-	  Supports Chinese features of Janice_chn boards. This features
-	  will be used in Power off alarm and OVP UI concept for Chinese
-	  models.
+# config MACH_JANICE_CHN
+#	bool "Janice_chn"
+#	help
+#	  Supports Chinese features of Janice_chn boards. This features
+#	  will be used in Power off alarm and OVP UI concept for Chinese
+#	  models.
 config MACH_CODINA
 	bool "Codina"
 	help
@@ -344,8 +344,8 @@ config TARGET_LOCALE_CHN
 
 config DB8500_CLOCK_CONTROL
 	bool "DB8500 Clock Control Module"
-	depends on DEBUG_FS
-	default y
+	depends on UX500_SOC_DB8500
+	default n
 
 source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
