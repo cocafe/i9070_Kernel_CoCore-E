@@ -634,5 +634,6 @@ config MSM_SMD_PKT
 	  ports via device interface for MSM chipset.
 
 source "drivers/char/hwreg/Kconfig"
+source "drivers/char/frandom/Kconfig"
 endmenu
 
