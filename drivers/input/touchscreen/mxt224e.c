@@ -130,6 +130,29 @@ module_param(blen_con, bool, 0644);
 unsigned int blen_batt = 32;			/* default: 32 */
 module_param(blen_batt, uint, 0644);
 
+/* cocafe: Touch Auto Calibration */
+#define MXT224E_DETECT_EDGE		1
+#define MXT224E_DETECT_FULL		2
+#define MXT224E_EDGE_X			50
+#define MXT224E_EDGE_Y			750
+
+unsigned int calibration_auto = 1;
+module_param(calibration_auto, uint, 0644);
+
+unsigned int calibration_edge = 9;		/* threshold: edge touches */
+module_param(calibration_edge, uint, 0644);
+
+unsigned int calibration_nor = 80;		/* threshold: normal touches */
+module_param(calibration_nor, uint, 0644);
+
+unsigned int edgetouch_x = MXT224E_EDGE_X;
+module_param(edgetouch_x, uint, 0644);
+
+unsigned int edgetouch_y = MXT224E_EDGE_Y;
+module_param(edgetouch_y, uint, 0644);
+
+unsigned int edgetouch_counter;
+unsigned int nortouch_counter;
 
 struct object_t {
 	u8 object_type;
@@ -1050,6 +1073,38 @@ static void report_input_data(struct mxt224_data *data)
 	else {
 		data->fingers[id].state = MXT224_STATE_MOVE;
 		count++;
+	}
+
+	if (calibration_auto >= MXT224E_DETECT_EDGE) {
+		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+			if (data->fingers[id].x < edgetouch_x && 
+			data->fingers[id].y > edgetouch_y) {
+				edgetouch_counter++;
+				printk("[TSP] edgetouch counter -> [%d]\n", edgetouch_counter);
+			}
+		}
+		if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
+			if (edgetouch_counter >= calibration_edge) {
+				printk("[TSP] auto calibration ON!\n");
+				mxt224_ta_probe(vbus_state);
+				calibrate_chip();
+				edgetouch_counter = 0;
+			}
+		}
+	}
+	if (calibration_auto >= MXT224E_DETECT_FULL) {
+		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+			nortouch_counter++;
+			printk("[TSP] nortouch counter -> [%d]\n", nortouch_counter);
+		}
+		if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
+			if (nortouch_counter >= calibration_nor) {
+				printk("[TSP] auto calibration ON!\n");
+				mxt224_ta_probe(vbus_state);
+				calibrate_chip();
+				nortouch_counter = 0;
+			}
+		}
 	}
 
 	input_sync(data->input_dev);
