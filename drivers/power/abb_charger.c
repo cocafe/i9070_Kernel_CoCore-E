@@ -8,7 +8,7 @@
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
  * Author: Arun R Murthy <arun.murthy@stericsson.com>
  *
- * Modified: cocafe@xda-developers.com
+ * Modified: Huang Ji (cocafe@xda-developers.com)
  *
  */
 

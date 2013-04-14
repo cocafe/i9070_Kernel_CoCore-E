@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 2010, Samsung Electronics Co. Ltd. All Rights Reserved.
  *
- *  Modified: cocafe@xda-developers.com
+ *  Modified: Huang Ji (cocafe@xda-developers.com)
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

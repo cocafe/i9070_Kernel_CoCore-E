@@ -9,7 +9,7 @@
  *         Johan Bohlin <johan.bohlin@stericsson.com>
  *         for ST-Ericsson.
  *
- * Modified: cocafe@xda-developers.com
+ * Modified: Huang Ji (cocafe@xda-developers.com)
  *
  * License terms:
  *

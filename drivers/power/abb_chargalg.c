@@ -7,7 +7,7 @@
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
  *
- * Modified: cocafe@xda-developers.com
+ * Modified: Huang Ji (cocafe@xda-developers.com)
  *
  */
 
