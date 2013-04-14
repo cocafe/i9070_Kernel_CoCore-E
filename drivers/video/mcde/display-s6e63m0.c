@@ -1696,7 +1696,7 @@ static ssize_t s6e63m0_sysfs_store_lcd_power(struct device *dev,
         int lcd_enable;
 	struct s6e63m0 *lcd = dev_get_drvdata(dev);
 
-	dev_info(lcd->dev,"s6e63m0 lcd_sysfs_store_lcd_power\n");
+	dev_info(lcd->dev,"s6e63m0 lcd_sysfs_store_ldi_power\n");
 
         rc = strict_strtoul(buf, 0, (unsigned long *)&lcd_enable);
         if (rc < 0)
@@ -1712,7 +1712,7 @@ static ssize_t s6e63m0_sysfs_store_lcd_power(struct device *dev,
         return len;
 }
 
-static DEVICE_ATTR(lcd_power, 0664,
+static DEVICE_ATTR(ldi_power, 0664,
                 NULL, s6e63m0_sysfs_store_lcd_power);
 
 static ssize_t lcd_type_show(struct device *dev,
@@ -2105,9 +2105,9 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 	 */
 	lcd->gamma_table_count = sizeof(gamma_table) / (MAX_GAMMA_LEVEL * sizeof(int));
 
-        ret = device_create_file(&(lcd->ld->dev), &dev_attr_lcd_power);
+        ret = device_create_file(&(lcd->ld->dev), &dev_attr_ldi_power);
         if (ret < 0)
-                dev_err(&(ddev->dev), "failed to add lcd_power sysfs entries\n");
+                dev_err(&(ddev->dev), "failed to add ldi_power sysfs entries\n");
 
 	ret = device_create_file(&(lcd->ld->dev), &dev_attr_power_reduce);
         if (ret < 0)
