@@ -112,11 +112,24 @@ unsigned int touch_boost_freq = 800000;
 module_param(touch_boost_freq, uint, 0644);
 
 /* cocafe: Touch Sensitivity Control */
-unsigned int threshold_batt = 17;		/* Default: 22 */
+bool threshold_con = false;
+module_param(threshold_con, bool, 0644);
+
+unsigned int threshold_batt = 11;		/* pdata -> 22 */
 module_param(threshold_batt, uint, 0644);
 
-unsigned int threshold_chrg = 25;		/* Default: 25 */
-module_param(threshold_chrg, uint, 0444);
+bool movefilter_con = false;
+module_param(movefilter_con, bool, 0644);
+
+unsigned int movefilter_batt = 11;		/* default: 46 */
+module_param(movefilter_batt, uint, 0644);
+
+bool blen_con = false;
+module_param(blen_con, bool, 0644);
+
+unsigned int blen_batt = 32;			/* default: 32 */
+module_param(blen_batt, uint, 0644);
+
 
 struct object_t {
 	u8 object_type;
@@ -222,8 +235,7 @@ struct t48_median_config_t {
 static struct t48_median_config_t noise_median; /* 110927 gumi noise */
 
 
-/* cocafe: Show threshold as moduleparam */
-int threshold = 55;
+static int threshold = 55;
 module_param(threshold, int, 0444);
 
 static int threshold_e = 50;
@@ -468,6 +480,7 @@ static void mxt224_ta_probe(int __vbus_state)
 	u16 size;
 	u8 active_depth;
 	u8 charge_time;
+	u8 tmpbuf;
 
 	if (!data) {
 		printk(KERN_ERR "mxt224e: %s: no platform data\n", __func__);
@@ -480,24 +493,20 @@ static void mxt224_ta_probe(int __vbus_state)
 	}
 
 	if (__vbus_state) {
-		/* cocafe: Skip platform data */
-		//threshold = copy_data->tchthr_charging;
-		threshold = threshold_chrg;
+		threshold = copy_data->tchthr_charging;
 		threshold_e = 45;
 
 		/* noise_threshold = copy_data->noisethr_charging; */
 		movfilter = 47; /* copy_data->movfilter_charging; */
 		blen = 16;
-		active_depth = 30; /* 0x22; 34 */
+		active_depth = 34; /* 0x22; 34 */
 		charge_time = 22;
 	#ifdef CLEAR_MEDIAN_FILTER_ERROR
 		gErrCondition = ERR_RTN_CONDITION_MAX;
 		noise_median.mferr_setting = false;
 	#endif
 	} else {
-		/* cocafe: Skip platform data */
-		//threshold = copy_data->tchthr_batt;
-		threshold = threshold_batt;
+		threshold = copy_data->tchthr_batt;
 		threshold_e = 40;
 
 		/* noise_threshold = copy_data->noisethr_batt; */
@@ -513,10 +522,11 @@ static void mxt224_ta_probe(int __vbus_state)
 	#endif
 	}
 
-	if (copy_data->family_id == 0x81) {
+	if (copy_data->family_id == 0x81) { 	/* MXT224E */
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
 		if (!__vbus_state) {
+			printk(KERN_INFO "[TSP] clear median filter error\n");
 			ret = get_object_info(copy_data,
 				TOUCH_MULTITOUCHSCREEN_T9,
 				&size_one, &obj_address);
@@ -557,11 +567,8 @@ static void mxt224_ta_probe(int __vbus_state)
 				copy_data->t48_config_batt_e[0],
 				copy_data->t48_config_batt_e + 1);
 		}
-
-		printk(KERN_ERR
-			"[TSP]TA_probe MXT224E T%d Byte%d is %d\n",
-			48, register_address, val);
-		} else if (copy_data->family_id == 0x80) { /*	: MXT-224 */
+		printk(KERN_INFO "[TSP] TA_probe MXT224E T%d Byte%d is %d\n", 48, register_address, val);
+	} else if (copy_data->family_id == 0x80) { 	/* MXT224 */
 		get_object_info(copy_data,
 			TOUCH_MULTITOUCHSCREEN_T9, &size, &obj_address);
 		value = (u8)threshold;
@@ -574,6 +581,28 @@ static void mxt224_ta_probe(int __vbus_state)
 		write_mem(copy_data,
 			obj_address+8, 1, &noise_threshold);
 	}
+
+	if (threshold_con || movefilter_con || blen_con) {
+		ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
+
+		if (blen_con) {
+			tmpbuf = (u8)blen_batt;
+			write_mem(copy_data, obj_address+6, 1, &tmpbuf);
+		}
+		if (threshold_con) {
+			tmpbuf = (u8)threshold_batt;
+			threshold = threshold_batt;
+			write_mem(copy_data, obj_address+7, 1, &tmpbuf);
+		}
+		if (movefilter_con) {
+			tmpbuf = (u8)movefilter_batt;
+			write_mem(copy_data, obj_address+13, 1, &tmpbuf);
+		}
+
+		printk(KERN_INFO "[TSP] T9 Blen[%d] Threshold[%d] Movfilter[%d]\n", 
+					blen_batt, threshold_batt, movefilter_batt);
+	}
+	
 	printk(KERN_INFO "[TSP] threshold : %d\n", threshold);
 }
 
