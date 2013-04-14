@@ -99,6 +99,8 @@
 #define MAX_USING_FINGER_NUM 10
 
 /* cocafe: Touch Booster Control */
+#define TOUCHBOOST_FREQ_DEF		400000
+
 bool touch_boost = true;
 module_param(touch_boost, bool, 0644);
 
@@ -108,7 +110,7 @@ module_param(touch_boost_ape, bool, 0644);
 bool touch_boost_ddr = true;
 module_param(touch_boost_ddr, bool, 0644);
 
-unsigned int touch_boost_freq = 800000;
+unsigned int touch_boost_freq = TOUCHBOOST_FREQ_DEF;
 module_param(touch_boost_freq, uint, 0644);
 
 /* cocafe: Touch Sensitivity Control */
@@ -1011,12 +1013,12 @@ static void report_input_data(struct mxt224_data *data)
 						(char *)data->client->name,
 						touch_boost_freq);
 				} else {
-					printk("[TSP] Boost freq is invalid.Revert 800Mhz(default).\n");
-					touch_boost_freq = 800000;
+					printk("[TSP] invalid cpufreq.\n");
+					touch_boost_freq = TOUCHBOOST_FREQ_DEF;
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_ARM_KHZ,
 						(char *)data->client->name,
-						800000);
+						TOUCHBOOST_FREQ_DEF);
 				}
 			}
 
