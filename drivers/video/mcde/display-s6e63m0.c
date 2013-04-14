@@ -1712,7 +1712,7 @@ static ssize_t s6e63m0_sysfs_store_lcd_power(struct device *dev,
         return len;
 }
 
-static DEVICE_ATTR(ldi_power, 0664,
+static DEVICE_ATTR(ldi_power, 0644,
                 NULL, s6e63m0_sysfs_store_lcd_power);
 
 static ssize_t lcd_type_show(struct device *dev,
