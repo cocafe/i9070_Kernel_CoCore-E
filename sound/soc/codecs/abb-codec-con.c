@@ -58,6 +58,8 @@ static ssize_t abb_codec_update_bit_store(struct kobject *kobj, struct kobj_attr
 {
 	int ret;
 	unsigned int reg;
+	unsigned int reg_a;
+	unsigned int reg_b;
 	unsigned int bit_wid;	/* Bit offset */
 	unsigned char bit_mask;
 	unsigned int bit;
@@ -74,11 +76,17 @@ static ssize_t abb_codec_update_bit_store(struct kobject *kobj, struct kobj_attr
 	
 	pr_info("abb-codec: Reg[%#04x] BMask[%#04x] Bit[%#08x] IS_locked[%d]\n", reg, bit_mask, bit, is_locked);
 
+	reg_a = snd_soc_read(abb_codec, reg);
+
 	if (is_locked) {
 		ret = snd_soc_update_bits_locked(abb_codec, reg, bit_mask, bit);
 	} else {
 		ret = snd_soc_update_bits(abb_codec, reg, bit_mask, bit);
 	}
+
+	reg_b = snd_soc_read(abb_codec, reg);
+
+	pr_info("abb-codec: REG[%#04x] %#04x -> %#04x\n", reg_a, reg_b);
 	
 	if (!ret) {
 		pr_info("abb-codec: return errors or no change \n");
