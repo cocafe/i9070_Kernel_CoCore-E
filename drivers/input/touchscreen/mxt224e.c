@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 2010, Samsung Electronics Co. Ltd. All Rights Reserved.
  *
- *  Modified: Huang Ji (cocafe@xda-developers.com)
+ *  Modified: cocafe@xda-developers.com
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
@@ -40,10 +41,10 @@
 
 #define CMD_RESET_OFFSET		0
 #define CMD_BACKUP_OFFSET		1
-#define CMD_CALIBRATE_OFFSET    2
-#define CMD_REPORTATLL_OFFSET   3
-#define CMD_DEBUG_CTRL_OFFSET   4
-#define CMD_DIAGNOSTIC_OFFSET   5
+#define CMD_CALIBRATE_OFFSET    	2
+#define CMD_REPORTATLL_OFFSET   	3
+#define CMD_DEBUG_CTRL_OFFSET   	4
+#define CMD_DIAGNOSTIC_OFFSET   	5
 
 
 #define DETECT_MSG_MASK			0x80
@@ -58,14 +59,14 @@
 #define MXT224_VER_22			22
 
 /* Slave addresses */
-#define MXT224_APP_LOW		0x4a
-#define MXT224_APP_HIGH		0x4b
-#define MXT224_BOOT_LOW		0x24
-#define MXT224_BOOT_HIGH	0x25
+#define MXT224_APP_LOW			0x4a
+#define MXT224_APP_HIGH			0x4b
+#define MXT224_BOOT_LOW			0x24
+#define MXT224_BOOT_HIGH		0x25
 
 /* FIRMWARE NAME */
-#define MXT224_ECHO_FW_NAME	    "mXT224E.fw"
-#define MXT224_FW_NAME		    "mXT224.fw"
+#define MXT224_ECHO_FW_NAME		"mXT224E.fw"
+#define MXT224_FW_NAME			"mXT224.fw"
 
 #define MXT224_FWRESET_TIME		175	/* msec */
 #define MXT224_RESET_TIME		80	/* msec */
@@ -111,36 +112,11 @@ unsigned int touch_boost_freq = 800000;
 module_param(touch_boost_freq, uint, 0644);
 
 /* cocafe: Touch Sensitivity Control */
-bool threshold_con = false;
-module_param(threshold_con, bool, 0644);
-
-unsigned int threshold_batt = 11;		/* pdata -> 22 */
+unsigned int threshold_batt = 17;		/* Default: 22 */
 module_param(threshold_batt, uint, 0644);
 
-bool movefilter_con = false;
-module_param(movefilter_con, bool, 0644);
-
-unsigned int movefilter_batt = 11;		/* default: 46 */
-module_param(movefilter_batt, uint, 0644);
-
-bool blen_con = false;
-module_param(blen_con, bool, 0644);
-
-unsigned int blen_batt = 32;			/* default: 32 */
-module_param(blen_batt, uint, 0644);
-
-/* cocafe: Touch Auto Calibration */
-/* Letf bottom corner */
-#define MXT224E_EDGE_X			50
-#define MXT224E_EDGE_Y			750
-
-bool calibration_auto = true;
-module_param(calibration_auto, bool, 0644);
-
-unsigned int calibration_thr = 11;
-module_param(calibration_thr, uint, 0644);
-
-unsigned int edgetouch_conter;
+unsigned int threshold_chrg = 25;		/* Default: 25 */
+module_param(threshold_chrg, uint, 0444);
 
 struct object_t {
 	u8 object_type;
@@ -246,8 +222,9 @@ struct t48_median_config_t {
 static struct t48_median_config_t noise_median; /* 110927 gumi noise */
 
 
-static int threshold = 55;
-module_param(threshold, int, 0644);
+/* cocafe: Show threshold as moduleparam */
+int threshold = 55;
+module_param(threshold, int, 0444);
 
 static int threshold_e = 50;
 
@@ -491,7 +468,6 @@ static void mxt224_ta_probe(int __vbus_state)
 	u16 size;
 	u8 active_depth;
 	u8 charge_time;
-	u8 tmpbuf;
 
 	if (!data) {
 		printk(KERN_ERR "mxt224e: %s: no platform data\n", __func__);
@@ -504,20 +480,24 @@ static void mxt224_ta_probe(int __vbus_state)
 	}
 
 	if (__vbus_state) {
-		threshold = copy_data->tchthr_charging;
+		/* cocafe: Skip platform data */
+		//threshold = copy_data->tchthr_charging;
+		threshold = threshold_chrg;
 		threshold_e = 45;
 
 		/* noise_threshold = copy_data->noisethr_charging; */
 		movfilter = 47; /* copy_data->movfilter_charging; */
 		blen = 16;
-		active_depth = 34; /* 0x22; 34 */
+		active_depth = 30; /* 0x22; 34 */
 		charge_time = 22;
 	#ifdef CLEAR_MEDIAN_FILTER_ERROR
 		gErrCondition = ERR_RTN_CONDITION_MAX;
 		noise_median.mferr_setting = false;
 	#endif
 	} else {
-		threshold = copy_data->tchthr_batt;
+		/* cocafe: Skip platform data */
+		//threshold = copy_data->tchthr_batt;
+		threshold = threshold_batt;
 		threshold_e = 40;
 
 		/* noise_threshold = copy_data->noisethr_batt; */
@@ -533,11 +513,10 @@ static void mxt224_ta_probe(int __vbus_state)
 	#endif
 	}
 
-	if (copy_data->family_id == 0x81) { 	/* MXT224E */
+	if (copy_data->family_id == 0x81) {
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
 		if (!__vbus_state) {
-			printk(KERN_INFO "[TSP] clear median filter error\n");
 			ret = get_object_info(copy_data,
 				TOUCH_MULTITOUCHSCREEN_T9,
 				&size_one, &obj_address);
@@ -578,8 +557,11 @@ static void mxt224_ta_probe(int __vbus_state)
 				copy_data->t48_config_batt_e[0],
 				copy_data->t48_config_batt_e + 1);
 		}
-		printk(KERN_INFO "[TSP] TA_probe MXT224E T%d Byte%d is %d\n", 48, register_address, val);
-	} else if (copy_data->family_id == 0x80) { 	/* MXT224 */
+
+		printk(KERN_ERR
+			"[TSP]TA_probe MXT224E T%d Byte%d is %d\n",
+			48, register_address, val);
+		} else if (copy_data->family_id == 0x80) { /*	: MXT-224 */
 		get_object_info(copy_data,
 			TOUCH_MULTITOUCHSCREEN_T9, &size, &obj_address);
 		value = (u8)threshold;
@@ -592,26 +574,6 @@ static void mxt224_ta_probe(int __vbus_state)
 		write_mem(copy_data,
 			obj_address+8, 1, &noise_threshold);
 	}
-
-	if (threshold_con || movefilter_con || blen_con) {
-		ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
-		if (blen_con) {
-			tmpbuf = (u8)blen_batt;
-			write_mem(copy_data, obj_address+6, 1, &tmpbuf);
-		}
-		if (threshold_con) {
-			tmpbuf = (u8)threshold_batt;
-			threshold = threshold_batt;
-			write_mem(copy_data, obj_address+7, 1, &tmpbuf);
-		}
-		if (movefilter_con) {
-			tmpbuf = (u8)movefilter_batt;
-			write_mem(copy_data, obj_address+13, 1, &tmpbuf);
-		}
-		printk(KERN_INFO "[TSP] T9 Blen[%d] Threshold[%d] Movfilter[%d]\n", 
-					blen_batt, threshold_batt, movefilter_batt);
-	}
-	
 	printk(KERN_INFO "[TSP] threshold : %d\n", threshold);
 }
 
@@ -997,7 +959,7 @@ static void report_input_data(struct mxt224_data *data)
 						(char *)data->client->name,
 						touch_boost_freq);
 				} else {
-					printk("[TSP] freq is invalid.Revert 800Mhz(default).\n");
+					printk("[TSP] Boost freq is invalid.Revert 800Mhz(default).\n");
 					touch_boost_freq = 800000;
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_ARM_KHZ,
@@ -1048,37 +1010,17 @@ static void report_input_data(struct mxt224_data *data)
 	if (data->fingers[id].state == MXT224_STATE_PRESS
 		|| data->fingers[id].state == MXT224_STATE_RELEASE) {
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		printk("[TSP] id[%d] x=%d y=%d z=%d w=%d\n",
+		printk("[TSP] id[%d],x=%d,y=%d,z=%d,w=%d\n",
 			id , data->fingers[id].x, data->fingers[id].y,
 			data->fingers[id].z, data->fingers[id].w);
 #endif
-		if (calibration_auto) {
-			if (data->fingers[id].state == MXT224_STATE_RELEASE) {
-				if (data->fingers[id].x < MXT224E_EDGE_X && 
-					data->fingers[id].y > MXT224E_EDGE_Y) {
-						edgetouch_conter++;
-						printk("[TSP] edge touch counter -> [%d]\n", edgetouch_conter);
-				}
-			}
-		}
 	}
 
-	if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+	if (data->fingers[id].state == MXT224_STATE_RELEASE)
 		data->fingers[id].state = MXT224_STATE_INACTIVE;
-	} else {
+	else {
 		data->fingers[id].state = MXT224_STATE_MOVE;
 		count++;
-	}
-
-	if (calibration_auto) {
-		if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
-			if (edgetouch_conter >= calibration_thr) {
-					printk("[TSP] auto calibration ON!\n");
-					mxt224_ta_probe(vbus_state);
-					calibrate_chip();
-					edgetouch_conter = 0;
-			}
-		}
 	}
 
 	input_sync(data->input_dev);
@@ -1258,7 +1200,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 		if (msg[0] == 0x1) {
 			if ((msg[1]&0x10) == 0x00) {/* normal mode */
 				Doing_calibration_falg = 0;
-				printk(KERN_ERR"[TSP] calibration End!!!!!!\n");
+				printk(KERN_ERR"[TSP] Calibration End!!!!!!");
 				valid_touch = 1;
 				if (cal_check_flag == 1) {
 					mxt_timer_state = 0;
@@ -1273,7 +1215,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				reset = 1;
 			}
 			if ((msg[1]&0x10) == 0x10) /* calibration */
-				printk(KERN_ERR"[TSP] calibration!!!!!!\n");
+				printk(KERN_ERR"[TSP] Calibration!!!!!!");
 			if ((msg[1]&0x20) == 0x20) { /* signal error */
 				printk(KERN_ERR"[TSP] signal error\n");
 				reset = 1;

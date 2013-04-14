@@ -58,6 +58,7 @@ int setScheduler(struct task_struct *p, int policy, struct sched_param *param);
 #include <wlioctl.h>
 #include <wlfc_proto.h>
 
+#include <dhd_sec_feature.h>
 
 #if defined(CUSTOMER_HW4_RELEASE)
 /* Customer requirement */

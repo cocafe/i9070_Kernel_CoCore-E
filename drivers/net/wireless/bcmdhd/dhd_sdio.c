@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c 373329 2012-12-07 04:46:09Z $
+ * $Id: dhd_sdio.c 363280 2012-10-17 00:53:50Z $
  */
 
 #include <typedefs.h>
@@ -388,10 +388,6 @@ static int tx_packets[NUMPRIO];
 const uint dhd_deferred_tx = 1;
 
 extern uint dhd_watchdog_ms;
-#ifdef BCMSPI_ANDROID
-extern uint *dhd_spi_lockcount;
-#endif /* BCMSPI_ANDROID */
-
 extern void dhd_os_wd_timer(void *bus, uint wdtick);
 
 /* Tx/Rx bounds */
@@ -1077,8 +1073,6 @@ dhdsdio_clk_devsleep_iovar(dhd_bus_t *bus, bool on)
 		bus->kso = on ? FALSE : TRUE;
 	else {
 		DHD_ERROR(("%s: Sleep request failed: on:%d err:%d\n", __FUNCTION__, on, err));
-		if (!on && retry > 2)
-			bus->kso = TRUE;
 	}
 
 	return err;
@@ -1538,14 +1532,12 @@ dhdsdio_func_blocksize(dhd_pub_t *dhd, int function_num, int block_size)
 }
 #endif /* CUSTOMER_HW4 && USE_DYNAMIC_F2_BLKSIZE */
 
-#if defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID)
+#if defined(OOB_INTR_ONLY)
 void
 dhd_enable_oob_intr(struct dhd_bus *bus, bool enable)
 {
 #if defined(HW_OOB)
 	bcmsdh_enable_hw_oob_intr(bus->sdh, enable);
-#elif defined(BCMSPI_ANDROID)
-	bcmsdh_intr_enable(bus->sdh);
 #else
 	sdpcmd_regs_t *regs = bus->regs;
 	uint retries = 0;
@@ -1569,7 +1561,7 @@ dhd_enable_oob_intr(struct dhd_bus *bus, bool enable)
 	dhdsdio_clkctl(bus, CLK_SDONLY, FALSE);
 #endif /* !defined(HW_OOB) */
 }
-#endif /* defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID) */
+#endif /* defined(OOB_INTR_ONLY) */
 
 /* Writes a HW/SW header into the packet and sends it. */
 /* Assumes: (a) header space already there, (b) caller holds lock */
@@ -1582,7 +1574,6 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 	uint16 len, pad1 = 0;
 	uint32 swheader;
 	uint retries = 0;
-	uint32 real_pad = 0;
 	bcmsdh_info_t *sdh;
 	void *new;
 	int i;
@@ -1665,7 +1656,7 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 		/* Software tag: channel, sequence number, data offset */
 		swheader = ((chan << SDPCM_CHANNEL_SHIFT) & SDPCM_CHANNEL_MASK) |
 			((bus->tx_seq + bus->glom_cnt) % SDPCM_SEQUENCE_WRAP) |
-			(((pad1 + SDPCM_HDRLEN) << SDPCM_DOFFSET_SHIFT) & SDPCM_DOFFSET_MASK);
+		        (((pad1 + SDPCM_HDRLEN) << SDPCM_DOFFSET_SHIFT) & SDPCM_DOFFSET_MASK);
 		htol32_ua_store(swheader, frame + SDPCM_FRAMETAG_LEN + SDPCM_HWEXT_LEN);
 		htol32_ua_store(0, frame + SDPCM_FRAMETAG_LEN + SDPCM_HWEXT_LEN + sizeof(swheader));
 
@@ -1688,96 +1679,91 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 			bus->glom_cnt++;
 			return BCME_OK;
 		} else {
-			/* Raise len to next SDIO block to eliminate tail command */
-			if (bus->roundup && bus->blocksize &&
+				/* Raise len to next SDIO block to eliminate tail command */
+				if (bus->roundup && bus->blocksize &&
 					((bus->glom_total_len + len) > bus->blocksize)) {
-				uint16 pad2 = bus->blocksize -
-					((bus->glom_total_len + len) % bus->blocksize);
-				if ((pad2 <= bus->roundup) && (pad2 < bus->blocksize)) {
-					len += pad2;
-				} else {
+					uint16 pad2 = bus->blocksize -
+						((bus->glom_total_len + len) % bus->blocksize);
+					if ((pad2 <= bus->roundup) && (pad2 < bus->blocksize)) {
+							len += pad2;
+					} else {
+					}
+				} else if ((bus->glom_total_len + len) % DHD_SDALIGN) {
+					len += DHD_SDALIGN
+					    - ((bus->glom_total_len + len) % DHD_SDALIGN);
 				}
-			} else if ((bus->glom_total_len + len) % DHD_SDALIGN) {
-				len += DHD_SDALIGN
-					- ((bus->glom_total_len + len) % DHD_SDALIGN);
-			}
-			if (forcealign && (len & (ALIGNMENT - 1))) {
-				len = ROUNDUP(len, ALIGNMENT);
-			}
+				if (forcealign && (len & (ALIGNMENT - 1))) {
+					len = ROUNDUP(len, ALIGNMENT);
+				}
 
-			/* Hardware extention tag */
-			/* 2byte frame length, 1byte-, 1byte frame flag,
-			 * 2byte-hdrlength, 2byte padlenght
-			 */
-			hwheader1 = (act_len - SDPCM_FRAMETAG_LEN) | (1 << 24);
-			hwheader2 = (len - act_len) << 16;
-			htol32_ua_store(hwheader1, frame + SDPCM_FRAMETAG_LEN);
-			htol32_ua_store(hwheader2, frame + SDPCM_FRAMETAG_LEN + 4);
+				/* Hardware extention tag */
+				/* 2byte frame length, 1byte-, 1byte frame flag,
+				 * 2byte-hdrlength, 2byte padlenght
+				 */
+				hwheader1 = (act_len - SDPCM_FRAMETAG_LEN) | (1 << 24);
+				hwheader2 = (len - act_len) << 16;
+				htol32_ua_store(hwheader1, frame + SDPCM_FRAMETAG_LEN);
+				htol32_ua_store(hwheader2, frame + SDPCM_FRAMETAG_LEN + 4);
 
-			/* Post the frame pointer to sdio glom array */
-			dhd_bcmsdh_glom_post(bus, frame, len);
-			/* Save the pkt pointer in bus glom array */
-			bus->glom_pkt_arr[bus->glom_cnt] = pkt;
-			bus->glom_cnt++;
-			bus->glom_total_len += len;
+				/* Post the frame pointer to sdio glom array */
+				dhd_bcmsdh_glom_post(bus, frame, len);
+				/* Save the pkt pointer in bus glom array */
+				bus->glom_pkt_arr[bus->glom_cnt] = pkt;
+				bus->glom_cnt++;
+				bus->glom_total_len += len;
 
-			/* Update the total length on the first pkt */
-			frame_tmp = (uint8*)PKTDATA(osh, bus->glom_pkt_arr[0]);
-			*(uint16*)frame_tmp = htol16(bus->glom_total_len);
-			*(((uint16*)frame_tmp) + 1) = htol16(~bus->glom_total_len);
+				/* Update the total length on the first pkt */
+				frame_tmp = (uint8*)PKTDATA(osh, bus->glom_pkt_arr[0]);
+				*(uint16*)frame_tmp = htol16(bus->glom_total_len);
+				*(((uint16*)frame_tmp) + 1) = htol16(~bus->glom_total_len);
 		}
 	} else
 #endif /* BCMSDIOH_TXGLOM */
 	{
-		uint32 act_len = len;
-		/* Software tag: channel, sequence number, data offset */
-		swheader = ((chan << SDPCM_CHANNEL_SHIFT) & SDPCM_CHANNEL_MASK) | bus->tx_seq |
-			(((pad1 + SDPCM_HDRLEN) << SDPCM_DOFFSET_SHIFT) & SDPCM_DOFFSET_MASK);
-		htol32_ua_store(swheader, frame + SDPCM_FRAMETAG_LEN);
-		htol32_ua_store(0, frame + SDPCM_FRAMETAG_LEN + sizeof(swheader));
+	/* Software tag: channel, sequence number, data offset */
+	swheader = ((chan << SDPCM_CHANNEL_SHIFT) & SDPCM_CHANNEL_MASK) | bus->tx_seq |
+	        (((pad1 + SDPCM_HDRLEN) << SDPCM_DOFFSET_SHIFT) & SDPCM_DOFFSET_MASK);
+	htol32_ua_store(swheader, frame + SDPCM_FRAMETAG_LEN);
+	htol32_ua_store(0, frame + SDPCM_FRAMETAG_LEN + sizeof(swheader));
 
 #ifdef DHD_DEBUG
-		if (PKTPRIO(pkt) < ARRAYSIZE(tx_packets)) {
-			tx_packets[PKTPRIO(pkt)]++;
-		}
-		if (DHD_BYTES_ON() &&
-				(((DHD_CTL_ON() && (chan == SDPCM_CONTROL_CHANNEL)) ||
-				  (DHD_DATA_ON() && (chan != SDPCM_CONTROL_CHANNEL))))) {
-			prhex("Tx Frame", frame, len);
-		} else if (DHD_HDRS_ON()) {
-			prhex("TxHdr", frame, MIN(len, 16));
-		}
+	if (PKTPRIO(pkt) < ARRAYSIZE(tx_packets)) {
+		tx_packets[PKTPRIO(pkt)]++;
+	}
+	if (DHD_BYTES_ON() &&
+	    (((DHD_CTL_ON() && (chan == SDPCM_CONTROL_CHANNEL)) ||
+	      (DHD_DATA_ON() && (chan != SDPCM_CONTROL_CHANNEL))))) {
+		prhex("Tx Frame", frame, len);
+	} else if (DHD_HDRS_ON()) {
+		prhex("TxHdr", frame, MIN(len, 16));
+	}
 #endif
 
 #ifndef BCMSPI
-		/* Raise len to next SDIO block to eliminate tail command */
-		if (bus->roundup && bus->blocksize && (len > bus->blocksize)) {
-			uint16 pad2 = bus->blocksize - (len % bus->blocksize);
-			if ((pad2 <= bus->roundup) && (pad2 < bus->blocksize))
+	/* Raise len to next SDIO block to eliminate tail command */
+	if (bus->roundup && bus->blocksize && (len > bus->blocksize)) {
+		uint16 pad2 = bus->blocksize - (len % bus->blocksize);
+		if ((pad2 <= bus->roundup) && (pad2 < bus->blocksize))
 #ifdef NOTUSED
-				if (pad2 <= PKTTAILROOM(osh, pkt))
+			if (pad2 <= PKTTAILROOM(osh, pkt))
 #endif /* NOTUSED */
-					len += pad2;
-		} else if (len % DHD_SDALIGN) {
-			len += DHD_SDALIGN - (len % DHD_SDALIGN);
-		}
+				len += pad2;
+	} else if (len % DHD_SDALIGN) {
+		len += DHD_SDALIGN - (len % DHD_SDALIGN);
+	}
 #endif  /* BCMSPI */
 
-		/* Some controllers have trouble with odd bytes -- round to even */
-		if (forcealign && (len & (ALIGNMENT - 1))) {
+	/* Some controllers have trouble with odd bytes -- round to even */
+	if (forcealign && (len & (ALIGNMENT - 1))) {
 #ifdef NOTUSED
-			if (PKTTAILROOM(osh, pkt))
+		if (PKTTAILROOM(osh, pkt))
 #endif
-				len = ROUNDUP(len, ALIGNMENT);
+			len = ROUNDUP(len, ALIGNMENT);
 #ifdef NOTUSED
-			else
-				DHD_ERROR(("%s: sending unrounded %d-byte packet\n", __FUNCTION__, len));
+		else
+			DHD_ERROR(("%s: sending unrounded %d-byte packet\n", __FUNCTION__, len));
 #endif
-		}
-		real_pad = len - act_len;
-		if (skb_pad(pkt, real_pad)) {
-			DHD_ERROR(("padding error size %d\n", real_pad));
-		}
+	}
 	}
 
 	do {
@@ -2247,7 +2233,7 @@ dhd_bus_txctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 	htol32_ua_store(0, frame + SDPCM_FRAMETAG_LEN + sizeof(swheader));
 	}
 	if (!TXCTLOK(bus)) {
-		DHD_ERROR(("%s: No bus credit bus->tx_max %d, bus->tx_seq %d\n",
+		DHD_INFO(("%s: No bus credit bus->tx_max %d, bus->tx_seq %d\n",
 			__FUNCTION__, bus->tx_max, bus->tx_seq));
 		bus->ctrl_frame_stat = TRUE;
 		/* Send from dpc */
@@ -2356,7 +2342,6 @@ done:
 	return ret ? -EIO : 0;
 }
 
-char _dbg_io_name_buf[20] = {0,};
 int
 dhd_bus_rxctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 {
@@ -2377,11 +2362,6 @@ dhd_bus_rxctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 	bcopy(bus->rxctl, msg, MIN(msglen, rxlen));
 	bus->rxlen = 0;
 	dhd_os_sdunlock(bus->dhd);
-
-	if (timeleft < 4)
-	{		
-		_dbg_io_name_buf[19] = '\0';
-	}		
 
 	if (rxlen) {
 		DHD_CTL(("%s: resumed on rxctl frame, got %d expected %d\n",
@@ -4400,9 +4380,7 @@ dhd_bus_init(dhd_pub_t *dhdp, bool enforce_mutex)
 		bus->intdis = FALSE;
 		if (bus->intr) {
 			DHD_INTR(("%s: enable SDIO device interrupts\n", __FUNCTION__));
-#ifndef BCMSPI_ANDROID
 			bcmsdh_intr_enable(bus->sdh);
-#endif /* !BCMSPI_ANDROID */
 		} else {
 			DHD_INTR(("%s: disable SDIO interrupts\n", __FUNCTION__));
 			bcmsdh_intr_disable(bus->sdh);
@@ -6040,14 +6018,10 @@ clkwait:
 		DHD_INTR(("%s: enable SDIO interrupts, rxdone %d framecnt %d\n",
 		          __FUNCTION__, rxdone, framecnt));
 		bus->intdis = FALSE;
-#if defined(OOB_INTR_ONLY)
+#if defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID)
 	bcmsdh_oob_intr_set(1);
-#endif /* defined(OOB_INTR_ONLY) */
+#endif /* defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID) */
 		bcmsdh_intr_enable(sdh);
-#ifdef BCMSPI_ANDROID
-		if (*dhd_spi_lockcount == 0)
-			bcmsdh_oob_intr_set(1);
-#endif /* BCMSPI_ANDROID */
 	}
 
 #if defined(OOB_INTR_ONLY) && !defined(HW_OOB)
@@ -6216,9 +6190,6 @@ dhdsdio_isr(void *arg)
 		DHD_ERROR(("dhdsdio_isr() w/o interrupt configured!\n"));
 	}
 
-#ifdef BCMSPI_ANDROID
-	bcmsdh_oob_intr_set(0);
-#endif /* BCMSPI_ANDROID */
 	bcmsdh_intr_disable(sdh);
 	bus->intdis = TRUE;
 
@@ -7979,7 +7950,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					if (bcmerror == BCME_OK) {
 #if defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID)
 						bcmsdh_set_irq(TRUE);
+#ifndef BCMSPI_ANDROID
 						dhd_enable_oob_intr(bus, TRUE);
+#endif /* !BCMSPI_ANDROID */
 #endif /* defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID) */
 
 						bus->dhd->dongle_reset = FALSE;

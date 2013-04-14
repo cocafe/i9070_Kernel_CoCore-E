@@ -69,9 +69,6 @@
 #include <mach/pm.h>
 #include <mach/reboot_reasons.h>
 
-#if defined(CONFIG_NFC_PN544)
-#include <linux/pn544.h>
-#endif
 
 #include <video/mcde_display.h>
 
@@ -575,10 +572,10 @@ static const u8 *mxt224_config[] = {
 /*
 	Configuration for MXT224-E
 */
-#define MXT224E_THRESHOLD_BATT		22
-#define MXT224E_THRESHOLD_CHRG		25
-#define MXT224E_CALCFG_BATT		0x72 //114
-#define MXT224E_CALCFG_CHRG		0x72 
+#define MXT224E_THRESHOLD_BATT			17	/* Default: 22 */
+#define MXT224E_THRESHOLD_CHRG			25	/* Default: 25 */
+#define MXT224E_CALCFG_BATT			0x72 //114
+#define MXT224E_CALCFG_CHRG			0x72 
 #define MXT224E_ATCHFRCCALTHR_NORMAL		40
 #define MXT224E_ATCHFRCCALRATIO_NORMAL		55
 
@@ -879,20 +876,11 @@ static struct platform_device janice_gpio_i2c7_pdata = {
 	},
 };
 
-#if defined(CONFIG_NFC_PN544)
-static struct pn544_i2c_platform_data pn544_pdata __initdata = {
-	.irq_gpio = NFC_IRQ_JANICE_R0_0,
-	.ven_gpio = NFC_EN_JANICE_R0_0,
-	.firm_gpio = NFC_FIRM_JANICE_R0_0,
-};
-#endif
-
 static struct i2c_board_info __initdata janice_r0_0_gpio_i2c7_devices[] = {
-#if defined(CONFIG_NFC_PN544)
+// TBD - NFC
+#if 0
 	{
-		I2C_BOARD_INFO("pn544", 0x2b),
-		.irq = GPIO_TO_IRQ(NFC_IRQ_JANICE_R0_0),
-		.platform_data = &pn544_pdata,
+		I2C_BOARD_INFO("", 0x30),
 	},
 #endif
 };

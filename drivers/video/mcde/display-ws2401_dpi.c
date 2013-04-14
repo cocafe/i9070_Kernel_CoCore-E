@@ -547,33 +547,6 @@ static int ws2401_dpi_ldi_init(struct ws2401_dpi *lcd)
 	return ret;
 }
 
-static int ws2401_dpi_ldi_enable(struct ws2401_dpi *lcd)
-{
-	int ret = 0;
-	dev_dbg(lcd->dev, "ws2401_dpi_ldi_enable\n");
-
-	ret |= ws2401_write_dcs_sequence(lcd, DCS_CMD_SEQ_WS2401_DISPLAY_ON);
-
-	if (!ret)
-		lcd->ldi_state = LDI_STATE_ON;
-
-	return ret;
-}
-
-static int ws2401_dpi_ldi_disable(struct ws2401_dpi *lcd)
-{
-	int ret;
-
-	dev_dbg(lcd->dev, "ws2401_dpi_ldi_disable\n");
-	ret = ws2401_write_dcs_sequence(lcd,
-				DCS_CMD_SEQ_WS2401_ENTER_SLEEP_MODE);
-
-	if (lcd->pd->sleep_in_delay)
-		msleep(lcd->pd->sleep_in_delay);
-
-	return ret;
-}
-
 static int ws2401_update_brightness(struct ws2401_dpi *lcd)
 {
 	int ret = 0;
@@ -589,6 +562,39 @@ static int ws2401_update_brightness(struct ws2401_dpi *lcd)
 		ret = ws2401_write_dcs_sequence(lcd,
 				DCS_CMD_SEQ_WS2401_UPDATE_BRIGHTNESS);
 	}
+
+	return ret;
+}
+
+static int ws2401_dpi_ldi_enable(struct ws2401_dpi *lcd)
+{
+	int ret = 0;
+	dev_dbg(lcd->dev, "ws2401_dpi_ldi_enable\n");
+
+	ret |= ws2401_write_dcs_sequence(lcd, DCS_CMD_SEQ_WS2401_DISPLAY_ON);
+
+	if (!ret)
+		lcd->ldi_state = LDI_STATE_ON;
+
+	/* Update the brightness when lcd turns on */
+	ws2401_update_brightness(lcd);
+
+	return ret;
+}
+
+static int ws2401_dpi_ldi_disable(struct ws2401_dpi *lcd)
+{
+	int ret;
+
+	dev_dbg(lcd->dev, "ws2401_dpi_ldi_disable\n");
+	ret = ws2401_write_dcs_sequence(lcd,
+				DCS_CMD_SEQ_WS2401_ENTER_SLEEP_MODE);
+
+	if (lcd->pd->sleep_in_delay)
+		msleep(lcd->pd->sleep_in_delay);
+	
+	/* Update the brightness when lcd truns off */
+	ws2401_update_brightness(lcd);
 
 	return ret;
 }
@@ -632,8 +638,6 @@ static int ws2401_dpi_power_on(struct ws2401_dpi *lcd)
 		return ret;
 	}
 	dev_dbg(lcd->dev, "ldi enable successful\n");
-
-	ws2401_update_brightness(lcd);
 
 	return 0;
 }

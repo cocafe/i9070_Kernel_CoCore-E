@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc_linux.c 372067 2012-11-30 08:03:06Z $
+ * $Id: bcmsdh_sdmmc_linux.c 363783 2012-10-19 06:27:14Z $
  */
 
 #include <typedefs.h>
@@ -297,11 +297,13 @@ static struct sdio_driver bcmsdh_sdmmc_driver = {
 	.remove		= bcmsdh_sdmmc_remove,
 	.name		= "bcmsdh_sdmmc",
 	.id_table	= bcmsdh_sdmmc_ids,
+#if !defined(CONFIG_ARCH_RHEA) || !defined(CONFIG_ARCH_CAPRI)
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) && defined(CONFIG_PM)
 	.drv = {
 	.pm	= &bcmsdh_sdmmc_pm_ops,
 	},
 #endif /* (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) && defined(CONFIG_PM) */
+#endif /* !defined(CONFIG_ARCH_RHEA) || !defined(CONFIG_ARCH_CAPRI) */
 	};
 
 struct sdos_info {

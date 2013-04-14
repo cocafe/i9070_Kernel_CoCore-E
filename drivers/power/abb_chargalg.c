@@ -7,7 +7,7 @@
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
  *
- * Modified: Huang Ji (cocafe@xda-developers.com)
+ * Modified: cocafe@xda-developers.com
  *
  */
 
@@ -228,29 +228,29 @@ enum maxim_ret {
 
 /**
  * struct ab8500_chargalg - ab8500 Charging algorithm device information
- * @dev:		pointer to the structure device
- * @charge_status:	battery operating status
+ * @dev:			pointer to the structure device
+ * @charge_status:		battery operating status
  * @eoc_cnt_1st:		counter used to determine end-of_charge (1st full charging check)
  * @eoc_cnt_2nd:		counter used to determine end-of_charge (2nd full charging check)
- * @rch_cnt:		counter used to determine start of recharge
- * @maintenance_chg:	indicate if maintenance charge is active
- * @recharging_status:	indicate if recharging is active
+ * @rch_cnt:			counter used to determine start of recharge
+ * @maintenance_chg:		indicate if maintenance charge is active
+ * @recharging_status:		indicate if recharging is active
  * @full_charging_status_1st:	indicate 1st full charging status
- * @t_hyst_norm		temperature hysteresis when the temperature has	been
- *			over or under normal limits
- * @t_hyst_lowhigh	temperature hysteresis when the temperature has	been
- *			over or under the high or low limits
- * @charge_state:	current state of the charging algorithm
- * @ccm			charging current maximization parameters
- * @chg_info:		information about connected charger types
- * @batt_data:		data of the battery
- * @susp_status:	current charger suspension status
- * @parent:		pointer to the struct ab8500
- * @pdata:		pointer to the ab8500_chargalg platform data
- * @bat:		pointer to the ab8500_bm platform data
- * @chargalg_psy:	structure that holds the battery properties exposed by
- *			the charging algorithm
- * @events:		structure for information about events triggered
+ * @t_hyst_norm			temperature hysteresis when the temperature has	been
+ *				over or under normal limits
+ * @t_hyst_lowhigh		temperature hysteresis when the temperature has	been
+ *				over or under the high or low limits
+ * @charge_state:		current state of the charging algorithm
+ * @ccm				charging current maximization parameters
+ * @chg_info:			information about connected charger types
+ * @batt_data:			data of the battery
+ * @susp_status:		current charger suspension status
+ * @parent:			pointer to the struct ab8500
+ * @pdata:			pointer to the ab8500_chargalg platform data
+ * @bat:			pointer to the ab8500_bm platform data
+ * @chargalg_psy:		structure that holds the battery properties exposed by
+ *				the charging algorithm
+ * @events:			structure for information about events triggered
  * @chargalg_wq:		work queue for running the charging algorithm
  * @chargalg_periodic_work:	work to run the charging algorithm periodically
  * @chargalg_wd_work:		work to kick the charger watchdog periodically

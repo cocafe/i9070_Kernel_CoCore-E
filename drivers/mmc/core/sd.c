@@ -84,12 +84,6 @@ void mmc_decode_cid(struct mmc_card *card)
 	card->cid.month			= UNSTUFF_BITS(resp, 8, 4);
 
 	card->cid.year += 2000; /* SD cards year offset */
-
-#ifdef CONFIG_MACH_JANICE_CHN
-	//FK27 dfl for I9070 SD card error issue	
-	pr_warning("%s: %s: manfid: 0x%02x, oemid: 0x%04x\n", __func__,
-	mmc_hostname(card->host), card->cid.manfid, card->cid.oemid);
-#endif
 }
 
 /*
@@ -365,13 +359,6 @@ out:
 	return err;
 }
 
-#ifdef CONFIG_MACH_JANICE_CHN
-//FK27 dfl for I9070 SD card error issue
-#define CID_MANFID_TRANSCEND  0x1B
-#define CID_OEMID_TRANSCEND 0x534D
-#define CID_NAME_TRANSCEND "00000"
-#endif
-
 /*
  * Test if the card supports high-speed mode and, if so, switch to it.
  */
@@ -391,21 +378,6 @@ int mmc_sd_switch_hs(struct mmc_card *card)
 
 	if (card->sw_caps.hs_max_dtr == 0)
 		return 0;
-
-#ifdef CONFIG_MACH_JANICE_CHN
-	//FK27 dfl for I9070 SD card error issue
-	/* 
-	 * Some cards display data crc error running on 50 Mhz,
-	 * so, disable high speed mode for them.
-	 */
-	if ((card->cid.manfid == CID_MANFID_TRANSCEND) &&
-			(card->cid.oemid == CID_OEMID_TRANSCEND) &&
-			!strcmp(mmc_card_name(card), CID_NAME_TRANSCEND)) {
-		pr_warning("%s: Trouble with high speed mode, disabling\n",
-			mmc_hostname(card->host));
-		return 0;
-	}
-#endif
 
 	err = -EIO;
 

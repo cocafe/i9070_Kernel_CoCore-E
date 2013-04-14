@@ -1636,7 +1636,7 @@ static struct lcd_ops s6e63m0_lcd_ops = {
 
 /* This structure defines all the properties of a backlight */
 struct backlight_properties s6e63m0_backlight_props = {
-	.brightness = DEFAULT_BRIGHTNESS,
+	.brightness = MAX_REQ_BRIGHTNESS,
 	.max_brightness = MAX_REQ_BRIGHTNESS,
 	.type = BACKLIGHT_RAW,
 };
@@ -1712,7 +1712,7 @@ static ssize_t s6e63m0_sysfs_store_lcd_power(struct device *dev,
         return len;
 }
 
-static DEVICE_ATTR(ldi_power, 0644,
+static DEVICE_ATTR(lcd_power, 0664,
                 NULL, s6e63m0_sysfs_store_lcd_power);
 
 static ssize_t lcd_type_show(struct device *dev,
@@ -2099,16 +2099,15 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 	lcd->cur_acl = 0;
 	lcd->panel_id = 0;
 	lcd->elvss_ref = 0;
-	lcd->gamma_mode = 0;
 	/*
 	 * it gets gamma table count available so it lets user
 	 * know that.
 	 */
 	lcd->gamma_table_count = sizeof(gamma_table) / (MAX_GAMMA_LEVEL * sizeof(int));
 
-        ret = device_create_file(&(lcd->ld->dev), &dev_attr_ldi_power);
+        ret = device_create_file(&(lcd->ld->dev), &dev_attr_lcd_power);
         if (ret < 0)
-                dev_err(&(ddev->dev), "failed to add ldi_power sysfs entries\n");
+                dev_err(&(ddev->dev), "failed to add lcd_power sysfs entries\n");
 
 	ret = device_create_file(&(lcd->ld->dev), &dev_attr_power_reduce);
         if (ret < 0)

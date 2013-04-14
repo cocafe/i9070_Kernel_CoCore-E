@@ -13,7 +13,7 @@
 #ifndef _S6E63M0_BRIGHTNESS_H
 #define _S6E63M0_BRIGHTNESS_H
 
-#define DEFAULT_GAMMA_LEVEL		10	//(aka. default brightness 160)
+#define DEFAULT_GAMMA_LEVEL	10	//(aka. default brightness 160)
 #define MAX_GAMMA_LEVEL		26
 
 #define MIN_BRIGHTNESS		0
@@ -23,7 +23,7 @@
 #define SLEEPMSEC		0x1000
 #define ENDDEF			0x2000
 #define DEFMASK			0xFF00
-#define COMMAND_ONLY	0xFE
+#define COMMAND_ONLY		0xFE
 #define DATA_ONLY		0xFF
 
 /* gamma value: 2.2 */

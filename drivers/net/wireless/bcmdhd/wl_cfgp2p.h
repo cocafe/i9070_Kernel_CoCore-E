@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfgp2p.h 368090 2012-11-12 04:28:13Z $
+ * $Id: wl_cfgp2p.h 363350 2012-10-17 08:29:23Z $
  */
 #ifndef _wl_cfgp2p_h_
 #define _wl_cfgp2p_h_
@@ -134,13 +134,6 @@ enum wl_cfgp2p_status {
 
 /* dword align allocation */
 #define WLC_IOCTL_MAXLEN 8192
-
-#ifdef CUSTOMER_HW4
-#define CFGP2P_ERROR_TEXT		"CFGP2P-INFO2) "
-#else
-#define CFGP2P_ERROR_TEXT		"CFGP2P-ERROR) "
-#endif
-
 
 #define CFGP2P_ERR(args)									\
 	do {										\
@@ -304,9 +297,6 @@ wl_cfgp2p_register_ndev(struct wl_priv *wl);
 
 extern s32
 wl_cfgp2p_unregister_ndev(struct wl_priv *wl);
-
-extern bool
-wl_cfgp2p_is_ifops(const struct net_device_ops *if_ops);
 
 /* WiFi Direct */
 #define SOCIAL_CHAN_1 1

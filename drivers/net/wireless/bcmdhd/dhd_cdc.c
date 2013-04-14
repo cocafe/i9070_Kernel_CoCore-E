@@ -110,8 +110,6 @@ dhdcdc_msg(dhd_pub_t *dhd)
 	return err;
 }
 
-extern char _dbg_io_name_buf[20];
-
 static int
 dhdcdc_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len)
 {
@@ -363,11 +361,6 @@ dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
 	prot->pending = TRUE;
 	prot->lastcmd = ioc->cmd;
 	action = ioc->set;
-
-	if (len<20)
-		memcpy(_dbg_io_name_buf, buf, len);
-	else
-		memcpy(_dbg_io_name_buf, buf, 20);
 	if (action & WL_IOCTL_ACTION_SET)
 		ret = dhdcdc_set_ioctl(dhd, ifidx, ioc->cmd, buf, len, action);
 	else {

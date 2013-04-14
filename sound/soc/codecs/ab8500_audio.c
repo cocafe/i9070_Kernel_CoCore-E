@@ -42,10 +42,6 @@
 #include <linux/mfd/dbx500-prcmu.h>
 #include "ab8500_audio.h"
 
-#ifdef CONFIG_ABB_CODEC_CONTROL
-#include "abb-codec-con.h"
-#endif
-
 /* To convert register definition shifts to masks */
 #define BMASK(bsft)	(1 << (bsft))
 
@@ -228,7 +224,6 @@ static void ab850x_audio_control(bool power_on);
 static void ab850x_control_hs(void);
 static void ab850x_control_hf(void);
 static void ab850x_control_mic2(void);
-static void ab850x_control_earpiece(void);
 
 static bool is_headset = false;
 
@@ -355,12 +350,6 @@ module_param(hshp_bit, uint, 0644);
  */
 static const u8 hsldiggain_mask = BMASK(REG_HSLEARDIGGAIN_HSLDGAIN);
 
-bool eardiggain_con = false;
-module_param(eardiggain_con, bool, 0644);
-
-unsigned int eardiggain_bit = 0000;
-module_param(eardiggain_bit, uint, 0644);
-
 bool hsldiggain_con = false;
 module_param(hsldiggain_con, bool, 0644);
 
@@ -447,9 +436,6 @@ static const u8 addiggain2_mask = BMASK(REG_ADDIGGAINX_GAIN);
 
 bool addiggain2_con = false;
 module_param(addiggain2_con, bool, 0644);
-
-unsigned int addiggain2_ms = 500;
-module_param(addiggain2_ms, uint, 0644);
 
 unsigned int addiggain2_bit = 9;
 module_param(addiggain2_bit, uint, 0644);
@@ -1513,9 +1499,7 @@ static int earpiece_dapm_event(struct snd_soc_dapm_widget *w,
 {
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
-		if (!is_headset) {
-			ab850x_control_earpiece();
-		}
+		ab850x_control_hs();
 		if (debug_level >= 2) {
 			pr_info("ab850x-codec: EarPiece power on\n");
 		}
@@ -1559,6 +1543,7 @@ static int ad2_dapm_event(struct snd_soc_dapm_widget *w,
 {
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
+		/*msleep(1000);*/
 		ab850x_control_mic2();
 		if (debug_level >= 2) {
 			pr_info("ab850x-codec: AD2 power on\n");
@@ -3473,24 +3458,13 @@ static void ab850x_control_hf(void) {
 /* Mic2 */
 static void ab850x_control_mic2(void) {
 	if (addiggain2_con) {
-		/* FIXME: add a delay to overwirte systems defaults */
-		msleep(addiggain2_ms);
+		msleep(1000);
 		snd_soc_write(ab850x_codec, REG_ADDIGGAIN2, addiggain2_bit);
 		/*snd_soc_update_bits(ab850x_codec, REG_ADDIGGAIN2, addiggain2_mask, addiggain2_bit);*/
 		pr_info("ab850x-codec: ADDigGain2 \n");
 	}
 }
 
-/* Earpiece */
-static void ab850x_control_earpiece(void) {
-	/* Ear and HsL use the same diggain path */
-	if (eardiggain_con) {
-		snd_soc_update_bits(ab850x_codec, REG_HSLEARDIGGAIN, hsldiggain_mask, eardiggain_bit);
-		pr_info("ab850x-codec: EarDigGain \n");
-	}
-}
-
-/* Normal */
 static void ab850x_audio_control(bool power_on)
 {
 	if (audswreset && !power_on) {
@@ -4406,10 +4380,6 @@ controls_done:
 	}
 
 	ab850x_codec = codec;
-
-	#ifdef CONFIG_ABB_CODEC_CONTROL
-	abb_codec_register(ab850x_codec);
-	#endif
 
 	return ret;
 }

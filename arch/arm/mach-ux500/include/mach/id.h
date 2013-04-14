@@ -65,7 +65,7 @@ static inline bool __attribute_const__ cpu_is_u5500(void)
 }
 
 #ifdef CONFIG_UX500_SOC_DB8500
-inline bool cpu_is_u9500(void);
+bool cpu_is_u9500(void);
 #else
 static inline bool cpu_is_u9500(void)
 {

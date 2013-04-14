@@ -136,6 +136,7 @@ void *memcpy(void *__dest, __const void *__src, size_t __n)
 	return __dest;
 }
 
+#ifndef CONFIG_KERNEL_XZ
 void *memmove(void *__dest, __const void *__src, size_t __n)
 {
 	unsigned char *d = __dest;
@@ -152,6 +153,7 @@ void *memmove(void *__dest, __const void *__src, size_t __n)
 
 	return __dest;
 }
+#endif
 
 size_t strlen(const char *s)
 {

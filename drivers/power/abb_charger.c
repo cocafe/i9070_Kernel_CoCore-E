@@ -7,13 +7,14 @@
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
  * Author: Arun R Murthy <arun.murthy@stericsson.com>
- * 
- * Modified: Huang Ji (cocafe@xda-developers.com)
+ *
+ * Modified: cocafe@xda-developers.com
  *
  */
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -106,7 +107,7 @@
 #define LOW_VOLT_REG			0x4E
 
 #define NBR_VDROP_STATE			3
-#define VDROP_TIME				2
+#define VDROP_TIME			2
 
 /* cocafe: Charger Current Control */
 unsigned int max_ac_current = 600;
@@ -1427,6 +1428,7 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 	charger_status = ab8500_charger_detect_chargers(di);
 	vbus_status = ab8500_vbus_is_detected(di);
 
+
 	/* cocafe: Charger Control */
 	/* Supported current definitions are at the top */
 	/* Limit minimum AC charging current */		/* 100mA */
@@ -1454,9 +1456,19 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 		max_usb_current = 500;
 	}
 
-//	cocafe: Skip pdata
-//	di->bat->ta_chg_current_input = di->bat->chg_params->ac_curr_max;
-//	di->bat->usb_chg_current_input = di->bat->chg_params->usb_curr_max;
+	/* Let's skip platform bm data */
+	//di->bat->ta_chg_current_input = di->bat->chg_params->ac_curr_max;
+	//di->bat->usb_chg_current_input = di->bat->chg_params->usb_curr_max;
+
+	di->bat->ta_chg_current_input = max_ac_current;
+	di->bat->usb_chg_current_input = max_usb_current;
+
+	max_ac_current_read = di->bat->ta_chg_current_input;
+	max_usb_current_read = di->bat->usb_chg_current_input;
+	
+	printk("ab8500-charger: AC charging max current = %dmA \n", max_ac_current_read);
+	printk("ab8500-charger: USB charging max current = %dmA \n", max_usb_current_read);
+
 
 	ab8500_charger_init_vdrop_state(di);
 

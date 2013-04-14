@@ -1872,12 +1872,48 @@ static DEVICE_ATTR(srp, 0644, NULL, musb_srp_store);
 
 #endif /* CONFIG_USB_GADGET_MUSB_HDRC */
 
+static ssize_t
+ux500_set_extvbus(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	unsigned short	extvbus;
+
+	if (sscanf(buf, "%hu", &extvbus) != 1
+			|| ((extvbus != 1) && (extvbus != 0))) {
+		dev_err(dev, "Invalid value EXTVBUS must be 1 or 0\n");
+		return -EINVAL;
+	}
+
+	plat->extvbus = extvbus;
+
+	return n;
+}
+
+static ssize_t
+ux500_get_extvbus(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	int		extvbus;
+
+	/* FIXME get_vbus_status() is normally #defined as false...
+	 * and is effectively TUSB-specific.
+	 */
+	extvbus = plat->extvbus;
+
+	return sprintf(buf, "EXTVBUS is %s\n",
+			extvbus ? "on" : "off");
+}
+static DEVICE_ATTR(extvbus, 0644, ux500_get_extvbus, ux500_set_extvbus);
+
+
 static struct attribute *musb_attributes[] = {
 	&dev_attr_mode.attr,
 	&dev_attr_vbus.attr,
 #ifdef CONFIG_USB_GADGET_MUSB_HDRC
 	&dev_attr_srp.attr,
 #endif
+	&dev_attr_extvbus.attr,
 	NULL
 };
 

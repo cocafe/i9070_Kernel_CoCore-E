@@ -71,4 +71,3 @@ obj-$(CONFIG_JS_RTC)		+= js-rtc.o
 js-rtc-y = rtc.o
 # Module HWREG for HATS
 obj-$(CONFIG_HWREG)		+= hwreg/
-obj-$(CONFIG_FRANDOM)		+= frandom/

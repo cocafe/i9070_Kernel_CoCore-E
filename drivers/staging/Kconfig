@@ -184,6 +184,8 @@ source "drivers/staging/camera_flash/Kconfig"
 
 source "drivers/staging/pasr/Kconfig"
 
+source "drivers/staging/cpupower/Kconfig"
+
 
 if CW1200
 config STE_WLAN 

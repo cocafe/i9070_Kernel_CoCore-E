@@ -326,6 +326,7 @@ static void ux500_musb_set_vbus(struct musb *musb, int is_on)
 	u8		devctl;
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
 	int ret = 1;
+	struct musb_hdrc_platform_data *plat = musb->controller->platform_data;
 #ifdef	CONFIG_USB_OTG_20
 	int val = 0;
 #endif
@@ -338,6 +339,17 @@ static void ux500_musb_set_vbus(struct musb *musb, int is_on)
 	val |= 0x1C;
 	musb_writeb(musb->mregs, MUSB_MISC, val);
 #endif
+
+	/* Use EXTVBUS */
+	u8 busctl = musb_read_ulpi_buscontrol(musb->mregs);
+	if (plat->extvbus) {
+		busctl |= MUSB_ULPI_USE_EXTVBUS;
+		musb_write_ulpi_buscontrol(musb->mregs, busctl);
+	} else {
+		busctl &= ~MUSB_ULPI_USE_EXTVBUS;
+		musb_write_ulpi_buscontrol(musb->mregs, busctl);
+	}
+
 	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
 
 	if (is_on) {

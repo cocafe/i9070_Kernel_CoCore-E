@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.h 366811 2012-11-05 13:49:17Z $
+ * $Id: wl_cfg80211.h 363350 2012-10-17 08:29:23Z $
  */
 
 #ifndef _wl_cfg80211_h_
@@ -61,12 +61,6 @@ struct wl_ibss;
 
 /* 0 invalidates all debug messages.  default is 1 */
 #define WL_DBG_LEVEL 0xFF
-
-#ifdef CUSTOMER_HW4
-#define CFG80211_ERROR_TEXT		"CFG80211-INFO2) "
-#else
-#define CFG80211_ERROR_TEXT		"CFG80211-ERROR) "
-#endif
 
 #if defined(DHD_DEBUG)
 #define	WL_ERR(args)									\
@@ -590,9 +584,6 @@ struct wl_priv {
 	u32 iw_ie_len;
 #endif /* WL11U */
 	bool sched_scan_running;	/* scheduled scan req status */
-#ifdef WL_SCHED_SCAN
-	struct cfg80211_sched_scan_request *sched_scan_req;	/* scheduled scan req */
-#endif /* WL_SCHED_SCAN */
 #ifdef WL_HOST_BAND_MGMT
 	u8 curr_band;
 #endif /* WL_HOST_BAND_MGMT */

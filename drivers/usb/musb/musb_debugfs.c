@@ -82,6 +82,7 @@ static const struct musb_register_map musb_regmap[] = {
 	{ "RxFIFOadd",		0x66,	16 },
 	{ "VControl",		0x68,	32 },
 	{ "HWVers",		0x6C,	16 },
+	{ "EXTVBUS",		0x70,	8 },
 	{ "EPInfo",		0x78,	8 },
 	{ "RAMInfo",		0x79,	8 },
 	{ "LinkInfo",		0x7A,	8 },

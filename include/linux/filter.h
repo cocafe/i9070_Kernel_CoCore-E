@@ -5,6 +5,10 @@
 #ifndef __LINUX_FILTER_H__
 #define __LINUX_FILTER_H__
 
+#ifdef CONFIG_BPF_JIT
+#include <linux/rcupdate.h>
+#endif
+
 #include <linux/compiler.h>
 #include <linux/types.h>
 
