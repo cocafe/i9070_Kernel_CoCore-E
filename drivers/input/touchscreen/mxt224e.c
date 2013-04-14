@@ -611,28 +611,35 @@ static void mxt224_ta_probe(int __vbus_state)
 		ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
 
 		if (blen_con) {
+			printk(KERN_INFO "[TSP] T9 blen(w) [%d]\n", blen_batt);
 			tmpbuf = (u8)blen_batt;
 			write_mem(copy_data, obj_address+6, 1, &tmpbuf);
 		}
 		if (threshold_con) {
+			printk(KERN_INFO "[TSP] T9 threshold(w) [%d]\n", threshold_batt);
 			tmpbuf = (u8)threshold_batt;
 			threshold = threshold_batt;
 			write_mem(copy_data, obj_address+7, 1, &tmpbuf);
 		}
 		if (movefilter_con) {
+			printk(KERN_INFO "[TSP] T9 movfilter(w) [%d]\n", movefilter_batt);
 			tmpbuf = (u8)movefilter_batt;
 			write_mem(copy_data, obj_address+13, 1, &tmpbuf);
 		}
-
-		printk(KERN_INFO "[TSP] T9 Blen[%d] Threshold[%d] Movfilter[%d]\n", 
-					blen_batt, threshold_batt, movefilter_batt);
 	}
-	
-	printk(KERN_INFO "[TSP] threshold : %d\n", threshold);
+	printk(KERN_INFO "[TSP] threshold(r): %d\n", threshold);
+
+	ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
+	read_mem(copy_data, obj_address+6, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] blen(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+7, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] threshold(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+13, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] movfilter(mem): %d\n", tmpbuf);
 }
 
 void mxt224e_ts_change_vbus_state(bool vbus_status) {
-	printk(KERN_INFO "mxt224e : vbus state is changed. (%d)\n", vbus_status);
+	printk(KERN_INFO "[TSP] mxt224e vbus state changed (%d)\n", vbus_status);
 	mxt224_ta_probe((int)vbus_status);
 }
 EXPORT_SYMBOL(mxt224e_ts_change_vbus_state);
