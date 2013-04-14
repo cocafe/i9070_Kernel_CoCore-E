@@ -595,7 +595,7 @@ int ab850x_audio_set_adcm(enum ab850x_audio_adcm req_adcm);
 /* REG_ADDIGGAIN5 */
 /* REG_ADDIGGAIN6 */
 #define REG_ADDIGGAINX_FADEDISADX		6
-#define REG_ADDIGGAINX_GAIN 			5
+#define REG_ADDIGGAINX_GAIN			5
 #define REG_ADDIGGAINX_ADXGAIN_MAX		0x3F
 
 /* REG_DADIGGAIN1 */
@@ -611,6 +611,7 @@ int ab850x_audio_set_adcm(enum ab850x_audio_adcm req_adcm);
 /* REG_ADDIGLOOPGAIN1 */
 /* REG_ADDIGLOOPGAIN2 */
 #define REG_ADDIGLOOPGAINX_FADEDISADXL		6
+#define REG_ADDIGLOOPGAINX_GAIN			5
 #define REG_ADDIGLOOPGAINX_ADXLBGAIN_MAX	0x3F
 
 /* REG_HSLEARDIGGAIN */
@@ -627,6 +628,7 @@ int ab850x_audio_set_adcm(enum ab850x_audio_adcm req_adcm);
 
 /* REG_SIDFIRGAIN1 */
 /* REG_SIDFIRGAIN2 */
+#define REG_SIDFIRGAINX_FIRSIDXGAIN		4
 #define REG_SIDFIRGAINX_FIRSIDXGAIN_MAX		0x1F
 
 /* REG_ANCCONF1 */
@@ -745,8 +747,8 @@ int ab850x_audio_set_adcm(enum ab850x_audio_adcm req_adcm);
 
 /* REG_USBHSGAIN */
 #define REG_USBHSGAIN_UHSL			4
-#define REG_USBHSGAIN_UHSR			0
 #define REG_USBHSGAIN_UHSX_MAX			0xF
+#define REG_USBHSGAIN_UHSR			0
 
 /* REG_USBDRVCTRL */
 #define REG_USBDRVCTRL_ENCKLOL			7
