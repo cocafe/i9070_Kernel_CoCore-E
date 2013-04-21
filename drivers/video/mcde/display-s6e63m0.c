@@ -2004,8 +2004,9 @@ static int __devinit s6e63m0_spi_probe(struct spi_device *spi)
 
 	#ifdef SMART_DIMMING
 	s6e63m0_read_panel_id(lcd, lcd_id);
-
-	if (lcd_id[1] >= SMART_MTP_PANEL_ID) {
+	pr_info("s6e63m0: lcd id: %#04X\n", lcd_id[1]);
+	pr_info("s6e63m0: smart dimming lcd id: %#04X\n", SMART_MTP_PANEL_ID);
+//	if (lcd_id[1] >= SMART_MTP_PANEL_ID) {
 		if (!is_load_mtp_offset) {
 		#if 0
 			s6e63mo_read_mtp_info(lcd);
@@ -2014,7 +2015,7 @@ static int __devinit s6e63m0_spi_probe(struct spi_device *spi)
 		#endif
 			is_load_mtp_offset =  1;
 		}
-	}
+//	}
 	#endif
 
 out:
