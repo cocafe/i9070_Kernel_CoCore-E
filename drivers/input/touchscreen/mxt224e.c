@@ -156,6 +156,10 @@ module_param(edgetouch_y, uint, 0644);
 unsigned int edgetouch_counter;
 unsigned int nortouch_counter;
 
+/* cocafe: Debugging Prints */
+static bool debug_mask = false;
+module_param(debug_mask, bool, 0644);
+
 struct object_t {
 	u8 object_type;
 	u16 i2c_address;
@@ -1068,13 +1072,12 @@ static void report_input_data(struct mxt224_data *data)
 				ABS_MT_TOUCH_MAJOR, data->fingers[id].w);
 	}
 
-	if (data->fingers[id].state == MXT224_STATE_PRESS
-		|| data->fingers[id].state == MXT224_STATE_RELEASE) {
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		printk("[TSP] id[%d] x=%d y=%d z=%d w=%d\n",
-			id , data->fingers[id].x, data->fingers[id].y,
-			data->fingers[id].z, data->fingers[id].w);
-#endif
+	if (debug_mask) {	/* This is noisy */	/* But helpful in debugging */
+		if (data->fingers[id].state == MXT224_STATE_PRESS || data->fingers[id].state == MXT224_STATE_RELEASE) {
+			printk("[TSP] id[%d] x=%d y=%d z=%d w=%d\n",
+				id , data->fingers[id].x, data->fingers[id].y,
+				data->fingers[id].z, data->fingers[id].w);
+		}
 	}
 
 	if (calibration_auto >= MXT224E_DETECT_EDGE) {
