@@ -2099,7 +2099,7 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 	lcd->cur_acl = 0;
 	lcd->panel_id = 0;
 	lcd->elvss_ref = 0;
-	lcd->gamma_mode = 0;
+
 	/*
 	 * it gets gamma table count available so it lets user
 	 * know that.
