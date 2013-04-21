@@ -2120,7 +2120,7 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 	
 	ret = device_create_file(&lcd->bd->dev, &dev_attr_auto_brightness);
 	if (ret < 0)
-		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n");
+		dev_err(&lcd->ld->dev, "failed to add sysfs entries\n");
 
 	ret = device_create_file(&(ddev->dev), &dev_attr_gamma_mode);
 	if (ret < 0)
@@ -2184,7 +2184,7 @@ static int __devexit s6e63m0_mcde_panel_remove(struct mcde_display_device *ddev)
 	return 0;
 }
 
-static void s6e63m0_mcde_panel_shutdown(struct mcde_display_device *ddev)
+static int s6e63m0_mcde_panel_shutdown(struct mcde_display_device *ddev)
 {
 	int ret;
 	struct s6e63m0 *lcd = dev_get_drvdata(&ddev->dev);
@@ -2208,7 +2208,7 @@ static void s6e63m0_mcde_panel_shutdown(struct mcde_display_device *ddev)
 static int s6e63m0_mcde_panel_resume(struct mcde_display_device *ddev)
 {
 	int ret;
-	struct s6e63m0 *lcd = dev_get_drvdata(&ddev->dev);
+//	struct s6e63m0 *lcd = dev_get_drvdata(&ddev->dev);
 	DPI_DISP_TRACE;
 	dev_info(&ddev->dev, "Invoked %s\n", __func__);
 
@@ -2224,7 +2224,7 @@ static int s6e63m0_mcde_panel_resume(struct mcde_display_device *ddev)
 static int s6e63m0_mcde_panel_suspend(struct mcde_display_device *ddev, pm_message_t state)
 {
 	int ret = 0;
-	struct s6e63m0 *lcd = dev_get_drvdata(&ddev->dev);
+//	struct s6e63m0 *lcd = dev_get_drvdata(&ddev->dev);
 
 	dev_info(&ddev->dev, "Invoked %s\n", __func__);
 
