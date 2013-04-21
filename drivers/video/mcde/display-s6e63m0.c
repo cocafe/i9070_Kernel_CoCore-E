@@ -38,6 +38,8 @@
 #include <linux/earlysuspend.h>
 #endif
 
+#include <linux/moduleparam.h>
+
 #include <linux/mfd/dbx500-prcmu.h>
 #include <video/mcde_display.h>
 #include <video/mcde_display-dpi.h>
@@ -158,6 +160,7 @@ extern char mtp_data_from_boot[];
 static unsigned int LCD_DB[] = {70, 71, 72, 73, 74, 75, 76, 77};
 
 static int is_load_mtp_offset;
+module_param(is_load_mtp_offset, bool, 0644);
 
 /* READ CLK */
 #define LCD_MPU80_RDX 169
