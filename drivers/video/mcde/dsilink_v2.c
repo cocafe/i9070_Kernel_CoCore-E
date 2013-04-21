@@ -499,11 +499,11 @@ static void set_clk_continous(u8 *io, bool value)
 
 static void enable_video_mode(u8 *io, bool enable)
 {
+	int i = 2000; /* 2000 * 10us = 20 ms > 1 frame */
 	if (!enable) {
 		dsi_wfld(io, DSI_MCTL_MAIN_DATA_CTL, VID_EN, false);
 
 		/* Wait for DSI VSG to stop */
-		int i = 2000; /* 2000 * 10us = 20 ms > 1 frame */
 		while (--i && dsi_rfld(io, DSI_VID_MODE_STS, VSG_RUNNING))
 			udelay(10);
 		if (!i)
