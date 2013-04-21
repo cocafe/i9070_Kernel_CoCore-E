@@ -471,7 +471,7 @@ uint8_t calibrate_chip(void)
 				if calibration was good or bad */
 			cal_check_flag = 1u;
 			Doing_calibration_falg = 1;
-			printk(KERN_ERR "[TSP] calibration success!!!\n");
+			printk(KERN_ERR "[TSP] Calibration succeeded!!!\n");
 		}
 	}
 	return ret;
@@ -551,7 +551,7 @@ static void mxt224_ta_probe(int __vbus_state)
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
 		if (!__vbus_state) {
-			printk(KERN_INFO "[TSP] clear median filter error\n");
+			printk(KERN_INFO "[TSP] Clean median filter errors\n");
 			ret = get_object_info(copy_data,
 				TOUCH_MULTITOUCHSCREEN_T9,
 				&size_one, &obj_address);
@@ -611,18 +611,18 @@ static void mxt224_ta_probe(int __vbus_state)
 		ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
 
 		if (blen_con) {
-			printk(KERN_INFO "[TSP] T9 blen(w) [%d]\n", blen_batt);
+			printk(KERN_INFO "[TSP] T9 blen(w): %d\n", blen_batt);
 			tmpbuf = (u8)blen_batt;
 			write_mem(copy_data, obj_address+6, 1, &tmpbuf);
 		}
 		if (threshold_con) {
-			printk(KERN_INFO "[TSP] T9 threshold(w) [%d]\n", threshold_batt);
+			printk(KERN_INFO "[TSP] T9 threshold(w): %d\n", threshold_batt);
 			tmpbuf = (u8)threshold_batt;
 			threshold = threshold_batt;
 			write_mem(copy_data, obj_address+7, 1, &tmpbuf);
 		}
 		if (movefilter_con) {
-			printk(KERN_INFO "[TSP] T9 movfilter(w) [%d]\n", movefilter_batt);
+			printk(KERN_INFO "[TSP] T9 movfilter(w): %d\n", movefilter_batt);
 			tmpbuf = (u8)movefilter_batt;
 			write_mem(copy_data, obj_address+13, 1, &tmpbuf);
 		}
@@ -631,11 +631,11 @@ static void mxt224_ta_probe(int __vbus_state)
 
 	ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
 	read_mem(copy_data, obj_address+6, 1, &tmpbuf);
-	printk(KERN_INFO "[TSP] blen(mem): %d\n", tmpbuf);
+	printk(KERN_INFO "[TSP] T9 blen(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+7, 1, &tmpbuf);
-	printk(KERN_INFO "[TSP] threshold(mem): %d\n", tmpbuf);
+	printk(KERN_INFO "[TSP] T9 threshold(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+13, 1, &tmpbuf);
-	printk(KERN_INFO "[TSP] movfilter(mem): %d\n", tmpbuf);
+	printk(KERN_INFO "[TSP] T9 movfilter(mem): %d\n", tmpbuf);
 }
 
 void mxt224e_ts_change_vbus_state(bool vbus_status) {
@@ -740,7 +740,7 @@ void check_chip_calibration(struct mxt224_data *data)
 			}
 		}
 
-		printk(KERN_INFO "[TSP] t: %d, a: %d\n", tch_ch, atch_ch);
+		printk(KERN_INFO "[TSP] t: %d  a: %d\n", tch_ch, atch_ch);
 
 		/* send page up command so we can detect
 		   when data updates next time,
@@ -753,7 +753,7 @@ void check_chip_calibration(struct mxt224_data *data)
 		if (tch_ch+atch_ch >= 25) {
 			/* cal was bad - must recalibrate
 			   and check afterwards */
-			printk(KERN_ERR "[TSP] tch_ch+atch_ch  calibration was bad\n");
+			printk(KERN_ERR "[TSP] tch_ch+atch_ch  Calibration was bad\n");
 			calibrate_chip();
 			mxt_timer_state = 0;
 			mxt_time_point = jiffies_to_msecs(jiffies);
@@ -764,7 +764,7 @@ void check_chip_calibration(struct mxt224_data *data)
 
 			if (mxt_timer_state == 1) {
 				if (mxt_time_diff > 300) {
-					printk(KERN_INFO "[TSP] calibration was good\n");
+					printk(KERN_INFO "[TSP] Calibration was good\n");
 					cal_check_flag = 0;
 					good_check_flag = 0;
 					mxt_timer_state = 0;
@@ -800,7 +800,7 @@ void check_chip_calibration(struct mxt224_data *data)
 		} else if (atch_ch >= 5) {
 			/* cal was bad - must recalibrate
 			   and check afterwards */
-			printk(KERN_ERR "[TSP] calibration was bad\n");
+			printk(KERN_ERR "[TSP] Calibration was bad\n");
 			calibrate_chip();
 			mxt_timer_state = 0;
 			mxt_time_point = jiffies_to_msecs(jiffies);
@@ -816,7 +816,7 @@ void check_chip_calibration(struct mxt224_data *data)
 				/* we cannot confirm if good or bad -
 				   we must wait for next touch message
 				   to confirm */
-				printk(KERN_ERR "[TSP] calibration was not decided yet\n");
+				printk(KERN_ERR "[TSP] Calibration was not decided yet\n");
 				cal_check_flag = 1u;
 				mxt_timer_state = 0;
 				mxt_time_point = jiffies_to_msecs(jiffies);
@@ -1299,7 +1299,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 		if (msg[0] == 0x1) {
 			if ((msg[1]&0x10) == 0x00) {/* normal mode */
 				Doing_calibration_falg = 0;
-				printk(KERN_ERR"[TSP] calibration End!!!!!!");
+				printk(KERN_ERR"[TSP] Calibration End!!!\n");
 				valid_touch = 1;
 				if (cal_check_flag == 1) {
 					mxt_timer_state = 0;
@@ -1314,7 +1314,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				reset = 1;
 			}
 			if ((msg[1]&0x10) == 0x10) /* calibration */
-				printk(KERN_ERR"[TSP] calibration!!!!!!");
+				printk(KERN_ERR"[TSP] Calibration!!!\n");
 			if ((msg[1]&0x20) == 0x20) { /* signal error */
 				printk(KERN_ERR"[TSP] signal error\n");
 				reset = 1;
