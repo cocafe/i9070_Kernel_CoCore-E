@@ -29,8 +29,12 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
+#include <linux/moduleparam.h>
 
 #include <trace/events/power.h>
+
+static bool debug_mask = false;
+module_param(debug_mask, bool, 0644);
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
@@ -1669,11 +1673,13 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 	data->min = policy->min;
 	data->max = policy->max;
 
-	if(prev_min != data->min || prev_max != data->max)
-		pr_info("new min and max freqs are %u - %u kHz\n",
-					data->min, data->max);
-	pr_debug("new min and max freqs are %u - %u kHz\n",
-					data->min, data->max);
+	if (debug_mask) {
+		if(prev_min != data->min || prev_max != data->max)
+			pr_info("cpufreq: min/max %u - %u kHz\n",
+						data->min, data->max);
+		pr_debug("cpufreq: min/max %u - %u kHz\n",
+						data->min, data->max);
+	}
 
 	if (cpufreq_driver->setpolicy) {
 		data->policy = policy->policy;
