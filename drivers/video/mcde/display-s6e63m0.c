@@ -7,6 +7,8 @@
  *
  * Derived from drivers/video/omap/lcd-apollon.c
  *
+ * Modified: Huang Ji (cocafe@xda-developers.com)
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -149,6 +151,40 @@ static int s6e63m0_ldi_enable(struct s6e63m0 *lcd);
 static int s6e63m0_set_power_mode(struct mcde_display_device *ddev,
 	enum mcde_display_power_mode power_mode);
 static int update_brightness(struct s6e63m0 *lcd, u8 force);
+
+/* cocafe: S6E63M0 Color Filters */
+#define R_OFFSET			3
+#define G_OFFSET			5
+#define B_OFFSET			7
+
+#define R_DEFVAL			0x18
+#define G_DEFVAL			0x08
+#define B_DEFVAL			0x24
+
+static bool R_req = false;
+static bool G_req = false;
+static bool B_req = false;
+
+static int R_val;
+static int G_val;
+static int B_val;
+
+/* cocafe: S6E63M0 Gamma Tuner */
+#define GAMMA_TABLE_START		0
+#define GAMMA_TABLE_END			47
+
+#define GAMMA_VAL_MIN			0
+#define GAMMA_VAL_MAX			255
+
+static bool gamma_req = false;
+static bool gamma_table_req = false;
+static bool gamma_level_req = false;
+
+static int gamma_offset;
+static int gamma_val;
+static int gamma_level;
+
+module_param(gamma_table_req, bool, 0644);
 
 #ifdef SMART_DIMMING
 #define LDI_MTP_LENGTH 21
@@ -1034,14 +1070,49 @@ unsigned short s6e63m0_22_gamma_table[] = {
 	ENDDEF, 0x0000
 };
 
+unsigned short s6e63m0_22_gamma_table_custom[] = {
+	0xFA, 0x02,
+
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+
+	0xFA, 0x03,
+
+	ENDDEF, 0x0000
+};
+
 unsigned short *Gen_gamma_table(struct s6e63m0 *lcd)
 {
 	int i;
 	int j = 0;
 	char gen_gamma[gen_table_max] ={0,};
 
-	lcd->smart.brightness_level = illumination_tabel[lcd->bl];
-	generate_gamma(&(lcd->smart),gen_gamma,gen_table_max);
+	if (gamma_level_req) {
+		lcd->smart.brightness_level = illumination_tabel[gamma_level];
+	} else {
+		lcd->smart.brightness_level = illumination_tabel[lcd->bl];
+	}
+
+	generate_gamma(&(lcd->smart), gen_gamma, gen_table_max);
 
 	for(i=3;i<((gen_table_max*2)+3);i+=2) {
 		s6e63m0_22_gamma_table[i] = gen_gamma[j++];
@@ -1055,6 +1126,22 @@ unsigned short *Gen_gamma_table(struct s6e63m0 *lcd)
 		}
 		printk("\n");
 	#endif
+
+	if (R_req) {
+		s6e63m0_22_gamma_table[R_OFFSET] = R_val;
+	}
+
+	if (G_req) {
+		s6e63m0_22_gamma_table[G_OFFSET] = G_val;
+	}
+
+	if (B_req) {
+		s6e63m0_22_gamma_table[B_OFFSET] = B_val;
+	}
+
+	if (gamma_req) {
+		s6e63m0_22_gamma_table[gamma_offset] = gamma_val;
+	}
 
 	return s6e63m0_22_gamma_table;
 }
@@ -1071,10 +1158,14 @@ static int s6e63m0_gamma_ctl(struct s6e63m0 *lcd)
 		gamma = gamma_table.gamma_19_table[lcd->bl];
 	else {
 		#ifdef SMART_DIMMING
-			if(is_load_mtp_offset)
+			if(is_load_mtp_offset && !gamma_table_req) {
 				gamma = Gen_gamma_table(lcd);
-			else
+			} else if(!gamma_table_req) {
 				gamma = gamma_table.gamma_22_table[lcd->bl];
+			}
+			if (gamma_table_req) {
+				gamma = s6e63m0_22_gamma_table_custom;
+			}
 		#else
 			gamma = gamma_table.gamma_22_table[lcd->bl];
 		#endif
@@ -1473,7 +1564,7 @@ static int update_brightness(struct s6e63m0 *lcd, u8 force)
 	if ((force) || ((lcd->ldi_state) &&
 				(lcd->current_brightness != lcd->bl))) {
 
-	printk("current brightness =[%d] current gamma=[%d]\n",bl,lcd->bl);
+	printk("s6e63m0: brightness [%d] gamma [%d]\n", bl, lcd->bl);
 
 		ret = s6e63m0_set_elvss(lcd);
 		if (ret) {
@@ -1863,15 +1954,366 @@ static ssize_t s6e63m0_sysfs_show_gamma_table(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
 	struct s6e63m0 *lcd = dev_get_drvdata(dev);
-	char temp[3];
 
-	sprintf(temp, "%d\n", lcd->gamma_table_count);
-	strcpy(buf, temp);
+	int i;
 
-	return strlen(buf);
+	if (!lcd->gamma_mode) {					/* 2.2 mode */
+		if (is_load_mtp_offset && !gamma_table_req) {	/* smart dimming */
+			sprintf(buf, "Gamma mode: 2.2 (Smart Dimming)\n");
+			sprintf(buf, "%sGamma level: %02d\n\n", buf, lcd->bl);
+			for (i = 3; i < ((gen_table_max * 2) + 3); i += 2) {
+				sprintf(buf, "%s[%02d]\t\t%#04X\n", buf, i, s6e63m0_22_gamma_table[i]);
+			}
+		} else if (!gamma_table_req) {
+			sprintf(buf, "Gamma mode: 2.2\n");
+			sprintf(buf, "%sGamma level: %02d\n\n", buf, lcd->bl);
+			for (i = 3; i < ((gen_table_max * 2) + 3); i += 2) {
+				sprintf(buf, "%s[%02d]\t\t%#04X\n", buf, i, (unsigned int)gamma_table.gamma_22_table[lcd->bl][i]);
+			}
+		} else if (gamma_table_req) {
+			sprintf(buf, "Gamma mode: Custom\n\n");
+			for (i = 3; i < ((gen_table_max * 2) + 3); i += 2) {
+				sprintf(buf, "%s[%02d]\t\t%#04X\n", buf, i, (unsigned int)s6e63m0_22_gamma_table_custom[i]);
+			}
+		}
+	} else {						/* 1.9 mode */
+		sprintf(buf, "Gamma mode 1.9\n");
+		sprintf(buf, "%sGamma level: %02d\n\n", buf, lcd->bl);
+		for (i = 3; i < ((gen_table_max * 2) + 3); i += 2) {
+			sprintf(buf, "%s[%02d]\t\t%#04X\n", buf, i, (unsigned int)gamma_table.gamma_19_table[lcd->bl][i]);
+		}
+	}
+
+	return sprintf(buf, "%s\n", buf);
+}
+static ssize_t s6e63m0_sysfs_store_gamma_table(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+
+	unsigned int buf_table[20];
+
+	int i;
+	int j;
+	int k = 0;
+	int ret;
+
+	/* 2.2 mode */ /* smart dimming only */
+	if (lcd->gamma_mode || !is_load_mtp_offset) {
+		pr_info("s6e63m0: not proper gamma mode\n");
+		return -EINVAL;
+	}
+
+	ret = sscanf(buf, "%x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x", 
+				&buf_table[0], &buf_table[1], 
+				&buf_table[2], &buf_table[3], 
+				&buf_table[4], &buf_table[5], 
+				&buf_table[6], &buf_table[7], 
+				&buf_table[8], &buf_table[9], 
+				&buf_table[10], &buf_table[11], 
+				&buf_table[12], &buf_table[13], 
+				&buf_table[14], &buf_table[15], 
+				&buf_table[16], &buf_table[17], 
+				&buf_table[18], &buf_table[19], 
+				&buf_table[20]);
+
+	if (!ret) {
+		pr_info("s6e63m0: invalid input(s)\n");
+	}
+
+	for (i = 0; i < 20; i++) {
+		if (buf_table[i] < 0 || buf_table[i] > 255) {
+			pr_info("s6e63m0: invalid input: [%02d]\n", i);
+			return -EINVAL;
+		}
+	}
+
+	for (j = 3; j < ((gen_table_max * 2) + 3); j += 2) {
+		s6e63m0_22_gamma_table_custom[j] = buf_table[k];
+		k++;
+	}
+
+	gamma_table_req = true;
+
+	s6e63m0_gamma_ctl(lcd);
+
+	return len;
 }
 static DEVICE_ATTR(gamma_table, 0644,
-		s6e63m0_sysfs_show_gamma_table, NULL);
+		s6e63m0_sysfs_show_gamma_table, s6e63m0_sysfs_store_gamma_table);
+
+static ssize_t s6e63m0_sysfs_store_gamma_tune(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+
+	int buf_offset;
+	int buf_val;
+	int buf_orig;
+
+	int ret;
+
+	/* 2.2 mode */ /* smart dimming only */
+	if (lcd->gamma_mode || !is_load_mtp_offset) {
+		pr_info("s6e63m0: not proper gamma mode\n");
+		return -EINVAL;
+	}
+
+	ret = sscanf(buf, "%d %x", &buf_offset, &buf_val);
+
+	if (!ret) {
+		pr_info("s6e63m0: invalid input(s)\n");
+		return -EINVAL;
+	}
+
+	if (buf_offset < 0 || buf_offset > 47) {
+		pr_info("s6e63m0: invalid input(s)\n");
+		return -EINVAL;
+	}
+
+	if (buf_val < 0) {
+		pr_info("s6e63m0: cancel tuned gamma value\n");
+		gamma_req = false;
+		s6e63m0_gamma_ctl(lcd);
+		return len;
+	} else if (buf_val > 255) {
+		pr_info("s6e63m0: invalid input(s)\n");
+		return -EINVAL;
+	}
+
+	buf_orig = s6e63m0_22_gamma_table[buf_offset];
+	
+	gamma_offset = buf_offset;
+	gamma_val = buf_val;
+	gamma_req = true;
+
+	s6e63m0_gamma_ctl(lcd);
+
+	pr_info("s6e63m0: Gamma [%02d] %#04X -> %#04X\n", gamma_offset, buf_orig, s6e63m0_22_gamma_table[gamma_offset]);
+
+	return len;
+}
+static DEVICE_ATTR(gamma_tune, 0200,
+		NULL, s6e63m0_sysfs_store_gamma_tune);
+
+static ssize_t s6e63m0_sysfs_show_gamma_level(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%02d", lcd->bl);
+}
+
+static ssize_t s6e63m0_sysfs_store_gamma_level(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	
+	int buf_val;
+
+	int ret;
+
+	ret = sscanf(buf, "%d", &buf_val);
+
+	if (!ret){
+		pr_info("s6e63m0: invalid input\n");
+		return -EINVAL;
+	}
+
+	if (buf_val < 0) {
+		pr_info("s6e63m0: gamma level automatical\n");
+		gamma_level_req = false;
+		s6e63m0_gamma_ctl(lcd);
+		return len;
+	} else if (buf_val > 25) {
+		pr_info("s6e63m0: invalid input\n");
+		return -EINVAL;
+	}
+
+	gamma_level = buf_val;
+	gamma_level_req = true;
+
+	s6e63m0_gamma_ctl(lcd);
+
+	return len;
+}
+
+static DEVICE_ATTR(gamma_level, 0644,
+		s6e63m0_sysfs_show_gamma_level, s6e63m0_sysfs_store_gamma_level);
+
+static ssize_t s6e63m0_sysfs_show_filter_R(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{	
+	/* 2.2 mode, smart dimming */
+	return sprintf(buf, "%d\n", s6e63m0_22_gamma_table[R_OFFSET]);
+}
+static ssize_t s6e63m0_sysfs_store_filter_R(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+
+	int buf_val;
+	int buf_R;
+
+	int ret;
+
+	/* 2.2 mode */ /* smart dimming only */
+	if (lcd->gamma_mode || !is_load_mtp_offset) {
+		pr_info("s6e63m0: not proper gamma mode\n");
+		return -EINVAL;
+	}
+
+	ret = sscanf(buf, "%d", &buf_val);
+
+	if (!ret) {
+		pr_info("s6e63m0: invalid input\n");
+	}
+
+	if (buf_val < GAMMA_VAL_MIN) {
+		pr_info("s6e63m0: reset R filter\n");
+
+		R_req = false;
+
+		s6e63m0_gamma_ctl(lcd);
+	} else if (buf_val >= GAMMA_VAL_MIN && buf_val <= GAMMA_VAL_MAX) {
+		buf_R = s6e63m0_22_gamma_table[R_OFFSET];
+
+		R_val = buf_val;
+		R_req = true;
+
+		s6e63m0_gamma_ctl(lcd);
+
+		pr_info("s6e63m0: [R] %#04X -> %#04X\n", buf_R, s6e63m0_22_gamma_table[R_OFFSET]);
+	} else {
+		pr_info("s6e63m0: invalid input\n");
+	}
+
+	return len;
+}
+static DEVICE_ATTR(filter_R, 0644,
+		s6e63m0_sysfs_show_filter_R, s6e63m0_sysfs_store_filter_R);
+
+static ssize_t s6e63m0_sysfs_show_filter_G(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{	
+	/* 2.2 mode, smart dimming */
+	return sprintf(buf, "%d\n", s6e63m0_22_gamma_table[G_OFFSET]);
+}
+static ssize_t s6e63m0_sysfs_store_filter_G(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+
+	int buf_val;
+	int buf_G;
+
+	int ret;
+
+	/* 2.2 mode */ /* smart dimming only */
+	if (lcd->gamma_mode || !is_load_mtp_offset) {
+		pr_info("s6e63m0: not proper gamma mode\n");
+		return -EINVAL;
+	}
+
+	ret = sscanf(buf, "%d", &buf_val);
+
+	if (!ret) {
+		pr_info("s6e63m0: invalid input\n");
+	}
+
+	if (buf_val < GAMMA_VAL_MIN) {
+		pr_info("s6e63m0: reset G filter\n");
+
+		G_req = false;
+
+		s6e63m0_gamma_ctl(lcd);
+	} else if (buf_val >= GAMMA_VAL_MIN && buf_val <= GAMMA_VAL_MAX) {
+		buf_G = s6e63m0_22_gamma_table[G_OFFSET];
+
+		G_val = buf_val;
+		G_req = true;
+
+		s6e63m0_gamma_ctl(lcd);
+
+		pr_info("s6e63m0: [G] %#04X -> %#04X\n", buf_G, s6e63m0_22_gamma_table[G_OFFSET]);
+	} else {
+		pr_info("s6e63m0: invalid input\n");
+	}
+
+	return len;
+}
+static DEVICE_ATTR(filter_G, 0644,
+		s6e63m0_sysfs_show_filter_G, s6e63m0_sysfs_store_filter_G);
+
+static ssize_t s6e63m0_sysfs_show_filter_B(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{	
+	/* 2.2 mode, smart dimming */
+	return sprintf(buf, "%d\n", s6e63m0_22_gamma_table[B_OFFSET]);
+}
+static ssize_t s6e63m0_sysfs_store_filter_B(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+
+	int buf_val;
+	int buf_B;
+
+	int ret;
+
+	/* 2.2 mode */ /* smart dimming only */
+	if (lcd->gamma_mode || !is_load_mtp_offset) {
+		pr_info("s6e63m0: not proper gamma mode\n");
+		return -EINVAL;
+	}
+
+	ret = sscanf(buf, "%d", &buf_val);
+
+	if (!ret) {
+		pr_info("s6e63m0: invalid input\n");
+	}
+
+	if (buf_val < GAMMA_VAL_MIN) {
+		pr_info("s6e63m0: reset B filter\n");
+
+		B_req = false;
+
+		s6e63m0_gamma_ctl(lcd);
+	} else if (buf_val >= GAMMA_VAL_MIN && buf_val <= GAMMA_VAL_MAX) {
+		buf_B = s6e63m0_22_gamma_table[B_OFFSET];
+
+		B_val = buf_val;
+		B_req = true;
+
+		s6e63m0_gamma_ctl(lcd);
+
+		pr_info("s6e63m0: [B] %#04X -> %#04X\n", buf_B, s6e63m0_22_gamma_table[B_OFFSET]);
+	} else {
+		pr_info("s6e63m0: invalid input\n");
+	}
+
+	return len;
+}
+static DEVICE_ATTR(filter_B, 0644,
+		s6e63m0_sysfs_show_filter_B, s6e63m0_sysfs_store_filter_B);
+
+static ssize_t s6e63m0_sysfs_show_update_brihtness(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	
+	update_brightness(lcd, 1);
+
+	return sprintf(buf, "Updating brightness...\n");
+}
+static DEVICE_ATTR(brightness_update, 0444,
+		s6e63m0_sysfs_show_update_brihtness, NULL);
 
 static int s6e63m0_set_power_mode(struct mcde_display_device *ddev,
 	enum mcde_display_power_mode power_mode)
@@ -2122,11 +2564,35 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries\n");
 
+	ret = device_create_file(&lcd->bd->dev, &dev_attr_brightness_update);
+	if (ret < 0)
+		dev_err(&lcd->ld->dev, "failed to add sysfs entries\n");
+
 	ret = device_create_file(&(ddev->dev), &dev_attr_gamma_mode);
 	if (ret < 0)
 		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
 
 	ret = device_create_file(&(ddev->dev), &dev_attr_gamma_table);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_gamma_level);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_gamma_tune);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_filter_R);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_filter_G);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_filter_B);
 	if (ret < 0)
 		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
 
