@@ -333,15 +333,16 @@ unsigned int hsdaclowpow_bit = 00;
 module_param(hsdaclowpow_bit, uint, 0644);
 
 /* HsHpEn:
+ * (Headset noise cancellation)
  * 0: Headset high pass filter disabled
- * 1: Headset high pass filter enabled (offset cancellation enabled)
+ * 1: Headset high pass filter enabled (offset cancellation enabled
  */
 static const u8 hshp_mask = BMASK(REG_ANACONF1_HSHPEN);
 
 bool hshp_con;
 module_param(hshp_con, bool, 0644);
 
-unsigned int hshp_bit = 0;
+unsigned int hshp_bit = 1;
 module_param(hshp_bit, uint, 0644);
 
 /* HsLEarDigGain */
