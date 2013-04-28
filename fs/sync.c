@@ -484,6 +484,7 @@ static void fsync_early_suspend(struct early_suspend *h)
 	screen_off = true;
 	/* Do fsync */
 	if (fsync_dyn && !fsync) {
+		pr_info("fsync: dynamic fsync called\n");
 		wakeup_flusher_threads(0);
 		sync_filesystems(0);
 		sync_filesystems(1);
