@@ -477,7 +477,9 @@ asmlinkage long SyS_sync_file_range2(long fd, long flags,
 SYSCALL_ALIAS(sys_sync_file_range2, SyS_sync_file_range2);
 #endif
 
-static void fsync_early_suspend(struct early_suspend *handler)
+static struct early_suspend early_suspend;
+
+static void fsync_early_suspend(struct early_suspend *h)
 {
 	screen_off = true;
 	/* Do fsync */
@@ -488,20 +490,21 @@ static void fsync_early_suspend(struct early_suspend *handler)
 	}
 }
 
-static void fsync_late_resume(struct early_suspend *handler)
+static void fsync_late_resume(struct early_suspend *h)
 {
 	screen_off = false;
 }
 
-static struct early_suspend fsync_suspend = {
-	.suspend = fsync_early_suspend,
-	.resume = fsync_late_resume,
-};
-
-static void __init fsync_module_init(void)
+static int __init fsync_module_init(void)
 {
-	register_early_suspend(&fsync_suspend);
+	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	early_suspend.suspend = fsync_early_suspend;
+	early_suspend.resume = fsync_late_resume;
+
+	register_early_suspend(&early_suspend);
 	pr_info ("fsync: fsync control registered.");
+
+	return 0;
 }
 
 module_init(fsync_module_init);
