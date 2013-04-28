@@ -1403,10 +1403,11 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				data->fingers[id].w = msg[5];
 				data->fingers[id].state = MXT224_STATE_RELEASE;
 				data->finger_mask = id;
-			} else {
-				printk(KERN_DEBUG "[TSP] Unknown state %#02x %#02x\n", msg[0], msg[1]);
+			} 
+//			else {
+//				printk(KERN_DEBUG "[TSP] Unknown state %#02x %#02x\n", msg[0], msg[1]);
 				/* continue; */
-			}
+//			}
 		}
 		if (data != data_backup)
 			data = data_backup;
