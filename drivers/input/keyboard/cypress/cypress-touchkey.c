@@ -3,6 +3,8 @@
  *
  * Copyright (C) 2011 Samsung Electronics
  *
+ * Modified: Huang Ji (cocafe@xda-developers.com)
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -999,6 +1001,30 @@ static ssize_t touchkey_threshold_show(struct device *dev,
 	return sprintf(buf, "%d\n", touchkey_threshold);
 }
 
+static ssize_t touchkey_threshold_store(struct device *dev,
+				 struct device_attribute *attr, const char *buf,
+				 size_t size)
+{
+	u8 buf_threshold;
+	int buftmp;
+	int ret;
+
+	ret = sscanf(buf, "%d", &buftmp);
+
+	if (!ret) {
+		printk(KERN_INFO "cypress-touchkey: invalid threshold\n");
+		return -EINVAL;
+	}
+
+	buf_threshold = buftmp;
+
+	ret = i2c_smbus_write_byte_data(info->client, CYPRESS_THRESHOLD, buf_threshold);
+
+	printk(KERN_INFO "cypress-touchkey: threshold(w) %d\n", (unsigned int)buf_threshold);
+
+	return size;
+}
+
 static ssize_t touch_autocal_testmode(struct device *dev,
 				 struct device_attribute *attr, const char *buf,
 				 size_t size)
@@ -1053,7 +1079,7 @@ static DEVICE_ATTR(touchkey_raw_data0, S_IRUGO, touchkey_raw_data0_show, NULL);
 static DEVICE_ATTR(touchkey_raw_data1, S_IRUGO, touchkey_raw_data1_show, NULL);
 static DEVICE_ATTR(touchkey_idac0, S_IRUGO, touchkey_idac0_show, NULL);
 static DEVICE_ATTR(touchkey_idac1, S_IRUGO, touchkey_idac1_show, NULL);
-static DEVICE_ATTR(touchkey_threshold, S_IRUGO, touchkey_threshold_show, NULL);
+static DEVICE_ATTR(touchkey_threshold, S_IRUGO | S_IWUSR, touchkey_threshold_show, touchkey_threshold_store);
 static DEVICE_ATTR(touch_sensitivity, S_IRUGO | S_IWUSR | S_IWGRP, NULL, touch_sensitivity_control);
 static DEVICE_ATTR(touchkey_autocal_start, S_IRUGO | S_IWUSR | S_IWGRP, NULL, touch_autocal_testmode);
 
