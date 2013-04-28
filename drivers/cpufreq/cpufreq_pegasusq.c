@@ -1054,7 +1054,7 @@ static int check_up(void)
 
 	if (min_freq >= up_freq && min_rq_avg > up_rq) {
 		if (online >= 2) {
-			if (min_avg_load < 65)
+			if (min_avg_load < 75)
 				return 0;
 		}
 		printk(KERN_ERR "[HOTPLUG IN] %s %d>=%d && %d>%d\n",
@@ -1117,7 +1117,7 @@ static int check_down(void)
 	}
 
 	if ((max_freq <= down_freq && max_rq_avg <= down_rq)
-		|| (online >= 3 && max_avg_load < 30)) {
+		|| (online >= 3 && max_avg_load < 35)) {
 		printk(KERN_ERR "[HOTPLUG OUT] %s %d<=%d && %d<%d\n",
 			__func__, max_freq, down_freq, max_rq_avg, down_rq);
 		hotplug_history->num_hist = 0;
