@@ -294,6 +294,7 @@ config CPU_FREQ_GOV_NIGHTMARE
 
 config CPU_FREQ_GOV_ONDEMANDQ
 	tristate "'ondemand' cpufreq policy governor"
+	depends on HAS_EARLYSUSPEND
 	help
 	   Based on ondemand,hotplug in suspend.
 

@@ -5,10 +5,14 @@
  *            (C)  2003 Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>.
  *                      Jun Nakajima <jun.nakajima@intel.com>
  *
- *                 2013 cocafe@xda-developers.com
+ *                 2013 Huang Ji (cocafe@xda-developers.com)
  *
- *  Based on ondemand.
- *  Hotplug in suspend.
+ * TODO:
+ * This governor is based on ondemand governor.
+ * The intention is to work with something like multi-core scheduler
+ * which needs two cores work at the same time to get best effects.
+ * In order to save power,when system goes to sleep,it will hotplug CPU1.
+ * So it WONT hotplug CPU1 in non-suspend state.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -69,7 +73,7 @@ static void do_dbs_timer(struct work_struct *work);
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				unsigned int event);
 
-#ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ondemandq
+#ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMANDQ
 static
 #endif
 struct cpufreq_governor cpufreq_gov_ondemandq = {
@@ -755,7 +759,7 @@ static void cpu_up_work(void)
 	if (cpu == 0)
 		continue;
 		cpu_up(cpu);
-		pr_info ("ondemandq: cpu%d up.\n", cpu);
+		pr_info ("ondemandq: CPU%d up.\n", cpu);
 	}
 }
 
@@ -766,13 +770,14 @@ static void cpu_down_work(void)
 	for_each_online_cpu(cpu) {
 		if (cpu == 0)
 			continue;
-		printk(KERN_ERR "CPU_DOWN %d\n", cpu);
 		cpu_down(cpu);
-		pr_info ("ondemandq: cpu%d down.\n", cpu);
+		pr_info ("ondemandq: CPU%d down.\n", cpu);
 	}
 }
 
-static void cpufreq_ondemandq_early_suspend(void)
+static struct early_suspend early_suspend;
+
+static void cpufreq_ondemandq_early_suspend(struct early_suspend *h)
 {
 	#if 0
 	pr_info ("ondemandq: enter suspend.\n");
@@ -780,20 +785,13 @@ static void cpufreq_ondemandq_early_suspend(void)
 	cpu_down_work();
 }
 
-static void cpufreq_ondemandq_late_resume(void)
+static void cpufreq_ondemandq_late_resume(struct early_suspend *h)
 {
 	#if 0
 	pr_info ("ondemandq: enter resume.\n");
 	#endif
 	cpu_up_work();
 }
-
-#if 1
-static struct early_suspend cpufreq_ondemandq_suspend = {
-	.suspend = cpufreq_ondemandq_early_suspend,
-	.resume = cpufreq_ondemandq_late_resume,
-};
-#endif
 
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				   unsigned int event)
@@ -880,7 +878,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		} else
 			dbs_timer_init(this_dbs_info, cpu);
 
-		register_early_suspend(&cpufreq_ondemandq_suspend);
+		register_early_suspend(&early_suspend);
 		#ifdef DEBUG
 		pr_info ("ondemandq: earlysuspend registered.\n");
 		#endif
@@ -889,7 +887,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 	case CPUFREQ_GOV_STOP:
 
-		unregister_early_suspend(&cpufreq_ondemandq_suspend);
+		unregister_early_suspend(&early_suspend);
 		#ifdef DEBUG
 		pr_info ("ondemandq: earlysuspend unregistered.\n");
 		#endif
@@ -953,6 +951,10 @@ static int __init cpufreq_gov_dbs_init(void)
 		min_sampling_rate =
 			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
+
+	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	early_suspend.suspend = cpufreq_ondemandq_early_suspend;
+	early_suspend.resume = cpufreq_ondemandq_late_resume;
 
 	return cpufreq_register_governor(&cpufreq_gov_ondemandq);
 }
