@@ -13,6 +13,8 @@
 #include <linux/resume-trace.h>
 #include <linux/workqueue.h>
 
+#include <linux/moduleparam.h>
+
 #include "power.h"
 
 #ifdef CONFIG_DVFS_LIMIT
@@ -21,6 +23,9 @@
 #endif /* CONFIG_DVFS_LIMIT */
 
 DEFINE_MUTEX(pm_mutex);
+
+static bool debug_mask = false;
+module_param(debug_mask, bool, 0644);
 
 #ifdef CONFIG_PM_SLEEP
 
@@ -437,7 +442,9 @@ static int get_cpufreq_level(unsigned int freq, unsigned int *level, int req_typ
 		for (i = 0; (table[i].frequency != CPUFREQ_TABLE_END); i++)
 			if (table[i].frequency >= freq) {
 				*level = table[i].frequency;
-				pr_info("%s: MIN_LOCK req_freq(%d), matched_freq(%d)\n", __func__, freq, table[i].frequency);
+				if (debug_mask) {
+					pr_info("%s: MIN_LOCK req_freq(%d), matched_freq(%d)\n", __func__, freq, table[i].frequency);
+				}
 				return VALID_LEVEL;
 			}
 		break;
@@ -446,7 +453,9 @@ static int get_cpufreq_level(unsigned int freq, unsigned int *level, int req_typ
 		for (i = table_length-1; i >= 0; i--)
 			if (table[i].frequency <= freq) {
 				*level = table[i].frequency;
-				pr_info("%s: MAX_LOCK req_freq(%d), matched_freq(%d)\n", __func__, freq, table[i].frequency);
+				if (debug_mask) {
+					pr_info("%s: MAX_LOCK req_freq(%d), matched_freq(%d)\n", __func__, freq, table[i].frequency);
+				}
 				return VALID_LEVEL;
 			}
 		break;
