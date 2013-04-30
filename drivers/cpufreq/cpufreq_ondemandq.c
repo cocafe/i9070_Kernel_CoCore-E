@@ -952,7 +952,8 @@ static int __init cpufreq_gov_dbs_init(void)
 			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
-	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+//	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
 	early_suspend.suspend = cpufreq_ondemandq_early_suspend;
 	early_suspend.resume = cpufreq_ondemandq_late_resume;
 
