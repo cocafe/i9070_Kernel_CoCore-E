@@ -1898,8 +1898,6 @@ static DEVICE_ATTR(auto_brightness, 0644, auto_brightness_show, auto_brightness_
 static ssize_t s6e63m0_sysfs_show_elvss_table(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
-	struct s6e63m0 *lcd = dev_get_drvdata(dev);
-
 	int i;
 
 	sprintf(buf, "ELVSS table:\n\n");
