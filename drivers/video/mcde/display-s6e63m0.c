@@ -1895,6 +1895,24 @@ static ssize_t auto_brightness_store(struct device *dev,
 
 static DEVICE_ATTR(auto_brightness, 0644, auto_brightness_show, auto_brightness_store);
 
+static ssize_t s6e63m0_sysfs_show_elvss_table(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+
+	int i;
+
+	sprintf(buf, "ELVSS table:\n\n");
+
+	for (i = 1; i <= 7; i += 2) {
+		sprintf(buf, "%s[%02d]\t%#04X\n", buf, i, SEQ_DYNAMIC_ELVSS[i]);
+	}
+	
+	return strlen(buf);
+}
+static DEVICE_ATTR(elvss_table, 0400,
+		s6e63m0_sysfs_show_elvss_table, NULL);
+
 static ssize_t s6e63m0_sysfs_show_gamma_mode(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
@@ -2593,6 +2611,10 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
 
 	ret = device_create_file(&(ddev->dev), &dev_attr_filter_B);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_elvss_table);
 	if (ret < 0)
 		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
 
