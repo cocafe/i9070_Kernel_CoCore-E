@@ -153,9 +153,6 @@ module_param(calibration_auto, bool, 0644);
 unsigned int calibration_edge = 9;		/* threshold: edge touches */
 module_param(calibration_edge, uint, 0644);
 
-unsigned int calibration_nor = 80;		/* threshold: normal touches */
-module_param(calibration_nor, uint, 0644);
-
 unsigned int edgetouch_x = MXT224E_EDGE_X;
 module_param(edgetouch_x, uint, 0644);
 
@@ -163,7 +160,6 @@ unsigned int edgetouch_y = MXT224E_EDGE_Y;
 module_param(edgetouch_y, uint, 0644);
 
 unsigned int edgetouch_counter;
-unsigned int nortouch_counter;
 
 /* cocafe: Debugging Prints */
 static bool debug_mask = false;
