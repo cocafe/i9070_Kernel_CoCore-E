@@ -498,7 +498,7 @@ static void fsync_late_resume(struct early_suspend *h)
 
 static int __init fsync_module_init(void)
 {
-	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
 	early_suspend.suspend = fsync_early_suspend;
 	early_suspend.resume = fsync_late_resume;
 
