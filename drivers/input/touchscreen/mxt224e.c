@@ -113,7 +113,12 @@ module_param(touch_boost_ddr, bool, 0644);
 unsigned int touch_boost_freq = TOUCHBOOST_FREQ_DEF;
 module_param(touch_boost_freq, uint, 0644);
 
-/* cocafe: Touch Sensitivity Control */
+/* cocafe: Touch Parameters Control */
+#define T9_BLEN_ADDR			6
+#define T9_THRESHOLD_ADDR		7
+#define T9_MOVFILTER_ADDR		13
+#define T9_NEXTTCHDI_ADDR		34
+
 bool threshold_con = false;
 module_param(threshold_con, bool, 0644);
 
@@ -131,6 +136,12 @@ module_param(blen_con, bool, 0644);
 
 unsigned int blen_batt = 32;			/* default: 32 */
 module_param(blen_batt, uint, 0644);
+
+bool nexttchdi_con = false;
+module_param(nexttchdi_con, bool, 0644);
+
+unsigned int nexttchdi_batt = 0;		/* default: 0 */
+module_param(nexttchdi_batt, uint, 0644);
 
 /* cocafe: Touch Auto Calibration */
 #define MXT224E_EDGE_X			50
@@ -609,7 +620,7 @@ static void mxt224_ta_probe(int __vbus_state)
 			obj_address+8, 1, &noise_threshold);
 	}
 
-	if (threshold_con || movefilter_con || blen_con) {
+	if (threshold_con || movefilter_con || blen_con || nexttchdi_con) {
 		ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
 
 		if (blen_con) {
@@ -628,6 +639,11 @@ static void mxt224_ta_probe(int __vbus_state)
 			tmpbuf = (u8)movefilter_batt;
 			write_mem(copy_data, obj_address+13, 1, &tmpbuf);
 		}
+		if (nexttchdi_con) {
+			printk(KERN_INFO "[TSP] T9 nexttchdi(w): %d\n", nexttchdi_batt);
+			tmpbuf = (u8)nexttchdi_batt;
+			write_mem(copy_data, obj_address+34, 1, &tmpbuf);
+		}
 	}
 	printk(KERN_INFO "[TSP] threshold(r): %d\n", threshold);
 
@@ -638,6 +654,8 @@ static void mxt224_ta_probe(int __vbus_state)
 	printk(KERN_INFO "[TSP] T9 threshold(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+13, 1, &tmpbuf);
 	printk(KERN_INFO "[TSP] T9 movfilter(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+34, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] T9 nexttchdi(mem): %d\n", tmpbuf);
 }
 
 void mxt224e_ts_change_vbus_state(bool vbus_status) {
