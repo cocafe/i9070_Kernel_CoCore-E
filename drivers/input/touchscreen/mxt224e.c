@@ -114,13 +114,24 @@ static unsigned int touch_boost_freq = TOUCHBOOST_FREQ_DEF;
 module_param(touch_boost_freq, uint, 0644);
 
 /* cocafe: Touch Parameters Control */
+
 /* mxT224E T9 config table offsets */
-#define T9_BLEN				6
-#define T9_THRESHOLD			7
-#define T9_MOVHYSTI			11
-#define T9_MOVHYSTN			12
-#define T9_MOVFILTER			13
+#define T9_BLEN				6		// Gain of the analog circuits in front of the ADC
+#define T9_THRESHOLD			7		// Touch threshold value
+#define T9_MOVHYSTI			11		// Move hysteresis, initial
+#define T9_MOVHYSTN			12		// Move hysteresis, next
+#define T9_MOVFILTER			13		// Move filter value
+#define T9_NUMTOUCH			14		// Number of max touches
+#define T9_MRGHYST			15		// Merge hysteresis
+#define T9_MRGTHR			16		// Merge threshold
+#define T9_AMPHYST			17		// Amplitude hysteresis
 #define T9_NEXTTCHDI			34
+
+static bool blen_con = false;
+module_param(blen_con, bool, 0644);
+
+static unsigned int blen_batt = 32;			/* default: 32 */
+module_param(blen_batt, uint, 0644);
 
 static bool threshold_con = false;
 module_param(threshold_con, bool, 0644);
@@ -131,8 +142,14 @@ module_param(threshold_batt, uint, 0644);
 static bool movhysti_con = false;
 module_param(movhysti_con, bool, 0644);
 
-static unsigned int movhysti_batt = 15;			/* pdata: 15 */
+static unsigned int movhysti_batt = 1;			/* pdata: 15 */
 module_param(movhysti_batt, uint, 0644);
+
+static bool movhystn_con = false;
+module_param(movhystn_con, bool, 0644);
+
+static unsigned int movhystn_batt = 1;			/* pdata: 1 */
+module_param(movhystn_batt, uint, 0644);
 
 static bool movefilter_con = false;
 module_param(movefilter_con, bool, 0644);
@@ -140,11 +157,23 @@ module_param(movefilter_con, bool, 0644);
 static unsigned int movefilter_batt = 11;		/* default: 46 */
 module_param(movefilter_batt, uint, 0644);
 
-static bool blen_con = false;
-module_param(blen_con, bool, 0644);
+static bool mrghyst_con = false;
+module_param(mrghyst_con, bool, 0644);
 
-static unsigned int blen_batt = 32;			/* default: 32 */
-module_param(blen_batt, uint, 0644);
+static unsigned int mrghyst_batt = 1;			/* pdata: 5 */
+module_param(mrghyst_batt, uint, 0644);
+
+static bool mrgthr_con = false;
+module_param(mrgthr_con, bool, 0644);
+
+static unsigned int mrgthr_batt = 20;			/* pdata: 40 */
+module_param(mrgthr_batt, uint, 0644);
+
+static bool amphyst_con = false;
+module_param(amphyst_con, bool, 0644);
+
+static unsigned int amphyst_batt = 10;			/* pdata: 10 */
+module_param(amphyst_batt, uint, 0644);
 
 static bool nexttchdi_con = false;
 module_param(nexttchdi_con, bool, 0644);
@@ -640,14 +669,34 @@ static void mxt224_ta_probe(int __vbus_state)
 		write_mem(copy_data, obj_address+7, 1, &tmpbuf);
 	}
 	if (movhysti_con) {
-		printk(KERN_INFO "[TSP] T9 movhysti(w): %d\n", movefilter_batt);
+		printk(KERN_INFO "[TSP] T9 movhysti(w): %d\n", movhysti_batt);
 		tmpbuf = (u8)movhysti_batt;
 		write_mem(copy_data, obj_address+11, 1, &tmpbuf);
+	}
+	if (movhystn_con) {
+		printk(KERN_INFO "[TSP] T9 movhystn(w): %d\n", movhystn_batt);
+		tmpbuf = (u8)movhystn_batt;
+		write_mem(copy_data, obj_address+12, 1, &tmpbuf);
 	}
 	if (movefilter_con) {
 		printk(KERN_INFO "[TSP] T9 movfilter(w): %d\n", movefilter_batt);
 		tmpbuf = (u8)movefilter_batt;
 		write_mem(copy_data, obj_address+13, 1, &tmpbuf);
+	}
+	if (mrghyst_con) {
+		printk(KERN_INFO "[TSP] T9 mrghyst(w): %d\n", mrghyst_batt);
+		tmpbuf = (u8)mrghyst_batt;
+		write_mem(copy_data, obj_address+15, 1, &tmpbuf);
+	}
+	if (mrgthr_con) {
+		printk(KERN_INFO "[TSP] T9 mrgthr(w): %d\n", mrgthr_batt);
+		tmpbuf = (u8)mrgthr_batt;
+		write_mem(copy_data, obj_address+16, 1, &tmpbuf);
+	}
+	if (amphyst_con) {
+		printk(KERN_INFO "[TSP] T9 amphyst(w): %d\n", amphyst_batt);
+		tmpbuf = (u8)amphyst_batt;
+		write_mem(copy_data, obj_address+17, 1, &tmpbuf);
 	}
 	if (nexttchdi_con) {
 		printk(KERN_INFO "[TSP] T9 nexttchdi(w): %d\n", nexttchdi_batt);
@@ -665,8 +714,16 @@ static void mxt224_ta_probe(int __vbus_state)
 	printk(KERN_INFO "[TSP] T9 threshold(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+11, 1, &tmpbuf);
 	printk(KERN_INFO "[TSP] T9 movhysti(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+12, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] T9 movhystn(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+13, 1, &tmpbuf);
 	printk(KERN_INFO "[TSP] T9 movfilter(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+15, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] T9 mrghyst(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+16, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] T9 mrgthr(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+17, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] T9 amphyst(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+34, 1, &tmpbuf);
 	printk(KERN_INFO "[TSP] T9 nexttchdi(mem): %d\n", tmpbuf);
 }
