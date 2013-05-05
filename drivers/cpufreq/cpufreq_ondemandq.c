@@ -953,7 +953,7 @@ static int __init cpufreq_gov_dbs_init(void)
 	}
 
 //	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+//	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
 	early_suspend.suspend = cpufreq_ondemandq_early_suspend;
 	early_suspend.resume = cpufreq_ondemandq_late_resume;
 
@@ -972,7 +972,7 @@ MODULE_DESCRIPTION("'cpufreq_ondemandq' - A dynamic cpufreq governor for "
 	"Low Latency Frequency Transition capable processors");
 MODULE_LICENSE("GPL");
 
-#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_ondemandq
+#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMANDQ
 fs_initcall(cpufreq_gov_dbs_init);
 #else
 module_init(cpufreq_gov_dbs_init);
