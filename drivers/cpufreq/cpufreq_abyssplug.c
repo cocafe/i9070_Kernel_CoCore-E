@@ -33,10 +33,10 @@
 #include <linux/slab.h>
 
 /* greater than 80% avg load across online CPUs increases frequency */
-#define DEFAULT_UP_FREQ_MIN_LOAD			(70)
+#define DEFAULT_UP_FREQ_MIN_LOAD			(80)
 
 /* Keep 10% of idle under the up threshold when decreasing the frequency */
-#define DEFAULT_FREQ_DOWN_DIFFERENTIAL			(30)
+#define DEFAULT_FREQ_DOWN_DIFFERENTIAL			(10)
 
 /* less than 20% avg load across online CPUs decreases frequency */
 #define DEFAULT_DOWN_FREQ_MAX_LOAD			(20)
@@ -45,7 +45,7 @@
 #define DEFAULT_SAMPLING_PERIOD				(100000)
 
 /* default number of sampling periods to average before hotplug-in decision */
-#define DEFAULT_HOTPLUG_IN_SAMPLING_PERIODS		(4)
+#define DEFAULT_HOTPLUG_IN_SAMPLING_PERIODS		(5)
 
 /* default number of sampling periods to average before hotplug-out decision */
 #define DEFAULT_HOTPLUG_OUT_SAMPLING_PERIODS		(20)
@@ -812,4 +812,3 @@ fs_initcall(cpufreq_gov_dbs_init);
 module_init(cpufreq_gov_dbs_init);
 #endif
 module_exit(cpufreq_gov_dbs_exit);
-
