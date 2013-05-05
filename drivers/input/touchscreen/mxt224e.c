@@ -101,16 +101,16 @@
 /* cocafe: Touch Booster Control */
 #define TOUCHBOOST_FREQ_DEF		400000
 
-bool touch_boost = true;
+static bool touch_boost = true;
 module_param(touch_boost, bool, 0644);
 
-bool touch_boost_ape = true;
+static bool touch_boost_ape = true;
 module_param(touch_boost_ape, bool, 0644);
 
-bool touch_boost_ddr = true;
+static bool touch_boost_ddr = true;
 module_param(touch_boost_ddr, bool, 0644);
 
-unsigned int touch_boost_freq = TOUCHBOOST_FREQ_DEF;
+static unsigned int touch_boost_freq = TOUCHBOOST_FREQ_DEF;
 module_param(touch_boost_freq, uint, 0644);
 
 /* cocafe: Touch Parameters Control */
@@ -119,47 +119,47 @@ module_param(touch_boost_freq, uint, 0644);
 #define T9_MOVFILTER_ADDR		13
 #define T9_NEXTTCHDI_ADDR		34
 
-bool threshold_con = false;
+static bool threshold_con = false;
 module_param(threshold_con, bool, 0644);
 
-unsigned int threshold_batt = 11;		/* pdata -> 22 */
+static unsigned int threshold_batt = 11;		/* pdata -> 22 */
 module_param(threshold_batt, uint, 0644);
 
-bool movefilter_con = false;
+static bool movefilter_con = false;
 module_param(movefilter_con, bool, 0644);
 
-unsigned int movefilter_batt = 11;		/* default: 46 */
+static unsigned int movefilter_batt = 11;		/* default: 46 */
 module_param(movefilter_batt, uint, 0644);
 
-bool blen_con = false;
+static bool blen_con = false;
 module_param(blen_con, bool, 0644);
 
-unsigned int blen_batt = 32;			/* default: 32 */
+static unsigned int blen_batt = 32;			/* default: 32 */
 module_param(blen_batt, uint, 0644);
 
-bool nexttchdi_con = false;
+static bool nexttchdi_con = false;
 module_param(nexttchdi_con, bool, 0644);
 
-unsigned int nexttchdi_batt = 0;		/* default: 0 */
+static unsigned int nexttchdi_batt = 0;			/* default: 0 */
 module_param(nexttchdi_batt, uint, 0644);
 
 /* cocafe: Touch Auto Calibration */
 #define MXT224E_EDGE_X			50
 #define MXT224E_EDGE_Y			750
 
-bool calibration_auto = true;
+static bool calibration_auto = true;
 module_param(calibration_auto, bool, 0644);
 
-unsigned int calibration_edge = 9;		/* threshold: edge touches */
+static unsigned int calibration_edge = 9;		/* threshold: edge touches */
 module_param(calibration_edge, uint, 0644);
 
-unsigned int edgetouch_x = MXT224E_EDGE_X;
+static unsigned int edgetouch_x = MXT224E_EDGE_X;
 module_param(edgetouch_x, uint, 0644);
 
-unsigned int edgetouch_y = MXT224E_EDGE_Y;
+static unsigned int edgetouch_y = MXT224E_EDGE_Y;
 module_param(edgetouch_y, uint, 0644);
 
-unsigned int edgetouch_counter;
+static unsigned int edgetouch_counter;
 
 /* cocafe: Debugging Prints */
 static bool debug_mask = false;
