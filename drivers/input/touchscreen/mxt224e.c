@@ -114,16 +114,25 @@ static unsigned int touch_boost_freq = TOUCHBOOST_FREQ_DEF;
 module_param(touch_boost_freq, uint, 0644);
 
 /* cocafe: Touch Parameters Control */
-#define T9_BLEN_ADDR			6
-#define T9_THRESHOLD_ADDR		7
-#define T9_MOVFILTER_ADDR		13
-#define T9_NEXTTCHDI_ADDR		34
+/* mxT224E T9 config table offsets */
+#define T9_BLEN				6
+#define T9_THRESHOLD			7
+#define T9_MOVHYSTI			11
+#define T9_MOVHYSTN			12
+#define T9_MOVFILTER			13
+#define T9_NEXTTCHDI			34
 
 static bool threshold_con = false;
 module_param(threshold_con, bool, 0644);
 
-static unsigned int threshold_batt = 11;		/* pdata -> 22 */
+static unsigned int threshold_batt = 11;		/* pdata: 22 */
 module_param(threshold_batt, uint, 0644);
+
+static bool movhysti_con = false;
+module_param(movhysti_con, bool, 0644);
+
+static unsigned int movhysti_batt = 15;			/* pdata: 15 */
+module_param(movhysti_batt, uint, 0644);
 
 static bool movefilter_con = false;
 module_param(movefilter_con, bool, 0644);
@@ -616,38 +625,46 @@ static void mxt224_ta_probe(int __vbus_state)
 			obj_address+8, 1, &noise_threshold);
 	}
 
-	if (threshold_con || movefilter_con || blen_con || nexttchdi_con) {
-		ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
 
-		if (blen_con) {
-			printk(KERN_INFO "[TSP] T9 blen(w): %d\n", blen_batt);
-			tmpbuf = (u8)blen_batt;
-			write_mem(copy_data, obj_address+6, 1, &tmpbuf);
-		}
-		if (threshold_con) {
-			printk(KERN_INFO "[TSP] T9 threshold(w): %d\n", threshold_batt);
-			tmpbuf = (u8)threshold_batt;
-			threshold = threshold_batt;
-			write_mem(copy_data, obj_address+7, 1, &tmpbuf);
-		}
-		if (movefilter_con) {
-			printk(KERN_INFO "[TSP] T9 movfilter(w): %d\n", movefilter_batt);
-			tmpbuf = (u8)movefilter_batt;
-			write_mem(copy_data, obj_address+13, 1, &tmpbuf);
-		}
-		if (nexttchdi_con) {
-			printk(KERN_INFO "[TSP] T9 nexttchdi(w): %d\n", nexttchdi_batt);
-			tmpbuf = (u8)nexttchdi_batt;
-			write_mem(copy_data, obj_address+34, 1, &tmpbuf);
-		}
+	ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
+
+	if (blen_con) {
+		printk(KERN_INFO "[TSP] T9 blen(w): %d\n", blen_batt);
+		tmpbuf = (u8)blen_batt;
+		write_mem(copy_data, obj_address+6, 1, &tmpbuf);
 	}
+	if (threshold_con) {
+		printk(KERN_INFO "[TSP] T9 threshold(w): %d\n", threshold_batt);
+		tmpbuf = (u8)threshold_batt;
+		threshold = threshold_batt;
+		write_mem(copy_data, obj_address+7, 1, &tmpbuf);
+	}
+	if (movhysti_con) {
+		printk(KERN_INFO "[TSP] T9 movhysti(w): %d\n", movefilter_batt);
+		tmpbuf = (u8)movhysti_batt;
+		write_mem(copy_data, obj_address+11, 1, &tmpbuf);
+	}
+	if (movefilter_con) {
+		printk(KERN_INFO "[TSP] T9 movfilter(w): %d\n", movefilter_batt);
+		tmpbuf = (u8)movefilter_batt;
+		write_mem(copy_data, obj_address+13, 1, &tmpbuf);
+	}
+	if (nexttchdi_con) {
+		printk(KERN_INFO "[TSP] T9 nexttchdi(w): %d\n", nexttchdi_batt);
+		tmpbuf = (u8)nexttchdi_batt;
+		write_mem(copy_data, obj_address+34, 1, &tmpbuf);
+	}
+	
 	printk(KERN_INFO "[TSP] threshold(r): %d\n", threshold);
 
 	ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
+
 	read_mem(copy_data, obj_address+6, 1, &tmpbuf);
 	printk(KERN_INFO "[TSP] T9 blen(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+7, 1, &tmpbuf);
 	printk(KERN_INFO "[TSP] T9 threshold(mem): %d\n", tmpbuf);
+	read_mem(copy_data, obj_address+11, 1, &tmpbuf);
+	printk(KERN_INFO "[TSP] T9 movhysti(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+13, 1, &tmpbuf);
 	printk(KERN_INFO "[TSP] T9 movfilter(mem): %d\n", tmpbuf);
 	read_mem(copy_data, obj_address+34, 1, &tmpbuf);
