@@ -579,12 +579,15 @@ static const u8 *mxt224_config[] = {
 #define MXT224E_ATCHFRCCALTHR_NORMAL		40
 #define MXT224E_ATCHFRCCALRATIO_NORMAL		55
 
+/* Power config settings */
 static u8 t7_config_e[] = {GEN_POWERCONFIG_T7,
 				48, 255, 25};
 
+/* Acquisition config */
 static u8 t8_config_e[] = {GEN_ACQUISITIONCONFIG_T8,
 				22, 0, 5, 1, 0, 0, 4, 35, MXT224E_ATCHFRCCALTHR_NORMAL, MXT224E_ATCHFRCCALRATIO_NORMAL};
 
+/* Multitouch screen config */
 #if defined(CONFIG_MACH_T1_CHN)
 static u8 t9_config_e[] = {TOUCH_MULTITOUCHSCREEN_T9,
 				139, 0, 0, 19, 11, 0, 32, MXT224E_THRESHOLD_BATT, 2, 1, 10, 15, 1,
@@ -598,6 +601,7 @@ static u8 t9_config_e[] = {TOUCH_MULTITOUCHSCREEN_T9,
 				143, 80, 18, 15, 50, 50, 0};
 #endif
 
+/* Key array config */
 static u8 t15_config_e[] = {TOUCH_KEYARRAY_T15,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -627,6 +631,7 @@ static u8 t46_config_e[] = {SPT_CTECONFIG_T46,
 static u8 t47_config_e[] = {PROCI_STYLUS_T47,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+/* Noise suppression config */
 static u8 t48_config_e[] = {PROCG_NOISESUPPRESSION_T48,
 				3, 132, MXT224E_CALCFG_BATT, 24, 0, 0, 0, 0, 1, 2, 0, 0, 0,
 				6,	6, 0, 0, 48, 4, 48, 10, 0, 100, 5, 0, 100, 0, 5,

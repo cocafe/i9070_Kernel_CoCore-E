@@ -31,39 +31,41 @@
 #define T7_ACTV2IDLETO            25
 
 /* _GEN_ACQUISITIONCONFIG_T8 INSTANCE 0 */
-#define T8_CHRGTIME		45	   /* 6 - 60  * 83 ns */
-#define T8_CHRGTIME_TA	31	   /* 6 - 60  * 83 ns */
+#define T8_CHRGTIME		45	   /* 6 - 60  * 83 ns */	// Charge-transfer dwell time
+#define T8_CHRGTIME_TA		31	   /* 6 - 60  * 83 ns */
 #define T8_ATCHDRIFT              0
-#define T8_TCHDRIFT               5
+#define T8_TCHDRIFT               5					// Touch drift time
 #define T8_DRIFTST                1
-#define T8_TCHAUTOCAL             0
+#define T8_TCHAUTOCAL             0					// Touch Automatic Calibration
 #define T8_SYNC                   0
-#define T8_ATCHCALST			3
-#define T8_ATCHCALSTHR			20
+#define T8_ATCHCALST			3				// Anti-touch calibration time
+#define T8_ATCHCALSTHR			20				// Anti-touch Calibration suspend time
 #define T8_ATCHFRCCALTHR		127		/* V2.0 added */
 #define T8_ATCHFRCCALRATIO		127		/* V2.0 added */
 
 
 
 /* TOUCH_MULTITOUCHSCREEN_T9 INSTANCE 0 */
-#define T9_CTRL                   0x8B
+//0x80 : Scan ena
+//0x8  : Disable vector change, 0x2: Enable reporting, 0x1 : Enable the multi-touch
+#define T9_CTRL                   0x8B		// Disable amplitude change : 0x1 << 3
 #define T9_XORIGIN                0
 #define T9_YORIGIN                0
 #define T9_XSIZE                  18
 #define T9_YSIZE                  11
 #define T9_AKSCFG                 1
-#define T9_BLEN                   0x10
-#define T9_TCHTHR		  32
+#define T9_BLEN                   0x10		// Gain of the analog circuits in front of the ADC [7:4]
+#define T9_TCHTHR		  32 		// touch Threshold value
 #define T9_TCHDI                  2
-#define T9_ORIENT                 1
+#define T9_ORIENT                 1		// 0x4 : Invert Y, 0x2 : Invert X, 0x1 : Switch
 #define T9_MRGTIMEOUT             10
-#define T9_MOVHYSTI               1
-#define T9_MOVHYSTN               1
-#define T9_MOVFILTER              0x2F
+#define T9_MOVHYSTI               1		// Move hysteresis, initial
+#define T9_MOVHYSTN               1		// Move hysteresis, next
+#define T9_MOVFILTER              0x2F		// Filter Limit[6:4] , Adapt threshold [3:0]
 #define T9_NUMTOUCH               10 
-#define T9_MRGHYST                70
-#define T9_MRGTHR                 70
-#define T9_AMPHYST                10
+#define T9_MRGHYST                70		// Merge hysteresis
+#define T9_MRGTHR                 70		// Merge threshold
+#define T9_AMPHYST                10		// Amplitude hysteresis
 #define T9_XRANGE                 (800-1)
 #define T9_YRANGE                 (480-1)
 #define T9_XLOCLIP                20
@@ -83,10 +85,10 @@
 /* TOUCH_KEYARRAY_T15 */
 #define T15_CTRL                  0x83 /* single key configuration*/  /* 0x03 = multi-key */
 #define T15_XORIGIN               16
-#define T15_XORIGIN_4KEY		14
-#define T15_YORIGIN			11
-#define T15_XSIZE				2
-#define T15_XSIZE_4KEY		4
+#define T15_XORIGIN_4KEY	  14
+#define T15_YORIGIN		  11
+#define T15_XSIZE		  2
+#define T15_XSIZE_4KEY		  4
 #define T15_YSIZE                 1
 #define T15_AKSCFG                3
 #define T15_BLEN                  0
