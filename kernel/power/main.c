@@ -512,9 +512,11 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 			/* Max lock has higher priority than Min lock */
 			if (cpufreq_min_limit_val != -1 &&
 			    cpufreq_min_limit_val > cpufreq_max_limit_val) {
-				printk(KERN_ERR "%s: Min lock forced to %d"
+				if (debug_mask) {
+					printk(KERN_ERR "%s: Min lock forced to %d"
 					" because of Max lock\n",
 					__func__, cpufreq_max_limit_val);
+				}
 				/* Update PRCMU QOS value to max value */
 				prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 						"power", cpufreq_max_limit_val);
@@ -578,9 +580,11 @@ static ssize_t cpufreq_min_limit_store(struct kobject *kobj,
 			/* Max lock has higher priority than Min lock */
 			if (cpufreq_max_limit_val != -1 &&
 			    cpufreq_min_limit_val > cpufreq_max_limit_val) {
-				printk(KERN_ERR "%s: Min lock forced to %d"
+				if (debug_mask) {
+					printk(KERN_ERR "%s: Min lock forced to %d"
 					" because of Max lock\n",
 					__func__, cpufreq_max_limit_val);
+				}
 				/* Update PRCMU QOS value to max value */
 				prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 						"power", cpufreq_max_limit_val);
