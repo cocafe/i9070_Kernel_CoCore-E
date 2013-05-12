@@ -544,8 +544,8 @@ static void mxt224_ta_probe(int __vbus_state)
 	u16 size_one;
 	int ret;
 	u8 value;
-	u8 val = 0;
-	unsigned int register_address = 7;
+//	u8 val = 0;
+//	unsigned int register_address = 7;
 	u8 noise_threshold;
 	u8 movfilter;
 	u8 blen;
