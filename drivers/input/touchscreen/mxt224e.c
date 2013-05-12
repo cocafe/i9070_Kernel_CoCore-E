@@ -101,17 +101,17 @@
 /* cocafe: Touch Booster Control */
 #define TOUCHBOOST_FREQ_DEF		400000
 
-static bool touch_boost = true;
-module_param(touch_boost, bool, 0644);
+static bool touchboost = true;
+module_param(touchboost, bool, 0644);
 
-static bool touch_boost_ape = true;
-module_param(touch_boost_ape, bool, 0644);
+static bool touchboost_ape = true;
+module_param(touchboost_ape, bool, 0644);
 
-static bool touch_boost_ddr = true;
-module_param(touch_boost_ddr, bool, 0644);
+static bool touchboost_ddr = true;
+module_param(touchboost_ddr, bool, 0644);
 
-static unsigned int touch_boost_freq = TOUCHBOOST_FREQ_DEF;
-module_param(touch_boost_freq, uint, 0644);
+static unsigned int touchboost_freq = TOUCHBOOST_FREQ_DEF;
+module_param(touchboost_freq, uint, 0644);
 
 /* cocafe: Touch Parameters Control */
 
@@ -1086,32 +1086,32 @@ static void report_input_data(struct mxt224_data *data)
 		goto out;
 
 	#if defined(TOUCH_BOOSTER)
-	if (touch_boost) {
+	if (touchboost) {
 		if (data->fingers[id].state == MXT224_STATE_PRESS) {
 			if (data->finger_cnt == 0) {
-				if (touch_boost_ape) {
+				if (touchboost_ape) {
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_APE_OPP,
 						(char *)data->client->name,
 						PRCMU_QOS_APE_OPP_MAX);
 				}
-				if (touch_boost_ddr) {
+				if (touchboost_ddr) {
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_DDR_OPP,
 						(char *)data->client->name,
 						PRCMU_QOS_DDR_OPP_MAX);
 				}
-				if (touch_boost_freq == 200000 || 
-				touch_boost_freq == 400000 || 
-				touch_boost_freq == 800000 || 
-				touch_boost_freq == 1000000) {
+				if (touchboost_freq == 200000 || 
+				touchboost_freq == 400000 || 
+				touchboost_freq == 800000 || 
+				touchboost_freq == 1000000) {
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_ARM_KHZ,
 						(char *)data->client->name,
-						touch_boost_freq);
+						touchboost_freq);
 				} else {
 					printk("[TSP] invalid cpufreq.\n");
-					touch_boost_freq = TOUCHBOOST_FREQ_DEF;
+					touchboost_freq = TOUCHBOOST_FREQ_DEF;
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_ARM_KHZ,
 						(char *)data->client->name,
@@ -1537,7 +1537,7 @@ static int mxt224_internal_suspend(struct mxt224_data *data)
 	}
 
 	#if defined(TOUCH_BOOSTER)
-	if (touch_boost) {
+	if (touchboost) {
 		if (data->finger_cnt > 0) {
 			prcmu_qos_update_requirement(
 				PRCMU_QOS_APE_OPP,(
