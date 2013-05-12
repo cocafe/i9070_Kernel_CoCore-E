@@ -484,8 +484,7 @@ static void mxt224_power_con(bool on)
 		gpio_direction_output(TSP_LDO_ON1_JANICE_R0_0, 0);
 	}
 
-	printk(KERN_INFO "%s is finished.(%s)\n",
-						__func__, (on) ? "on" : "off");
+	printk(KERN_INFO "[TSP] GPIO output (%s)\n", (on) ? "on" : "off");
 }
 
 #ifdef CONFIG_USB_SWITCHER

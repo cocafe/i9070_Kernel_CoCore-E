@@ -598,7 +598,7 @@ static void mxt224_ta_probe(int __vbus_state)
 
 #ifdef CLEAR_MEDIAN_FILTER_ERROR
 		if (!__vbus_state) {
-			printk(KERN_INFO "[TSP] Clean median filter errors\n");
+//			printk(KERN_INFO "[TSP] Clean median filter errors\n");
 			ret = get_object_info(copy_data,
 				TOUCH_MULTITOUCHSCREEN_T9,
 				&size_one, &obj_address);
@@ -639,7 +639,7 @@ static void mxt224_ta_probe(int __vbus_state)
 				copy_data->t48_config_batt_e[0],
 				copy_data->t48_config_batt_e + 1);
 		}
-		printk(KERN_INFO "[TSP] TA_probe MXT224E T%d Byte%d is %d\n", 48, register_address, val);
+//		printk(KERN_INFO "[TSP] TA_probe MXT224E T%d Byte%d is %d\n", 48, register_address, val);
 	} else if (copy_data->family_id == 0x80) { 	/* MXT224 */
 		get_object_info(copy_data,
 			TOUCH_MULTITOUCHSCREEN_T9, &size, &obj_address);
@@ -1618,7 +1618,8 @@ static void mxt224_late_resume(struct early_suspend *h)
 
 	mxt224_internal_resume(data);
 
-	dev_info(&data->client->dev, "vbus_state = %d\n", (int)vbus_state);
+//	dev_info(&data->client->dev, "vbus_state = %d\n", (int)vbus_state);
+	pr_info("[TSP] vbus_state = %d\n", (int)vbus_state);
 	if (!(tsp_deepsleep && vbus_state))
 		mxt224_ta_probe(vbus_state);
 
