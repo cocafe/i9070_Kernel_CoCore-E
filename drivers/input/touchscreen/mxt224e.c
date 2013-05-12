@@ -142,7 +142,7 @@ module_param(threshold_batt, uint, 0644);
 static bool movhysti_con = false;
 module_param(movhysti_con, bool, 0644);
 
-static unsigned int movhysti_batt = 1;			/* pdata: 15 */
+static unsigned int movhysti_batt = 2;			/* pdata: 15 */
 module_param(movhysti_batt, uint, 0644);
 
 static bool movhystn_con = false;
