@@ -300,15 +300,10 @@ static struct bfq_group *__bfq_cic_change_cgroup(struct bfq_data *bfqd,
 						 struct cfq_io_context *cic,
 						 struct cgroup *cgroup)
 {
-	struct bfq_queue *async_bfqq;
-	struct bfq_queue *sync_bfqq;
+	struct bfq_queue *async_bfqq = cic_to_bfqq(cic, 0);
+	struct bfq_queue *sync_bfqq = cic_to_bfqq(cic, 1);
 	struct bfq_entity *entity;
 	struct bfq_group *bfqg;
-
-	spin_lock(&bfqd->eqm_lock);
-
-	async_bfqq = cic_to_bfqq(cic, 0);
-	sync_bfqq = cic_to_bfqq(cic, 1);
 
 	bfqg = bfq_find_alloc_group(bfqd, cgroup);
 	if (async_bfqq != NULL) {
@@ -328,8 +323,6 @@ static struct bfq_group *__bfq_cic_change_cgroup(struct bfq_data *bfqd,
 		if (entity->sched_data != &bfqg->sched_data)
 			bfq_bfqq_move(bfqd, sync_bfqq, entity, bfqg);
 	}
-
-	spin_unlock(&bfqd->eqm_lock);
 
 	return bfqg;
 }
@@ -706,7 +699,7 @@ static struct cgroup_subsys_state *bfqio_create(struct cgroup_subsys *subsys,
 }
 
 /*
- * We cannot support shared io contexts, as we have no means to support
+ * We cannot support shared io contexts, as we have no mean to support
  * two tasks with the same ioc in two different groups without major rework
  * of the main cic/bfqq data structures.  By now we allow a task to change
  * its cgroup only if it's the only owner of its ioc; the drawback of this
