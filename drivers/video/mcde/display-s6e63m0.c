@@ -178,11 +178,9 @@ static int B_val;
 
 static bool gamma_req = false;
 static bool gamma_table_req = false;
-static bool gamma_level_req = false;
 
 static int gamma_offset;
 static int gamma_val;
-static int gamma_level;
 
 module_param(gamma_table_req, bool, 0644);
 
@@ -1106,11 +1104,7 @@ unsigned short *Gen_gamma_table(struct s6e63m0 *lcd)
 	int j = 0;
 	char gen_gamma[gen_table_max] ={0,};
 
-	if (gamma_level_req) {
-		lcd->smart.brightness_level = illumination_tabel[gamma_level];
-	} else {
-		lcd->smart.brightness_level = illumination_tabel[lcd->bl];
-	}
+	lcd->smart.brightness_level = illumination_tabel[lcd->bl];
 
 	generate_gamma(&(lcd->smart), gen_gamma, gen_table_max);
 
@@ -2113,52 +2107,6 @@ static ssize_t s6e63m0_sysfs_store_gamma_tune(struct device *dev,
 }
 static DEVICE_ATTR(gamma_tune, 0200,
 		NULL, s6e63m0_sysfs_store_gamma_tune);
-
-static ssize_t s6e63m0_sysfs_show_gamma_level(struct device *dev,
-				      struct device_attribute *attr, char *buf)
-{
-	struct s6e63m0 *lcd = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%02d", lcd->bl);
-}
-
-static ssize_t s6e63m0_sysfs_store_gamma_level(struct device *dev,
-				       struct device_attribute *attr,
-				       const char *buf, size_t len)
-{
-	struct s6e63m0 *lcd = dev_get_drvdata(dev);
-	
-	int buf_val;
-
-	int ret;
-
-	ret = sscanf(buf, "%d", &buf_val);
-
-	if (!ret){
-		pr_info("s6e63m0: invalid input\n");
-		return -EINVAL;
-	}
-
-	if (buf_val < 0) {
-		pr_info("s6e63m0: gamma level automatical\n");
-		gamma_level_req = false;
-		s6e63m0_gamma_ctl(lcd);
-		return len;
-	} else if (buf_val > 25) {
-		pr_info("s6e63m0: invalid input\n");
-		return -EINVAL;
-	}
-
-	gamma_level = buf_val;
-	gamma_level_req = true;
-
-	s6e63m0_gamma_ctl(lcd);
-
-	return len;
-}
-
-static DEVICE_ATTR(gamma_level, 0644,
-		s6e63m0_sysfs_show_gamma_level, s6e63m0_sysfs_store_gamma_level);
 
 static ssize_t s6e63m0_sysfs_show_filter_R(struct device *dev,
 				      struct device_attribute *attr, char *buf)
