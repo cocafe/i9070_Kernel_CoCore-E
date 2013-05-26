@@ -184,6 +184,14 @@ static int gamma_val;
 
 module_param(gamma_table_req, bool, 0644);
 
+/* cocafe: S6E63M0 Illumination Tuner */
+#define ILLUMINATION_MIN		1
+#define ILLUMINATION_MAX		300
+
+static bool illumination_req = false;
+static unsigned int illumination_val = ILLUMINATION_MIN;
+
+
 #ifdef SMART_DIMMING
 #define LDI_MTP_LENGTH 21
 #define LDI_MTP_ADDR	0xd3
@@ -1104,7 +1112,12 @@ unsigned short *Gen_gamma_table(struct s6e63m0 *lcd)
 	int j = 0;
 	char gen_gamma[gen_table_max] ={0,};
 
-	lcd->smart.brightness_level = illumination_tabel[lcd->bl];
+	/* TODO: Send illumination(brightness) to smart dimming */
+	if (illumination_req) {
+		lcd->smart.brightness_level = illumination_val;
+	} else {
+		lcd->smart.brightness_level = illumination_tabel[lcd->bl];
+	}
 
 	generate_gamma(&(lcd->smart), gen_gamma, gen_table_max);
 
@@ -2282,6 +2295,113 @@ static ssize_t s6e63m0_sysfs_show_update_brihtness(struct device *dev,
 static DEVICE_ATTR(brightness_update, 0444,
 		s6e63m0_sysfs_show_update_brihtness, NULL);
 
+static ssize_t s6e63m0_sysfs_show_illumination(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", illumination_val);
+}
+
+static ssize_t s6e63m0_sysfs_store_illumination(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	int buf_val;
+	int ret;
+
+	ret = sscanf(buf, "%d", &buf_val);
+
+	if (!ret) {
+		pr_err("s6e63m0: invalid inputs!\n");
+		return -EINVAL;
+	}
+
+	if (buf_val > ILLUMINATION_MAX) {
+		pr_err("s6e63m0: invalid inputs!\n");
+		return -EINVAL;
+	}
+
+	if (buf_val <= 0) {
+		pr_err("s6e63m0: use illumination table now\n");
+
+		illumination_req = false;
+		update_brightness(lcd, 1);
+
+		return len;
+	}
+
+	illumination_req = true;
+	illumination_val = buf_val;
+
+	pr_info("s6e63m0: illumination [%d]\n", illumination_val);
+
+	update_brightness(lcd, 1);
+
+	return len;
+}
+
+static DEVICE_ATTR(illumination, 0644,
+		s6e63m0_sysfs_show_illumination, s6e63m0_sysfs_store_illumination);
+
+static ssize_t s6e63m0_sysfs_show_illumination_table(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	int i;
+	
+	sprintf(buf, "Illumination table:\n");
+	sprintf(buf, "%sCurrent: %02d\n\n", buf, illumination_tabel[lcd->bl]);
+	for (i = 0; i < 25; i++) {
+		sprintf("%s[%02d]\t\t%03d\n", buf, i, illumination_tabel[i]);
+	}
+	
+	return strlen(buf);
+}
+
+static DEVICE_ATTR(illumination_table, 0644,
+		s6e63m0_sysfs_show_illumination_table, NULL);
+
+static ssize_t s6e63m0_sysfs_show_ulow_brightness(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", illumination_req);
+}
+
+static ssize_t s6e63m0_sysfs_store_ulow_brightness(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	int buf_val;
+	int ret;
+
+	ret = sscanf(buf, "%d", &buf_val);
+
+	if (!ret) {
+		pr_err("s6e63m0: invalid inputs!\n");
+		return -EINVAL;
+	}
+
+	if (buf_val != 0 && buf_val != 1) {
+		pr_err("s6e63m0: invalid inputs!\n");
+		return -EINVAL;
+	}
+
+	illumination_req = buf_val;
+	
+	if (illumination_req)
+		illumination_val = ILLUMINATION_MIN;
+
+	pr_info("s6e63m0: ulow brightness [%d]\n", illumination_req);
+
+	update_brightness(lcd, 1);
+
+	return len;
+}
+
+static DEVICE_ATTR(ulow_brightness, 0644,
+		s6e63m0_sysfs_show_ulow_brightness, s6e63m0_sysfs_store_ulow_brightness);
+
 static int s6e63m0_set_power_mode(struct mcde_display_device *ddev,
 	enum mcde_display_power_mode power_mode)
 {
@@ -2560,6 +2680,18 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
 
 	ret = device_create_file(&(ddev->dev), &dev_attr_elvss_table);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_illumination);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_illumination_table);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
+	ret = device_create_file(&(ddev->dev), &dev_attr_ulow_brightness);
 	if (ret < 0)
 		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
 
