@@ -2352,14 +2352,48 @@ static ssize_t s6e63m0_sysfs_show_illumination_table(struct device *dev,
 	sprintf(buf, "Illumination table:\n");
 	sprintf(buf, "%sCurrent: %02d\n\n", buf, illumination_tabel[lcd->bl]);
 	for (i = 0; i < 25; i++) {
-		sprintf("%s[%02d]\t\t%03d\n", buf, i, illumination_tabel[i]);
+		sprintf(buf, "%s[%02d]\t\t%03d\n", buf, i, illumination_tabel[i]);
 	}
 	
 	return strlen(buf);
 }
 
+static ssize_t s6e63m0_sysfs_store_illumination_table(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	int num;
+	int val;
+	int ret;
+
+	ret = sscanf(buf, "%d %d", &num, &val);
+
+	if (!ret) {
+		pr_err("s6e63m0: invalid inputs!\n");
+		return -EINVAL;
+	}
+
+	if (num < 0 || num > 25) {
+		pr_err("s6e63m0: invalid range!\n");
+		return -EINVAL;
+	}
+
+	if (illumination_tabel[num + 1] < val) {
+		pr_err("s6e63m0: the value inputed should be smaller than the next\n");
+		return -EINVAL;
+	}
+
+	pr_info("s6e63m0: illumination table [%02d] %02d -> %02d\n", num, illumination_tabel[num], val);
+	illumination_tabel[num] = val;
+
+	update_brightness(lcd, 1);
+
+	return len;
+}
+
 static DEVICE_ATTR(illumination_table, 0644,
-		s6e63m0_sysfs_show_illumination_table, NULL);
+		s6e63m0_sysfs_show_illumination_table, s6e63m0_sysfs_store_illumination_table);
 
 static ssize_t s6e63m0_sysfs_show_ulow_brightness(struct device *dev,
 				      struct device_attribute *attr, char *buf)
