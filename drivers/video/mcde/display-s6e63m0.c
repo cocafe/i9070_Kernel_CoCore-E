@@ -1550,8 +1550,11 @@ static int update_brightness(struct s6e63m0 *lcd, u8 force)
 
 	bl = lcd->bd->props.brightness;
 
+	/* FIXME: Allow maximum gamma level(25) in manual mode */
+	#if 0
 	if (unlikely(!lcd->auto_brightness && bl > 241))
 		bl = 241;
+	#endif
 
 	lcd->bl = get_gamma_value_from_bl(bl);
 
