@@ -2316,12 +2316,14 @@ static ssize_t s6e63m0_sysfs_store_illumination(struct device *dev,
 		return -EINVAL;
 	}
 
+	#if 0
 	if (buf_val > ILLUMINATION_MAX) {
 		pr_err("s6e63m0: invalid inputs!\n");
 		return -EINVAL;
 	}
+	#endif
 
-	if (buf_val <= 0) {
+	if (buf_val < 0) {
 		pr_err("s6e63m0: use illumination table now\n");
 
 		illumination_req = false;
