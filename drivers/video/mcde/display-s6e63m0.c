@@ -2351,7 +2351,7 @@ static ssize_t s6e63m0_sysfs_show_illumination_table(struct device *dev,
 	
 	sprintf(buf, "Illumination table:\n");
 	sprintf(buf, "%sCurrent: %02d\n\n", buf, illumination_tabel[lcd->bl]);
-	for (i = 0; i < 25; i++) {
+	for (i = 0; i <= 25; i++) {
 		sprintf(buf, "%s[%02d]\t\t%03d\n", buf, i, illumination_tabel[i]);
 	}
 	
