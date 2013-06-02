@@ -41,6 +41,9 @@
 /* Recharge criteria counter */
 #define RCH_COND_CNT			3
 
+/* SysFs controls */
+#define SYSFS_CHARGER_CONTROL
+
 #define to_ab8500_chargalg_device_info(x) container_of((x), \
 	struct ab8500_chargalg, chargalg_psy);
 
