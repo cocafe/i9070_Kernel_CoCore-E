@@ -6,14 +6,10 @@
  * License Terms: GNU General Public License v2
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
- *
- * Modified: Huang Ji (cocafe@xda-developers.com)
- *
  */
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -43,23 +39,6 @@
 
 #define to_ab8500_chargalg_device_info(x) container_of((x), \
 	struct ab8500_chargalg, chargalg_psy);
-
-/* cocafe: EOC(end of charge) notification */
-char * eoc_status = "Not reported yet...";
-module_param(eoc_status, charp, 0444);
-
-char * charge_status = "Not detected yet...";
-module_param(charge_status, charp, 0444);
-
-/* cocafe: Charging cycle control */
-unsigned int eoc_level1 = EOC_COND_CNT_1ST;
-unsigned int eoc_level2 = EOC_COND_CNT_2ND;
-unsigned int recharge_cycle = RCH_COND_CNT;
-
-module_param(eoc_level1, uint, 0644);
-module_param(eoc_level2, uint, 0644);
-module_param(recharge_cycle, uint, 0644);
-
 
 enum ab8500_chargers {
 	NO_CHG,
@@ -228,29 +207,29 @@ enum maxim_ret {
 
 /**
  * struct ab8500_chargalg - ab8500 Charging algorithm device information
- * @dev:			pointer to the structure device
- * @charge_status:		battery operating status
+ * @dev:		pointer to the structure device
+ * @charge_status:	battery operating status
  * @eoc_cnt_1st:		counter used to determine end-of_charge (1st full charging check)
  * @eoc_cnt_2nd:		counter used to determine end-of_charge (2nd full charging check)
- * @rch_cnt:			counter used to determine start of recharge
- * @maintenance_chg:		indicate if maintenance charge is active
- * @recharging_status:		indicate if recharging is active
+ * @rch_cnt:		counter used to determine start of recharge
+ * @maintenance_chg:	indicate if maintenance charge is active
+ * @recharging_status:	indicate if recharging is active
  * @full_charging_status_1st:	indicate 1st full charging status
- * @t_hyst_norm			temperature hysteresis when the temperature has	been
- *				over or under normal limits
- * @t_hyst_lowhigh		temperature hysteresis when the temperature has	been
- *				over or under the high or low limits
- * @charge_state:		current state of the charging algorithm
- * @ccm				charging current maximization parameters
- * @chg_info:			information about connected charger types
- * @batt_data:			data of the battery
- * @susp_status:		current charger suspension status
- * @parent:			pointer to the struct ab8500
- * @pdata:			pointer to the ab8500_chargalg platform data
- * @bat:			pointer to the ab8500_bm platform data
- * @chargalg_psy:		structure that holds the battery properties exposed by
- *				the charging algorithm
- * @events:			structure for information about events triggered
+ * @t_hyst_norm		temperature hysteresis when the temperature has	been
+ *			over or under normal limits
+ * @t_hyst_lowhigh	temperature hysteresis when the temperature has	been
+ *			over or under the high or low limits
+ * @charge_state:	current state of the charging algorithm
+ * @ccm			charging current maximization parameters
+ * @chg_info:		information about connected charger types
+ * @batt_data:		data of the battery
+ * @susp_status:	current charger suspension status
+ * @parent:		pointer to the struct ab8500
+ * @pdata:		pointer to the ab8500_chargalg platform data
+ * @bat:		pointer to the ab8500_bm platform data
+ * @chargalg_psy:	structure that holds the battery properties exposed by
+ *			the charging algorithm
+ * @events:		structure for information about events triggered
  * @chargalg_wq:		work queue for running the charging algorithm
  * @chargalg_periodic_work:	work to run the charging algorithm periodically
  * @chargalg_wd_work:		work to kick the charger watchdog periodically
@@ -751,8 +730,7 @@ static void ab8500_chargalg_stop_charging(struct ab8500_chargalg *di)
 	cancel_delayed_work(&di->chargalg_wd_work);
 	power_supply_changed(&di->chargalg_psy);
 	printk(KERN_INFO "Charging is Stop\n"); 
-	charge_status = "Charging is stopped...";
-
+	
 }
 
  /**
@@ -777,8 +755,7 @@ static void ab8500_chargalg_hold_charging(struct ab8500_chargalg *di)
 	cancel_delayed_work(&di->chargalg_wd_work);
 	power_supply_changed(&di->chargalg_psy);
 	printk(KERN_INFO "Charging is Pause\n"); 
-	charge_status = "Charging is paused...";
-
+	
 }
 
 /**
@@ -818,8 +795,6 @@ static void ab8500_chargalg_start_charging(struct ab8500_chargalg *di,
 		dev_err(di->dev, "Unknown charger to charge from\n");
 		return;
 	}
-
-	charge_status = "Charging now...";
 
 	cancel_delayed_work(&di->chargalg_wd_work);
 	queue_delayed_work(di->chargalg_wq, &di->chargalg_wd_work, 0);
@@ -966,7 +941,7 @@ static void ab8500_chargalg_end_of_charge(struct ab8500_chargalg *di)
 		    di->bat->bat_type[di->bat->batt_id].termination_curr_1st) {
 
 			if (!di->full_charging_status_1st) {
-				if (++di->eoc_cnt_1st >= eoc_level1) {
+				if (++di->eoc_cnt_1st >= EOC_COND_CNT_1ST) {
 					dev_dbg(di->dev,
 					"1st Full Charging EOC reached!\n");
 					di->eoc_cnt_1st = 0;
@@ -975,11 +950,11 @@ static void ab8500_chargalg_end_of_charge(struct ab8500_chargalg *di)
 					 "Full charging status will be shown \
 in the UI, BUT NOT Real Full charging\n");
 					power_supply_changed(&di->chargalg_psy);
-					eoc_status = "First full charging reached...\nNot real full charged!";
+
 				} else {
 					dev_dbg(di->dev,
 					"1st Full Charging EOC limit reached \
-for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, eoc_level1);
+for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, EOC_COND_CNT_1ST);
 				}
 			}
 		} else {
@@ -989,7 +964,7 @@ for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, eoc_level1);
 		if (di->batt_data.avg_curr <=
 		   di->bat->bat_type[di->bat->batt_id].termination_curr_2nd) {
 
-			if (++di->eoc_cnt_2nd >= eoc_level2) {
+			if (++di->eoc_cnt_2nd >= EOC_COND_CNT_2ND) {
 				di->eoc_cnt_2nd = 0;
 				di->charge_status = POWER_SUPPLY_STATUS_FULL;
 				di->maintenance_chg = true;
@@ -997,13 +972,12 @@ for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, eoc_level1);
 				dev_dbg(di->dev, "real EOC reached!\n");
 				power_supply_changed(&di->chargalg_psy);
 				dev_dbg(di->dev, "Charging is end\n");
-				eoc_status = "Real full charging reached!\nCharging finished!";
 			} else {
 				dev_dbg(di->dev,
 				" real EOC limit reached for the %d"
 				" time, out of %d before EOC\n",
 						di->eoc_cnt_2nd,
-						eoc_level2);
+						EOC_COND_CNT_2ND);
 			}
 		} else {
 			di->eoc_cnt_2nd = 0;
@@ -1828,7 +1802,7 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 	case STATE_WAIT_FOR_RECHARGE_INIT:
 		ab8500_chargalg_hold_charging(di);
 		ab8500_chargalg_state_to(di, STATE_WAIT_FOR_RECHARGE);
-		di->rch_cnt = recharge_cycle;
+		di->rch_cnt = RCH_COND_CNT;
 		/* Intentional fallthrough */
 
 	case STATE_WAIT_FOR_RECHARGE:
@@ -1839,7 +1813,7 @@ static void ab8500_chargalg_algorithm(struct ab8500_chargalg *di)
 				ab8500_chargalg_state_to(di, STATE_NORMAL_INIT);
 			}
 		 } else
-			di->rch_cnt = recharge_cycle;
+			di->rch_cnt = RCH_COND_CNT;
 
 		break;
 
