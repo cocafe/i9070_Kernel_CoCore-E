@@ -6,9 +6,13 @@
  * License Terms: GNU General Public License v2
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
+ *
+ * Modified: Huang Ji (cocafe@xda-developers.com)
+ *
  */
 
 #include <linux/init.h>
+#include <linux/sysfs.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
@@ -39,6 +43,15 @@
 
 #define to_ab8500_chargalg_device_info(x) container_of((x), \
 	struct ab8500_chargalg, chargalg_psy);
+
+/* cocafe: Real end of charged */
+#define CHARGING_PAUSED			-1
+#define CHARGING_STOPPED		0
+#define CHARGING_WORKING		1
+static int charging_stats = CHARGING_STOPPED;
+
+static bool eoc_first = 0;
+static bool eoc_real = 0;
 
 enum ab8500_chargers {
 	NO_CHG,
@@ -730,7 +743,7 @@ static void ab8500_chargalg_stop_charging(struct ab8500_chargalg *di)
 	cancel_delayed_work(&di->chargalg_wd_work);
 	power_supply_changed(&di->chargalg_psy);
 	printk(KERN_INFO "Charging is Stop\n"); 
-	
+	charging_stats = CHARGING_STOPPED;
 }
 
  /**
@@ -755,7 +768,7 @@ static void ab8500_chargalg_hold_charging(struct ab8500_chargalg *di)
 	cancel_delayed_work(&di->chargalg_wd_work);
 	power_supply_changed(&di->chargalg_psy);
 	printk(KERN_INFO "Charging is Pause\n"); 
-	
+	charging_stats = CHARGING_PAUSED;
 }
 
 /**
@@ -795,6 +808,8 @@ static void ab8500_chargalg_start_charging(struct ab8500_chargalg *di,
 		dev_err(di->dev, "Unknown charger to charge from\n");
 		return;
 	}
+
+	charging_stats = CHARGING_WORKING;
 
 	cancel_delayed_work(&di->chargalg_wd_work);
 	queue_delayed_work(di->chargalg_wq, &di->chargalg_wd_work, 0);
@@ -950,7 +965,7 @@ static void ab8500_chargalg_end_of_charge(struct ab8500_chargalg *di)
 					 "Full charging status will be shown \
 in the UI, BUT NOT Real Full charging\n");
 					power_supply_changed(&di->chargalg_psy);
-
+					eoc_first = 1;
 				} else {
 					dev_dbg(di->dev,
 					"1st Full Charging EOC limit reached \
@@ -972,6 +987,7 @@ for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, EOC_COND_CNT_1ST);
 				dev_dbg(di->dev, "real EOC reached!\n");
 				power_supply_changed(&di->chargalg_psy);
 				dev_dbg(di->dev, "Charging is end\n");
+				eoc_real = 1;
 			} else {
 				dev_dbg(di->dev,
 				" real EOC limit reached for the %d"
@@ -2382,6 +2398,73 @@ static int ab8500_chargalg_sysfs_init(struct ab8500_chargalg *di)
 /* Exposure to the sysfs interface <<END>> */
 #endif //SYSFS_CHARGER_CONTROL
 
+static ssize_t abb_chargalg_charging_stats_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	char *txt;
+
+	if (charging_stats == CHARGING_PAUSED)
+		txt = "Charging paused\n";
+
+	if (charging_stats == CHARGING_STOPPED)
+		txt = "Charging stopped\n";
+
+	if (charging_stats == CHARGING_WORKING)
+		txt = "Charging now\n";
+
+	return sprintf(buf, "%s", txt);
+}
+
+static struct kobj_attribute abb_chargalg_charging_stats_interface = __ATTR(charging_status, 0444, abb_chargalg_charging_stats_show, NULL);
+
+static ssize_t abb_chargalg_eoc_stats_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	char *txt;
+
+	if (eoc_first == 0) {
+		txt = "Not reported yet\n";
+	}
+
+	if (eoc_first == 1) {
+		txt = "First EOC reached\n";
+	}
+
+	if (eoc_real == 1) {
+		txt = "Real EOC reached\n";
+	}
+
+	return sprintf(buf, "%s", txt);
+}
+
+static struct kobj_attribute abb_chargalg_eoc_stats_interface = __ATTR(eoc_status, 0444, abb_chargalg_eoc_stats_show, NULL);
+
+static ssize_t abb_chargalg_eoc_first_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", eoc_first);
+}
+
+static struct kobj_attribute abb_chargalg_eoc_first_interface = __ATTR(eoc_first, 0444, abb_chargalg_eoc_first_show, NULL);
+
+static ssize_t abb_chargalg_eoc_real_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", eoc_real);
+}
+
+static struct kobj_attribute abb_chargalg_eoc_real_interface = __ATTR(eoc_real, 0444, abb_chargalg_eoc_real_show, NULL);
+
+static struct attribute *abb_chargalg_attrs[] = {
+	&abb_chargalg_charging_stats_interface.attr, 
+	&abb_chargalg_eoc_stats_interface.attr, 
+	&abb_chargalg_eoc_first_interface.attr, 
+	&abb_chargalg_eoc_real_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group abb_chargalg_interface_group = {
+	.attrs = abb_chargalg_attrs,
+};
+
+static struct kobject *abb_chargalg_kobject;
+
 #if defined(CONFIG_PM)
 static int ab8500_chargalg_resume(struct platform_device *pdev)
 {
@@ -2425,6 +2508,8 @@ static int __devexit ab8500_chargalg_remove(struct platform_device *pdev)
 	/* sysfs interface to enable/disbale charging from user space */
 	ab8500_chargalg_sysfs_exit(di);
 #endif
+
+	kobject_put(abb_chargalg_kobject);
 
 	/* Delete the work queue */
 	destroy_workqueue(di->chargalg_wq);
@@ -2532,6 +2617,20 @@ static int __devinit ab8500_chargalg_probe(struct platform_device *pdev)
 		goto free_psy;
 	}
 #endif //SYSFS_CHARGER_CONTROL
+
+	abb_chargalg_kobject = kobject_create_and_add("abb-chargalg", kernel_kobj);
+
+	if (!abb_chargalg_kobject) {
+		pr_info("abb-chargalg: faile to register sysfs kobj\n");
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(abb_chargalg_kobject, &abb_chargalg_interface_group);
+
+	if (ret) {
+		pr_info("abb-chargalg: faile to register sysfs group\n");
+		kobject_put(abb_chargalg_kobject);
+	}
 
 	/* Run the charging algorithm */
 	queue_delayed_work(di->chargalg_wq, &di->chargalg_periodic_work, 0);
