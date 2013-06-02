@@ -185,6 +185,7 @@ static int gamma_val;
 module_param(gamma_table_req, bool, 0644);
 
 /* cocafe: S6E63M0 Illumination Tuner */
+/* FIXME: illumination 0 and 3 have color issues! */
 #define ILLUMINATION_MIN		1
 #define ILLUMINATION_MAX		300
 
