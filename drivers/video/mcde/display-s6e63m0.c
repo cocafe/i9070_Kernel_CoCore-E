@@ -2444,6 +2444,21 @@ static ssize_t s6e63m0_sysfs_store_ulow_brightness(struct device *dev,
 static DEVICE_ATTR(ulow_brightness, 0644,
 		s6e63m0_sysfs_show_ulow_brightness, s6e63m0_sysfs_store_ulow_brightness);
 
+/* TODO: Debug the panel id issue */
+static ssize_t s6e63m0_sysfs_show_panel_smtid(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	u8 lcd_id[3];
+
+	s6e63m0_read_panel_id(lcd, lcd_id);
+
+	return sprintf(buf, "%#04X\n", lcd_id[1]);
+}
+
+static DEVICE_ATTR(lcd_smtid, 0444,
+		s6e63m0_sysfs_show_panel_smtid, NULL);
+
 static int s6e63m0_set_power_mode(struct mcde_display_device *ddev,
 	enum mcde_display_power_mode power_mode)
 {
@@ -2684,6 +2699,10 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
         ret = device_create_file(&(lcd->ld->dev), &dev_attr_ldi_power);
         if (ret < 0)
                 dev_err(&(ddev->dev), "failed to add ldi_power sysfs entries\n");
+
+        ret = device_create_file(&(lcd->ld->dev), &dev_attr_lcd_smtid);
+        if (ret < 0)
+                dev_err(&(ddev->dev), "failed to add lcd_smtid sysfs entries\n");
 
 	ret = device_create_file(&(lcd->ld->dev), &dev_attr_power_reduce);
         if (ret < 0)
