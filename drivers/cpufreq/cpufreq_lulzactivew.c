@@ -241,7 +241,7 @@ static int cpufreq_governor_lulzactivew(struct cpufreq_policy *policy,
 static
 #endif
 struct cpufreq_governor cpufreq_gov_lulzactivew = {
-	.name = "lulzactiveW",
+	.name = "lulzactivew",
 	.governor = cpufreq_governor_lulzactivew,
 	.max_transition_latency = 9000000,
 	.owner = THIS_MODULE,
@@ -952,7 +952,7 @@ static struct attribute *lulzactivew_attributes[] = {
 
 static struct attribute_group lulzactivew_attr_group = {
 	.attrs = lulzactivew_attributes,
-	.name = "lulzactiveW",
+	.name = "lulzactivew",
 };
 
 static int cpufreq_governor_lulzactivew(struct cpufreq_policy *new_policy,
