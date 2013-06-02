@@ -2381,7 +2381,12 @@ static ssize_t s6e63m0_sysfs_store_illumination_table(struct device *dev,
 		return -EINVAL;
 	}
 
-	if (illumination_tabel[num + 1] < val) {
+	if (num != 0 && (illumination_tabel[num - 1] > val)) {
+		pr_err("s6e63m0: the value inputed should be larger than the prev\n");
+		return -EINVAL;
+	}
+
+	if (num != 25 && (illumination_tabel[num + 1] < val)) {
 		pr_err("s6e63m0: the value inputed should be smaller than the next\n");
 		return -EINVAL;
 	}
