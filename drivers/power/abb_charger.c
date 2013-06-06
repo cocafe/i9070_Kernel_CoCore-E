@@ -7,14 +7,10 @@
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
  * Author: Arun R Murthy <arun.murthy@stericsson.com>
- *
- * Modified: Huang Ji (cocafe@xda-developers.com)
- *
  */
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -107,18 +103,7 @@
 #define LOW_VOLT_REG			0x4E
 
 #define NBR_VDROP_STATE			3
-#define VDROP_TIME			2
-
-/* cocafe: Charger Current Control */
-unsigned int max_ac_current = 600;
-unsigned int max_usb_current = 500;
-unsigned int max_ac_current_read;
-unsigned int max_usb_current_read;
-
-module_param(max_ac_current, uint, 0644);
-module_param(max_usb_current, uint, 0644);
-module_param(max_ac_current_read, uint, 0444);
-module_param(max_usb_current_read, uint, 0444);
+#define VDROP_TIME				2
 
 /* UsbLineStatus register - usb types */
 enum ab8500_charger_link_status {
@@ -1428,47 +1413,8 @@ static int ab8500_charger_ac_en(struct ux500_charger *charger,
 	charger_status = ab8500_charger_detect_chargers(di);
 	vbus_status = ab8500_vbus_is_detected(di);
 
-
-	/* cocafe: Charger Control */
-	/* Supported current definitions are at the top */
-	/* Limit minimum AC charging current */		/* 100mA */
-	if (max_ac_current < 100) {
-		printk("ab8500-charger: max ac charging electric current is too low! \n");
-		printk("ab8500-charger: revert max_ac_current to 600mA(defualt). \n");
-		max_ac_current = 600;
-	}
-	/* Limit maximum AC charging current */		/* 1100mA*/
-	if (max_ac_current > 1100) {
-		printk("ab8500-charger: max ac charging electric current is too high! \n");
-		printk("ab8500-charger: revert max_ac_current to 600mA(defualt). \n");
-		max_ac_current = 600;
-	}
-	/* Limit minimum USB charging current */	/* 50mA */
-	if (max_usb_current < 50) {
-		printk("ab8500-charger: max usb charging electric current is too low! \n");
-		printk("ab8500-charger: revert max_usb_current to 500mA(defualt). \n");
-		max_usb_current = 500;
-	}
-	/* Limit maximum USB charging current */	/* 1100mA */
-	if (max_usb_current > 1100) {
-		printk("ab8500-charger: max usb charging electric current is too high! \n");
-		printk("ab8500-charger: revert max_usb_current to 500mA(defualt). \n");
-		max_usb_current = 500;
-	}
-
-	/* Let's skip platform bm data */
-	//di->bat->ta_chg_current_input = di->bat->chg_params->ac_curr_max;
-	//di->bat->usb_chg_current_input = di->bat->chg_params->usb_curr_max;
-
-	di->bat->ta_chg_current_input = max_ac_current;
-	di->bat->usb_chg_current_input = max_usb_current;
-
-	max_ac_current_read = di->bat->ta_chg_current_input;
-	max_usb_current_read = di->bat->usb_chg_current_input;
-	
-	printk("ab8500-charger: AC charging max current = %dmA \n", max_ac_current_read);
-	printk("ab8500-charger: USB charging max current = %dmA \n", max_usb_current_read);
-
+	di->bat->ta_chg_current_input = di->bat->chg_params->ac_curr_max;
+	di->bat->usb_chg_current_input = di->bat->chg_params->usb_curr_max;
 
 	ab8500_charger_init_vdrop_state(di);
 
