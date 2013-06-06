@@ -7,7 +7,6 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <linux/namei.h>
 #include <linux/sched.h>
 #include <linux/writeback.h>
@@ -21,17 +20,6 @@
 
 #define VALID_FLAGS (SYNC_FILE_RANGE_WAIT_BEFORE|SYNC_FILE_RANGE_WRITE| \
 			SYNC_FILE_RANGE_WAIT_AFTER)
-
-#include <linux/earlysuspend.h>
-
-bool fsync = true;
-module_param(fsync, bool, 0644);
-
-bool fsync_dyn = false;
-module_param(fsync_dyn, bool, 0644);
-
-bool screen_off = false;
-
 
 /*
  * Do the filesystem syncing work. For simple filesystems
@@ -151,14 +139,6 @@ SYSCALL_DEFINE1(syncfs, int, fd)
 	int ret;
 	int fput_needed;
 
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
-
 	file = fget_light(fd, &fput_needed);
 	if (!file)
 		return -EBADF;
@@ -187,14 +167,6 @@ int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
 {
 	struct address_space *mapping = file->f_mapping;
 	int err, ret;
-
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
 
 	if (!file->f_op || !file->f_op->fsync) {
 		ret = -EINVAL;
@@ -228,14 +200,6 @@ EXPORT_SYMBOL(vfs_fsync_range);
  */
 int vfs_fsync(struct file *file, int datasync)
 {
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
-
 	return vfs_fsync_range(file, 0, LLONG_MAX, datasync);
 }
 EXPORT_SYMBOL(vfs_fsync);
@@ -244,14 +208,6 @@ static int do_fsync(unsigned int fd, int datasync)
 {
 	struct file *file;
 	int ret = -EBADF;
-
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
 
 	file = fget(fd);
 	if (file) {
@@ -263,27 +219,11 @@ static int do_fsync(unsigned int fd, int datasync)
 
 SYSCALL_DEFINE1(fsync, unsigned int, fd)
 {
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
-
 	return do_fsync(fd, 0);
 }
 
 SYSCALL_DEFINE1(fdatasync, unsigned int, fd)
 {
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
-
 	return do_fsync(fd, 1);
 }
 
@@ -297,14 +237,6 @@ SYSCALL_DEFINE1(fdatasync, unsigned int, fd)
  */
 int generic_write_sync(struct file *file, loff_t pos, loff_t count)
 {
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
-
 	if (!(file->f_flags & O_DSYNC) && !IS_SYNC(file->f_mapping->host))
 		return 0;
 	return vfs_fsync_range(file, pos, pos + count - 1,
@@ -368,14 +300,6 @@ SYSCALL_DEFINE(sync_file_range)(int fd, loff_t offset, loff_t nbytes,
 	loff_t endbyte;			/* inclusive */
 	int fput_needed;
 	umode_t i_mode;
-
-	if (!fsync) {
-		if (!fsync_dyn) {
-			return 0;
-		} else if (!screen_off) {
-			return 0;
-		}
-	}
 
 	ret = -EINVAL;
 	if (flags & ~VALID_FLAGS)
@@ -476,36 +400,3 @@ asmlinkage long SyS_sync_file_range2(long fd, long flags,
 }
 SYSCALL_ALIAS(sys_sync_file_range2, SyS_sync_file_range2);
 #endif
-
-static struct early_suspend early_suspend;
-
-static void fsync_early_suspend(struct early_suspend *h)
-{
-	screen_off = true;
-	/* Do fsync */
-	if (fsync_dyn && !fsync) {
-		pr_info("fsync: dynamic fsync called\n");
-		wakeup_flusher_threads(0);
-		sync_filesystems(0);
-		sync_filesystems(1);
-	}
-}
-
-static void fsync_late_resume(struct early_suspend *h)
-{
-	screen_off = false;
-}
-
-static int __init fsync_module_init(void)
-{
-	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
-	early_suspend.suspend = fsync_early_suspend;
-	early_suspend.resume = fsync_late_resume;
-
-	register_early_suspend(&early_suspend);
-	pr_info ("fsync: fsync control registered.");
-
-	return 0;
-}
-
-module_init(fsync_module_init);
