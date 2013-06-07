@@ -385,13 +385,6 @@ config SND_SOC_AB5500
 config SND_SOC_AB8500
 	tristate
 
-config ABB_CODEC_CONTROL
-	bool "AB8500 codec control module"
-	depends on SND_SOC_AB8500
-	default n
-	help 
-		Say Y if you have a ab8500 codec then want the codec control module.
-
 config SND_SOC_CG29XX
 	tristate
 
