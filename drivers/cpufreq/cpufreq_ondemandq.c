@@ -953,7 +953,7 @@ static int __init cpufreq_gov_dbs_init(void)
 	}
 
 //	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN - 10;
 	early_suspend.suspend = cpufreq_ondemandq_early_suspend;
 	early_suspend.resume = cpufreq_ondemandq_late_resume;
 
