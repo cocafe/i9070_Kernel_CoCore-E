@@ -322,6 +322,11 @@ config CPU_FREQ_GOV_LULZACTIVEW
 
 	  If in doubt, say N.
 
+config CPU_FREQ_GOV_LULZACTIVEQ
+	tristate "'lulzactiveq' cpufreq governor"
+	depends on CPU_FREQ
+
+
 menu "x86 CPU frequency scaling drivers"
 depends on X86
 source "drivers/cpufreq/Kconfig.x86"
