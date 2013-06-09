@@ -779,7 +779,7 @@ static struct early_suspend early_suspend;
 
 static void cpufreq_ondemandq_early_suspend(struct early_suspend *h)
 {
-	#if 0
+	#if 1
 	pr_info ("ondemandq: enter suspend.\n");
 	#endif
 	cpu_down_work();
@@ -787,7 +787,7 @@ static void cpufreq_ondemandq_early_suspend(struct early_suspend *h)
 
 static void cpufreq_ondemandq_late_resume(struct early_suspend *h)
 {
-	#if 0
+	#if 1
 	pr_info ("ondemandq: enter resume.\n");
 	#endif
 	cpu_up_work();
@@ -953,7 +953,7 @@ static int __init cpufreq_gov_dbs_init(void)
 	}
 
 //	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN - 10;
+	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 3;
 	early_suspend.suspend = cpufreq_ondemandq_early_suspend;
 	early_suspend.resume = cpufreq_ondemandq_late_resume;
 
