@@ -68,6 +68,9 @@
 #include <mach/pm.h>
 #include <mach/reboot_reasons.h>
 
+#if defined(CONFIG_NFC_PN544)
+#include <linux/pn544.h>
+#endif
 
 #include <video/mcde_display.h>
 
@@ -875,12 +878,28 @@ static struct platform_device janice_gpio_i2c7_pdata = {
 	},
 };
 
+#if defined(CONFIG_NFC_PN544)
+static struct pn544_i2c_platform_data pn544_pdata __initdata = {
+	.irq_gpio = NFC_IRQ_JANICE_R0_0,
+	.ven_gpio = NFC_EN_JANICE_R0_0,
+	.firm_gpio = NFC_FIRM_JANICE_R0_0,
+};
+#endif
+
 static struct i2c_board_info __initdata janice_r0_0_gpio_i2c7_devices[] = {
-// TBD - NFC
-#if 0
+#if defined(CONFIG_NFC_PN544)
+	{
+		I2C_BOARD_INFO("pn544", 0x2b),
+		.irq = GPIO_TO_IRQ(NFC_IRQ_JANICE_R0_0),
+		.platform_data = &pn544_pdata,
+	},
+#else
+	// TBD - NFC
+	#if 0
 	{
 		I2C_BOARD_INFO("", 0x30),
 	},
+	#endif
 #endif
 };
 
