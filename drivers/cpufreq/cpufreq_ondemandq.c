@@ -13,6 +13,8 @@
  * which needs two cores work at the same time to get best effects.
  * In order to save power,when system goes to sleep,it will hotplug CPU1.
  * So it WONT hotplug CPU1 in non-suspend state.
+ * 
+ * Got some ideas from hotplugx (imoseyon <imoseyon@gmail.com>)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -34,7 +36,7 @@
 #include <linux/sched.h>
 #include <linux/earlysuspend.h>
 
-#define DEBUG
+//#define DEBUG
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -72,6 +74,9 @@ static unsigned int min_sampling_rate;
 static void do_dbs_timer(struct work_struct *work);
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				unsigned int event);
+
+/* Variables used in early suspend */
+static int is_register = 0;
 
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMANDQ
 static
@@ -779,18 +784,20 @@ static struct early_suspend early_suspend;
 
 static void cpufreq_ondemandq_early_suspend(struct early_suspend *h)
 {
-	#if 0
+	#ifdef DEBUG
 	pr_info ("ondemandq: enter suspend.\n");
 	#endif
-	cpu_down_work();
+	if (is_register)
+		cpu_down_work();
 }
 
 static void cpufreq_ondemandq_late_resume(struct early_suspend *h)
 {
-	#if 0
+	#ifdef DEBUG
 	pr_info ("ondemandq: enter resume.\n");
 	#endif
-	cpu_up_work();
+	if (is_register)
+		cpu_up_work();
 }
 
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
@@ -878,7 +885,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		} else
 			dbs_timer_init(this_dbs_info, cpu);
 
+		is_register = 0;
 		register_early_suspend(&early_suspend);
+		is_register = 1;
 		#ifdef DEBUG
 		pr_info ("ondemandq: earlysuspend registered.\n");
 		#endif
@@ -888,6 +897,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 	case CPUFREQ_GOV_STOP:
 
 		unregister_early_suspend(&early_suspend);
+		is_register = 0;
 		#ifdef DEBUG
 		pr_info ("ondemandq: earlysuspend unregistered.\n");
 		#endif
@@ -952,8 +962,7 @@ static int __init cpufreq_gov_dbs_init(void)
 			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
-//	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-//	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 3;
+	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 2;
 	early_suspend.suspend = cpufreq_ondemandq_early_suspend;
 	early_suspend.resume = cpufreq_ondemandq_late_resume;
 
