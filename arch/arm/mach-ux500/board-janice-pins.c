@@ -66,8 +66,13 @@ static pin_cfg_t janice_r0_0_pins[] = {
 	GPIO29_U2_RXD	| PIN_INPUT_PULLUP,
 	GPIO30_U2_TXD	| PIN_OUTPUT_HIGH,
 
+	#if defined(CONFIG_NFC_PN544)
+	GPIO31_GPIO		| PIN_OUTPUT_LOW,	/* NFC_FIRMWARE */
+	GPIO32_GPIO		| PIN_INPUT_PULLDOWN,	/* NFC_IRQ */
+	#else
 	GPIO31_GPIO		| PIN_INPUT_NOPULL,	/* NFC_FIRMWARE */
 	GPIO32_GPIO		| PIN_INPUT_NOPULL,	/* NFC_IRQ */
+	#endif
 
 	/* MSP AB8500 */
 	GPIO33_MSP1_TXD,
@@ -121,8 +126,13 @@ static pin_cfg_t janice_r0_0_pins[] = {
 
 	GPIO149_GPIO		| PIN_OUTPUT_LOW,	/* RST_5M_CAM */
 
+	#if defined(CONFIG_NFC_PN544)
+	GPIO151_GPIO		| PIN_OUTPUT_HIGH,	/* NFC_SCL GPIO I2C */
+	GPIO152_GPIO		| PIN_OUTPUT_HIGH,	/* NFC_SDA GPIO I2C */
+	#else
 	GPIO151_GPIO		| PIN_INPUT_NOPULL,	/* NFC_SCL GPIO I2C */
 	GPIO152_GPIO		| PIN_INPUT_NOPULL,	/* NFC_SDA GPIO I2C */
+	#endif
 
 	GPIO192_GPIO		| PIN_INPUT_PULLDOWN,	/* NC */
 	GPIO193_GPIO		| PIN_INPUT_PULLDOWN,	/* NC */
@@ -491,8 +501,14 @@ static pin_cfg_t janice_r0_0_power_save_bank0[] = {
 		PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_ENABLED,
 	GPIO30_U2_TXD | PIN_SLPM_DIR_OUTPUT |
 		PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED,
+	#if defined(CONFIG_NFC_PN544)
+	/* GPIO31_GPIO | PIN_SLPM_DIR_OUTPUT |
+	PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED, - removed */ /* NFC_FIRMWARE */
+	/* NOTES: GT-I9070P removed this*/
+	#else
 	GPIO31_GPIO | PIN_SLPM_DIR_INPUT |
 		PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PULL_DOWN, /* NFC_FIRMWARE */
+	#endif
 };
 
 static pin_cfg_t janice_r0_0_sdmmc_sleep[] = {
@@ -526,6 +542,9 @@ static pin_cfg_t janice_r0_0_sdmmc_sleep[] = {
 };
 
 static pin_cfg_t janice_common_sleep_table[] = {
+	#if defined(CONFIG_NFC_PN544)
+	GPIO31_GPIO | PIN_INPUT_PULLDOWN,	/* NFC_FIRMWARE */
+	#endif
 	GPIO32_GPIO | PIN_INPUT_PULLDOWN,  /* NFC_IRQ */
 	GPIO33_GPIO | PIN_OUTPUT_LOW,
 	GPIO34_GPIO | PIN_INPUT_NOPULL,
@@ -558,7 +577,11 @@ static pin_cfg_t janice_common_sleep_table[] = {
 	GPIO85_GPIO | PIN_INPUT_PULLDOWN,
 /*	GPIO86_GPIO | PIN_OUTPUT_LOW, */ /* EN_GPS */
 	/*GPIO87_GPIO | PIN_INPUT_PULLDOWN,*/
+	#if defined(CONFIG_NFC_PN544)
+/*	GPIO88_GPIO | PIN_OUTPUT_LOW, - removed */ /* NFC_EN */
+	#else
 	GPIO88_GPIO | PIN_OUTPUT_LOW,  /* NFC_EN */
+	#endif
 	GPIO89_GPIO | PIN_OUTPUT_LOW,  /* TSP_LDO_ON2 */
 
 	GPIO90_GPIO | PIN_INPUT_PULLDOWN,
@@ -680,7 +703,16 @@ static pin_cfg_t janice_common_sleep_table[] = {
 };
 
 static pin_cfg_t janice_r0_0_sleep_table[] = {
+	#if defined(CONFIG_NFC_PN544)
+  	GPIO31_GPIO | PIN_INPUT_PULLDOWN,  /* NFC_FIRMWARE */
+	GPIO32_GPIO | PIN_INPUT_PULLDOWN,  /* NFC_IRQ */
+	#endif
 	GPIO93_GPIO | PIN_OUTPUT_LOW,  /* OLED_DETECT_BB */
+
+	#if defined(CONFIG_NFC_PN544)
+	GPIO151_GPIO | PIN_OUTPUT_HIGH,  /* NFC_SCL_1.8V */
+	GPIO152_GPIO | PIN_OUTPUT_HIGH,  /* NFC_SDA_1.8V */
+	#endif
 
 	GPIO203_GPIO | PIN_INPUT_PULLDOWN,
 	GPIO204_GPIO | PIN_INPUT_PULLDOWN,
