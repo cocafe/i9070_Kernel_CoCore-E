@@ -100,7 +100,7 @@ static const u8 ab850x_reg_cache[] = {
 	0x00, /* REG_ANACONF4		(0x08) */
 	0x00, /* REG_DAPATHCONF		(0x09) */
 	0x40, /* REG_MUTECONF		(0x0A) */
-	0x01, /* REG_SHORTCIRCONF	(0x0B) */
+	0x05, /* REG_SHORTCIRCONF	(0x0B) */
 	0x01, /* REG_ANACONF5		(0x0C) */
 	0x00, /* REG_ENVCPCONF		(0x0D) */
 	0x00, /* REG_SIGENVCONF		(0x0E) */
@@ -258,7 +258,7 @@ struct ab8500_codec_drvdata {
 };
 
 /* cocafe: ABBamp module */
-#define ABBAMP_VERSION_TAG			"2.0b"		/* b: beta */
+#define ABBAMP_VERSION_TAG			"2.1b"
 #define ABBAMP_DEBUG_LEVEL			0
 
 #define REG_FULLBITS				0xFF		/* 1111 1111 */
@@ -273,11 +273,13 @@ static void abbamp_control_hsdaclowpow(void);
 static void abbamp_control_hshpen(void);
 static void abbamp_control_hsleardiggain(int input);
 static void abbamp_control_hsrdiggain(void);
+static void abbamp_control_classdhpg(void);
+static void abbamp_control_classdwg(void);
 
 //static void abbamp_control_ponup(bool power_on);
 static void abbamp_control_hs(void);
+static void abbamp_control_hf(void);
 static void abbamp_control_earpiece(void);
-//static void abbamp_control_hf(void);
 //static void abbamp_control_mic2(void);
 
 
@@ -363,6 +365,12 @@ static int abbamp_dbg = ABBAMP_DEBUG_LEVEL;
 /* HS widget status */
 static int hs_ponup = false;
 
+/* HF widget status */
+static int hf_ponup = false;
+
+/* Earpiece widget status */
+static int ear_ponup = false;
+
 /* AnaConf1
  * Lowpower/Headset/Earpiece amp configuration.
  * 
@@ -403,6 +411,34 @@ static void abbamp_control_hshpen(void)
 {
 	abbamp_write(REG_ANACONF1, REG_ANACONF1_HSHPEN, 1, hshpen_v);
 }
+
+/* ShortCirConf 
+ * Short circuit configuration
+ *
+ * [7] EnShortPWD
+ * 	0: Automatic switch off on short circuit detection is disabled
+ * 	1: Automatic switch off on short circuit detection is enabled
+ * [6] EarShortDis
+ * 	0: Short circuit detection on Ear driver enabled
+ * 	1: Short circuit detection on Ear driver disabled
+ * [5] HsShortDis
+ * 	0: Short circuit detection on HsL and HsR drivers enabled
+ * 	1: Short circuit detection on HsL and HsR drivers disabled
+ * [4] HsPullDEn
+ * 	0: HsL and HsR outputs are in high impedance
+ * 	1: HsL and HsR outputs are pulled down to ground
+ * [2] HsOscEn (ABBamp enables it by default)
+ * 	0: The HS drivers use the system clock
+ * 	1: The HS drivers use a local oscillator (system clock absent: analog path only)
+ * [1] HsFadDis
+ * 	0: All intermediate steps are applied between two programmed gains (fading)
+ * 	1: Gain on HS is applied immediately
+ * [0] HsZcdDis
+ * 	0: HS gain changes on signal zero cross (unless time-out occurs)
+ * 	1: HS gain is changed without zero cross control
+ * 
+ * Codec won't change ShortCir(0x0b) register.
+ */
 
 /* AnaGain3
  * Headset Analog Gain
@@ -446,6 +482,41 @@ static void abbamp_control_anagain3(void)
 {
 	abbamp_write(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSL, 4, anagain3_hsl);
 	abbamp_write(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSR, 4, anagain3_hsr);
+}
+
+/* ClassDConf3
+ * Class-D dithering control(gain)
+ *
+ * ClassDDithHPGain
+ * 	ClassD High Pass Gain Playback Volume
+ * 	0000: Minimum gain
+ * 	0100: Medium gain
+ * 	1010: Maximum gain
+ * 
+ * ClassDDithWGain
+ * 	ClassD White Gain Playback Volume
+ * 	0000: Minimum gain
+ * 	0100: Medium gain
+ * 	1010: Maximum gain
+ */
+#define SHIFT_CLASSDDIR_HPG			7
+#define SHIFT_CLASSDDIR_WG			3
+#define GAIN_CLASSDDIR_MAX			0xA
+
+static bool classdhpg_con = false;
+static bool classdwg_con = false;
+
+static int classdhpg_v = GAIN_CLASSDDIR_MAX;
+static int classdwg_v = GAIN_CLASSDDIR_MAX;
+
+static void abbamp_control_classdhpg(void)
+{
+	abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_HPG, 4, classdhpg_v);
+}
+
+static void abbamp_control_classdwg(void)
+{
+	abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_WG, 4, classdwg_v);
 }
 
 /* HsLEarDigGain
@@ -559,6 +630,18 @@ static void abbamp_control_earpiece(void)
 	}
 }
 
+/* ABBamp handsfree controls */
+static void abbamp_control_hf(void)
+{
+	if (classdhpg_con) {
+		abbamp_control_classdhpg();
+		pr_err("abb-codec: ClassD-HPG\n");
+	}
+	if (classdwg_con) {
+		abbamp_control_classdwg();
+		pr_err("abb-codec: ClassD-WG\n");
+	}
+}
 
 /* Reads an arbitrary register from the ab8500 chip.
 */
@@ -1528,12 +1611,14 @@ static int ihfr_dapm_event(struct snd_soc_dapm_widget *w,
 {
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-//		ab850x_control_hf();
+		hf_ponup = true;
+		abbamp_control_hf();
 		if (abbamp_dbg >= 1) {
 			pr_info("abb-codec: IHfR power on\n");
 		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+		hf_ponup = false;
 		if (hs_ponup) {
 			abbamp_control_hs();
 		}
@@ -1550,6 +1635,7 @@ static int earpiece_dapm_event(struct snd_soc_dapm_widget *w,
 {
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
+		ear_ponup = true;
 		if (!hs_ponup) {
 			abbamp_control_earpiece();
 		}
@@ -1558,6 +1644,7 @@ static int earpiece_dapm_event(struct snd_soc_dapm_widget *w,
 		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+		ear_ponup = false;
 		if (hs_ponup) {
 			abbamp_control_hs();
 		}
@@ -4755,6 +4842,86 @@ static ssize_t abb_codec_hsrdiggain_store(struct kobject *kobj,
 static struct kobj_attribute abb_codec_hsrdiggain_interface = __ATTR(hsrdiggain, 0644, 
 				abb_codec_hsrdiggain_show, abb_codec_hsrdiggain_store);
 
+static ssize_t abb_codec_eardiggain_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int gain_mem = abbamp_read(REG_HSLEARDIGGAIN, REG_HSLEARDIGGAIN_HSLDGAIN, 4);
+
+	sprintf(buf, "Ear Digital Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, eardiggain_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (gain_mem > 8) {
+		sprintf(buf, "%sGain(mem):\t%02d (mute)\n", buf, gain_mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (+%ddB)\n", buf, gain_mem, 
+						hsleardiggain_volmap[gain_mem]);
+	}
+	if (eardiggain_v > 8) {
+		sprintf(buf, "%sGain(user):\t%02d (mute)\n", buf, eardiggain_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (+%ddB)\n", buf, eardiggain_v, 
+						hsleardiggain_volmap[eardiggain_v]);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_eardiggain_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "enable", 6)) {
+		pr_err("abb-codec: enable EarDigGain con\n");
+		
+		eardiggain_con = true;
+		if (ear_ponup) {
+			abbamp_control_hsleardiggain(eardiggain_v);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "disable", 7)) {
+		pr_err("abb-codec: disable EarDigGain con\n");
+
+		eardiggain_con = false;
+		if (ear_ponup) {
+			/* 0000 1000 */
+			snd_soc_write(ab850x_codec, REG_HSLEARDIGGAIN, 0x08);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_HSLEARDIGGAIN);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > MUTE_HSLEARDIG_MAX)) {
+			pr_err("abb-codec: invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		eardiggain_con = true;
+		eardiggain_v = val;
+		if (ear_ponup) {
+			abbamp_control_hsleardiggain(eardiggain_v);
+		}
+
+		new = snd_soc_read(ab850x_codec, REG_HSLEARDIGGAIN);
+		pr_err("abb-codec: REG[%#04x] %#04x -> %#04x\n", REG_HSLEARDIGGAIN, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_eardiggain_interface = __ATTR(eardiggain, 0644, 
+				abb_codec_eardiggain_show, abb_codec_eardiggain_store);
+
 static ssize_t abb_codec_hslowpow_show(struct kobject *kobj, 
 		struct kobj_attribute *attr, char *buf)
 {
@@ -4911,14 +5078,14 @@ static ssize_t abb_codec_hshpen_show(struct kobject *kobj,
 	sprintf(buf, "%sEnable [%s]\n", buf, hshpen_con ? "*" : " ");
 	sprintf(buf, "%s\n", buf);
 	if (mem) {
-		sprintf(buf, "%sMode(mem):\t%d (*)\n", buf, mem);
+		sprintf(buf, "%sMode(mem):\t%d [*]\n", buf, mem);
 	} else {
-		sprintf(buf, "%sMode(mem):\t%d ( )\n", buf, mem);
+		sprintf(buf, "%sMode(mem):\t%d [ ]\n", buf, mem);
 	}
 	if (hshpen_v) {
-		sprintf(buf, "%sMode(user):\t%d (*)\n", buf, hshpen_v);
+		sprintf(buf, "%sMode(user):\t%d [*]\n", buf, hshpen_v);
 	} else {
-		sprintf(buf, "%sMode(user):\t%d ( )\n", buf, hshpen_v);
+		sprintf(buf, "%sMode(user):\t%d [ ]\n", buf, hshpen_v);
 	}
 
 	return strlen(buf);
@@ -4997,6 +5164,200 @@ static ssize_t abb_codec_anaconf1_show(struct kobject *kobj,
 static struct kobj_attribute abb_codec_anaconf1_interface = __ATTR(anaconf1, 0444, 
 				abb_codec_anaconf1_show, NULL);
 
+static ssize_t abb_codec_shortcir_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "Short Circuit Conf:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%s[0][%d] HsZcdDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSZCDDIS, 1));
+	sprintf(buf, "%s[1][%d] HsFadDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSFADDIS, 1));
+	sprintf(buf, "%s[2][%d] HsOscEn\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSOSCEN, 1));
+	sprintf(buf, "%s[3][%d] \n", 		buf, abbamp_read(REG_SHORTCIRCONF, 3, 1));
+	sprintf(buf, "%s[4][%d] HsPullDEn\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSPULLDEN, 1));
+	sprintf(buf, "%s[5][%d] HsShortDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSSHORTDIS, 1));
+	sprintf(buf, "%s[6][%d] EarShortDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_EARSHORTDIS, 1));
+	sprintf(buf, "%s[7][%d] EnShortPWD\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_ENSHORTPWD, 1));
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_shortcir_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int sft, val, ret;
+	
+	ret = sscanf(buf, "%d %d", &sft, &val);
+	
+	if ((ret < 0) || (sft < 0) || (sft > 7) || ((val != 0) && (val != 1)))
+	{
+		pr_err("abb-codec: invalid inputs\n");
+		return -EINVAL;
+	}
+
+	abbamp_write(REG_SHORTCIRCONF, sft, 1, val);
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_shortcir_interface = __ATTR(shortcir, 0644, 
+				abb_codec_shortcir_show, abb_codec_shortcir_store);
+
+static ssize_t abb_codec_classdhpg_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int mem = abbamp_read(REG_CLASSDCONF3, SHIFT_CLASSDDIR_HPG, 4);
+
+	sprintf(buf, "ClassD HighPass Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, classdhpg_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (mem == 0xA) {
+		sprintf(buf, "%sGain(mem):\t%02d (Maximum)\n", buf, mem);
+	} else if (mem == 0x0){
+		sprintf(buf, "%sGain(mem):\t%02d (Minimum)\n", buf, mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (Medium)\n", buf, mem);
+	}
+	if (classdhpg_v == 0xA) {
+		sprintf(buf, "%sGain(user):\t%02d (Maximum)\n", buf, classdhpg_v);
+	} else if (classdhpg_v == 0x0){
+		sprintf(buf, "%sGain(user):\t%02d (Minimum)\n", buf, classdhpg_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (Medium)\n", buf, classdhpg_v);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_classdhpg_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "enable", 6)) {
+		pr_err("abb-codec: enable ClassDHPG con\n");
+		
+		classdhpg_con = true;
+		abbamp_control_classdhpg();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "disable", 7)) {
+		pr_err("abb-codec: disable ClassDHPG con\n");
+
+		classdhpg_con = false;
+		/* 0100 xxxx */
+		if (hf_ponup) {
+			abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_HPG, 4, 0x4);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_CLASSDDIR_MAX)) {
+			pr_err("abb-codec: invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		classdhpg_con = true;
+		classdhpg_v = val;
+		abbamp_control_classdhpg();
+
+		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		pr_err("abb-codec: REG[%#04x] %#04x -> %#04x\n", REG_CLASSDCONF3, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_classdhpg_interface = __ATTR(classdhpg, 0644, 
+				abb_codec_classdhpg_show, abb_codec_classdhpg_store);
+
+static ssize_t abb_codec_classdwg_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int mem = abbamp_read(REG_CLASSDCONF3, SHIFT_CLASSDDIR_WG, 4);
+
+	sprintf(buf, "ClassD White Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, classdwg_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (mem == 0xA) {
+		sprintf(buf, "%sGain(mem):\t%02d (Maximum)\n", buf, mem);
+	} else if (mem == 0x0){
+		sprintf(buf, "%sGain(mem):\t%02d (Minimum)\n", buf, mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (Medium)\n", buf, mem);
+	}
+	if (classdwg_v == 0xA) {
+		sprintf(buf, "%sGain(user):\t%02d (Maximum)\n", buf, classdwg_v);
+	} else if (classdwg_v == 0x0){
+		sprintf(buf, "%sGain(user):\t%02d (Minimum)\n", buf, classdwg_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (Medium)\n", buf, classdwg_v);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_classdwg_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "enable", 6)) {
+		pr_err("abb-codec: enable ClassDWG con\n");
+		
+		classdwg_con = true;
+		abbamp_control_classdwg();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "disable", 7)) {
+		pr_err("abb-codec: disable ClassDWG con\n");
+
+		classdwg_con = false;
+		/* xxxx 0100 */
+		if (hf_ponup) {
+			abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_WG, 4, 0x4);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_CLASSDDIR_MAX)) {
+			pr_err("abb-codec: invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		classdwg_con = true;
+		classdwg_v = val;
+		abbamp_control_classdwg();
+
+		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		pr_err("abb-codec: REG[%#04x] %#04x -> %#04x\n", REG_CLASSDCONF3, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_classdwg_interface = __ATTR(classdwg, 0644, 
+				abb_codec_classdwg_show, abb_codec_classdwg_store);
+
 static struct attribute *abb_codec_attrs[] = {
 	&abb_codec_dbg_interface.attr, 
 	&abb_codec_vertag_interface.attr, 
@@ -5009,6 +5370,10 @@ static struct attribute *abb_codec_attrs[] = {
 	&abb_codec_hsdaclowpow_interface.attr, 
 	&abb_codec_hshpen_interface.attr, 
 	&abb_codec_anaconf1_interface.attr, 
+	&abb_codec_eardiggain_interface.attr, 
+	&abb_codec_shortcir_interface.attr, 
+	&abb_codec_classdhpg_interface.attr, 
+	&abb_codec_classdwg_interface.attr, 
 	NULL,
 };
 
