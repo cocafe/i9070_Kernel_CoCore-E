@@ -16,8 +16,17 @@ endif
 endif
 
 AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
-HEAD	= head.o
-OBJS	+= misc.o decompress.o
+AFLAGS_head.o += -Wa,-march=armv7-a
+HEAD 	= head.o
+
+AFLAGS_misc.o +=-Wa,-march=armv7-a
+MISC = misc.o
+
+AFLAGS_decompress.o += -Wa,-march=armv7-a
+DECOMPRESS = decompress.o
+
+#OBJS	+= misc.o decompress.o
+
 FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
 
 #
@@ -103,7 +112,7 @@ endif
 
 targets       := vmlinux vmlinux.lds \
 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
-		 font.o font.c head.o misc.o $(OBJS)
+		 font.o font.c head.o misc.o decompress.o $(OBJS)
 
 # Make sure files are removed during clean
 extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
@@ -136,12 +145,14 @@ LDFLAGS_vmlinux += -X
 LDFLAGS_vmlinux += -T
 
 # For __aeabi_uidivmod
+AFLAGS_lib1funcs.o +=-Wa,-march=armv7-a
 lib1funcs = $(obj)/lib1funcs.o $(obj)/../../lib/lib.a
 
 $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
 	$(call cmd,shipped)
 
 # For __aeabi_llsl
+AFLAGS_ashldi3.o +=-Wa,-march=armv7-a
 ashldi3 = $(obj)/ashldi3.o
 
 $(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S FORCE
@@ -160,11 +171,12 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
   ( echo "following symbols must have non local/private scope:" >&2; \
     echo "$$bad_syms" >&2; rm -f $@; false )
 
-$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/$(MISC) $(obj)/$(DECOMPRESS) $(obj)/piggy.$(suffix_y).o \
 	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
 	$(call if_changed,ld)
 	@$(check_for_bad_syms)
 
+AFLAGS_piggy.$(suffix_y).o += -Wa,-march=armv7-a
 $(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
 	$(call if_changed,$(suffix_y))
 
