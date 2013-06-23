@@ -100,7 +100,7 @@ static const u8 ab850x_reg_cache[] = {
 	0x00, /* REG_ANACONF4		(0x08) */
 	0x00, /* REG_DAPATHCONF		(0x09) */
 	0x40, /* REG_MUTECONF		(0x0A) */
-	0x05, /* REG_SHORTCIRCONF	(0x0B) */
+	0x37, /* REG_SHORTCIRCONF	(0x0B) */
 	0x01, /* REG_ANACONF5		(0x0C) */
 	0x00, /* REG_ENVCPCONF		(0x0D) */
 	0x00, /* REG_SIGENVCONF		(0x0E) */
@@ -258,7 +258,7 @@ struct ab8500_codec_drvdata {
 };
 
 /* cocafe: ABBamp module */
-#define ABBAMP_VERSION_TAG			"2.3b"
+#define ABBAMP_VERSION_TAG			"2.4"
 #define ABBAMP_DEBUG_LEVEL			0
 
 #define REG_FULLBITS				0xFF		/* 1111 1111 */
@@ -421,7 +421,7 @@ static void abbamp_control_hshpen(void)
  * [4] HsPullDEn
  * 	0: HsL and HsR outputs are in high impedance
  * 	1: HsL and HsR outputs are pulled down to ground
- * [2] HsOscEn (ABBamp enables it by default)
+ * [2] HsOscEn
  * 	0: The HS drivers use the system clock
  * 	1: The HS drivers use a local oscillator (system clock absent: analog path only)
  * [1] HsFadDis
@@ -4750,7 +4750,7 @@ static ssize_t abb_codec_anagain3_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable AnaGain3 con\n");
 		
 		anagain3_con = true;
@@ -4759,7 +4759,7 @@ static ssize_t abb_codec_anagain3_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable AnaGain3 con\n");
 
 		anagain3_con = false;
@@ -4847,7 +4847,7 @@ static ssize_t abb_codec_hsldiggain_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable HsLDigGain con\n");
 		
 		hsldiggain_con = true;
@@ -4856,7 +4856,7 @@ static ssize_t abb_codec_hsldiggain_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable HsLDigGain con\n");
 
 		hsldiggain_con = false;
@@ -4923,7 +4923,7 @@ static ssize_t abb_codec_hsrdiggain_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable HsRDigGain con\n");
 		
 		hsrdiggain_con = true;
@@ -4932,7 +4932,7 @@ static ssize_t abb_codec_hsrdiggain_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable HsRDigGain con\n");
 
 		hsrdiggain_con = false;
@@ -4999,7 +4999,7 @@ static ssize_t abb_codec_eardiggain_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable EarDigGain con\n");
 		
 		eardiggain_con = true;
@@ -5010,7 +5010,7 @@ static ssize_t abb_codec_eardiggain_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable EarDigGain con\n");
 
 		eardiggain_con = false;
@@ -5077,7 +5077,7 @@ static ssize_t abb_codec_hslowpow_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable HsLowPow con\n");
 		
 		hslowpow_con = true;
@@ -5086,7 +5086,7 @@ static ssize_t abb_codec_hslowpow_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable HsLowPow con\n");
 
 		hslowpow_con = false;
@@ -5150,7 +5150,7 @@ static ssize_t abb_codec_hsdaclowpow_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable HsDACLowPow con\n");
 		
 		hsdaclowpow_con = true;
@@ -5159,7 +5159,7 @@ static ssize_t abb_codec_hsdaclowpow_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable HsDACLowPow con\n");
 
 		hsdaclowpow_con = false;
@@ -5223,7 +5223,7 @@ static ssize_t abb_codec_hshpen_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable HsHpEn con\n");
 		
 		hshpen_con = true;
@@ -5232,7 +5232,7 @@ static ssize_t abb_codec_hshpen_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable HsHpEn con\n");
 
 		hshpen_con = false;
@@ -5361,7 +5361,7 @@ static ssize_t abb_codec_classdhpg_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable ClassDHPG con\n");
 		
 		classdhpg_con = true;
@@ -5370,7 +5370,7 @@ static ssize_t abb_codec_classdhpg_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable ClassDHPG con\n");
 
 		classdhpg_con = false;
@@ -5439,7 +5439,7 @@ static ssize_t abb_codec_classdwg_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable ClassDWG con\n");
 		
 		classdwg_con = true;
@@ -5448,7 +5448,7 @@ static ssize_t abb_codec_classdwg_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable ClassDWG con\n");
 
 		classdwg_con = false;
@@ -5506,7 +5506,7 @@ static ssize_t abb_codec_addiggain2_store(struct kobject *kobj,
 {
 	int new, old, val, ret;
 
-	if (!strncmp(buf, "enable", 6)) {
+	if (!strncmp(buf, "on", 2)) {
 		pr_err("abb-codec: enable AD2DigGain con\n");
 		
 		addiggain2_con = true;
@@ -5518,7 +5518,7 @@ static ssize_t abb_codec_addiggain2_store(struct kobject *kobj,
 		return count;
 	}
 
-	if (!strncmp(buf, "disable", 7)) {
+	if (!strncmp(buf, "off", 3)) {
 		pr_err("abb-codec: disable AD2DigGain con\n");
 
 		addiggain2_con = false;
