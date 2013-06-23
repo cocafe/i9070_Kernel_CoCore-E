@@ -13,6 +13,7 @@
 
 /* #define TOUCHKEY_UPDATE_ONBOOT */
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/input.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -94,6 +95,9 @@ extern bool vbus_state;
 
 static struct workqueue_struct *touchkey_wq;
 static struct work_struct update_work;
+
+static bool suspend_con = false;
+module_param(suspend_con, bool, 0644);
 
 extern int touch_is_pressed;
 struct cypress_touchkey_info {
@@ -348,8 +352,10 @@ static void cypress_touchkey_con_hw(struct cypress_touchkey_info *info, bool fla
 		gpio_set_value(info->pdata->gpio_ldo_en, 1);
 		gpio_set_value(info->pdata->gpio_led_en, 1);
 	} else {
-		gpio_set_value(info->pdata->gpio_led_en, 0);
-		gpio_set_value(info->pdata->gpio_ldo_en, 0);
+		if (!suspend_con) {
+			gpio_set_value(info->pdata->gpio_led_en, 0);
+			gpio_set_value(info->pdata->gpio_ldo_en, 0);
+		}
 	}
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	dev_notice(&info->client->dev, "%s : called with flag %d.\n", __func__, flag);
@@ -657,7 +663,8 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
 {
 	struct cypress_touchkey_info *info;
 	info = container_of(h, struct cypress_touchkey_info, early_suspend);
-	cypress_touchkey_suspend(&info->client->dev);
+	if (!suspend_con)
+		cypress_touchkey_suspend(&info->client->dev);
 
 	#ifdef CONFIG_LEDS_CLASS
 	info->current_status = 0;
@@ -668,7 +675,8 @@ static void cypress_touchkey_late_resume(struct early_suspend *h)
 {
 	struct cypress_touchkey_info *info;
 	info = container_of(h, struct cypress_touchkey_info, early_suspend);
-	cypress_touchkey_resume(&info->client->dev);
+	if (!suspend_con)
+		cypress_touchkey_resume(&info->client->dev);
 
 	#ifdef CONFIG_LEDS_CLASS
 	/*led sysfs write led value before resume process is not executed */
