@@ -127,5 +127,5 @@ endif
 endif
 endif
 obj-$(CONFIG_MACH_SAMSUNG_UX500)	+= sec_common.o
-
+obj-$(CONFIG_JANICE_GPIO_DEBUG)		+= gpio-debug.o
 obj-$(CONFIG_DB8500_CLOCK_CONTROL)	+= clock-con.o

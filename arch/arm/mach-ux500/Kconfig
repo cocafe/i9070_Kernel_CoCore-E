@@ -347,6 +347,11 @@ config DB8500_CLOCK_CONTROL
 	depends on UX500_SOC_DB8500
 	default n
 
+config JANICE_GPIO_DEBUG
+	bool "GPIO debug module for Janice Machine"
+	depends on MACH_JANICE
+	default n
+
 source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
 source "arch/arm/mach-ux500/test/Kconfig"
