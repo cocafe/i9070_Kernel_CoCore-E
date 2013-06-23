@@ -1101,21 +1101,23 @@ static void report_input_data(struct mxt224_data *data)
 						(char *)data->client->name,
 						PRCMU_QOS_DDR_OPP_MAX);
 				}
-				if (touchboost_freq == 200000 || 
-				touchboost_freq == 400000 || 
-				touchboost_freq == 800000 || 
-				touchboost_freq == 1000000) {
+				if (	touchboost_freq == 200000 || 
+					touchboost_freq == 400000 || 
+					touchboost_freq == 800000 || 
+					touchboost_freq == 1000000) {
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_ARM_KHZ,
 						(char *)data->client->name,
 						touchboost_freq);
 				} else {
-					printk("[TSP] invalid cpufreq.\n");
-					touchboost_freq = TOUCHBOOST_FREQ_DEF;
-					prcmu_qos_update_requirement(
-						PRCMU_QOS_ARM_KHZ,
-						(char *)data->client->name,
-						TOUCHBOOST_FREQ_DEF);
+					if (touchboost_freq != 0) {
+						printk("[TSP] invalid cpufreq requirement.\n");
+						touchboost_freq = TOUCHBOOST_FREQ_DEF;
+						prcmu_qos_update_requirement(
+							PRCMU_QOS_ARM_KHZ,
+							(char *)data->client->name,
+							TOUCHBOOST_FREQ_DEF);
+					}
 				}
 			}
 
