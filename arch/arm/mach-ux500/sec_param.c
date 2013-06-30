@@ -23,6 +23,9 @@ static ssize_t sec_param_show(struct kobject *kobj, struct kobj_attribute *attr,
 
 		sprintf(buf, "  <SecBootloader Parameters>:  \n\n");
 
+		sprintf(buf, "%s  PARAM_MAGIC  : %d\n", buf, PARAM_MAGIC);
+		sprintf(buf, "%s  PARAM_VERSION  : %d\n", buf, PARAM_VERSION);
+
 		sec_get_param_value(__SERIAL_SPEED, &value);
 		sprintf(buf, "%s  - 00. SERIAL_SPEED  : %d\n", buf, value);
 		sec_get_param_value(__LOAD_TESTKERNEL, &value);
