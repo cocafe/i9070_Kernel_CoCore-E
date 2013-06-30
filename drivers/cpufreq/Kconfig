@@ -314,14 +314,6 @@ config CPU_FREQ_GOV_ZZMOOVE
 
 	  If in doubt, say N.
 
-config CPU_FREQ_GOV_LULZACTIVEW
-	tristate "'lulzactivew' cpufreq governor"
-	depends on CPU_FREQ
-	help
-	  'lulzactivew' - A combination of lulzactive and performance by erik96
-
-	  If in doubt, say N.
-
 config CPU_FREQ_GOV_LULZACTIVEQ
 	tristate "'lulzactiveq' cpufreq governor"
 	depends on CPU_FREQ
