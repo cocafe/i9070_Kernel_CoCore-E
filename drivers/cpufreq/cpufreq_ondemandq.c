@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/cpumask.h>
+#include <linux/delay.h>
 #include <linux/cpu.h>
 #include <linux/jiffies.h>
 #include <linux/kernel_stat.h>
@@ -77,6 +78,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 /* Variables used in early suspend */
 static int is_register = 0;
+static int is_suspend = 0;
 
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMANDQ
 static
@@ -780,6 +782,16 @@ static void cpu_down_work(void)
 	}
 }
 
+static void ondemandq_cpu_wakeup_thread(struct work_struct *ondemandq_cpu_wakeup_work)
+{
+	pr_err("ondemandq: wake up CPU1 at starting\n");
+
+	msleep(3000);
+
+	cpu_up_work();
+}
+static DECLARE_WORK(ondemandq_cpu_wakeup_work, ondemandq_cpu_wakeup_thread);
+
 static struct early_suspend early_suspend;
 
 static void cpufreq_ondemandq_early_suspend(struct early_suspend *h)
@@ -787,6 +799,7 @@ static void cpufreq_ondemandq_early_suspend(struct early_suspend *h)
 	#ifdef DEBUG
 	pr_info ("ondemandq: enter suspend.\n");
 	#endif
+	is_suspend = true;
 	if (is_register)
 		cpu_down_work();
 }
@@ -796,6 +809,7 @@ static void cpufreq_ondemandq_late_resume(struct early_suspend *h)
 	#ifdef DEBUG
 	pr_info ("ondemandq: enter resume.\n");
 	#endif
+	is_suspend = false;
 	if (is_register)
 		cpu_up_work();
 }
@@ -891,6 +905,10 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		#ifdef DEBUG
 		pr_info ("ondemandq: earlysuspend registered.\n");
 		#endif
+
+		/* TODO: Wakeup CPU1 when governor starts */
+		if (!is_suspend)
+			schedule_work(&ondemandq_cpu_wakeup_work);
 
 		break;
 
