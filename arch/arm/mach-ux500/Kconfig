@@ -352,6 +352,10 @@ config JANICE_GPIO_DEBUG
 	depends on MACH_JANICE
 	default n
 
+config SEC_PARAM_DEBUG
+	bool "SBL PARAM debug module"
+	default n
+
 source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
 source "arch/arm/mach-ux500/test/Kconfig"
