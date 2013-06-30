@@ -59,7 +59,7 @@ static int __init janice_gpio_debug_init(void)
 {
 	int ret;
 
-	janice_gpio_debug_kobject = kobject_create_and_add("janice-gpio", kernel_kobj);
+	janice_gpio_debug_kobject = kobject_create_and_add("gpio", kernel_kobj);
 	if (!janice_gpio_debug_kobject) {
 		return -ENOMEM;
 	}
