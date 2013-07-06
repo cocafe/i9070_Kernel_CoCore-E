@@ -352,6 +352,11 @@ config JANICE_GPIO_DEBUG
 	depends on MACH_JANICE
 	default n
 
+config JANICE_DVFS_DEBUG
+	bool "DVFS debug module for Janice Machine"
+	depends on MACH_JANICE
+	default n
+
 config SEC_PARAM_DEBUG
 	bool "SBL PARAM debug module"
 	default n
