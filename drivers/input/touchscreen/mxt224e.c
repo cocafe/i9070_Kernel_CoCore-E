@@ -181,24 +181,6 @@ module_param(nexttchdi_con, bool, 0644);
 static unsigned int nexttchdi_batt = 0;			/* default: 0 */
 module_param(nexttchdi_batt, uint, 0644);
 
-/* cocafe: Touch Auto Calibration */
-#define MXT224E_EDGE_X			50
-#define MXT224E_EDGE_Y			750
-
-static bool calibration_auto = true;
-module_param(calibration_auto, bool, 0644);
-
-static unsigned int calibration_edge = 9;		/* threshold: edge touches */
-module_param(calibration_edge, uint, 0644);
-
-static unsigned int edgetouch_x = MXT224E_EDGE_X;
-module_param(edgetouch_x, uint, 0644);
-
-static unsigned int edgetouch_y = MXT224E_EDGE_Y;
-module_param(edgetouch_y, uint, 0644);
-
-static unsigned int edgetouch_counter;
-
 /* cocafe: Debugging Prints */
 static bool debug_mask = false;
 module_param(debug_mask, bool, 0644);
@@ -1169,32 +1151,11 @@ static void report_input_data(struct mxt224_data *data)
 		}
 	}
 
-	if (calibration_auto) {
-		if (data->fingers[id].state == MXT224_STATE_RELEASE) {
-			if (data->fingers[id].x < edgetouch_x && 
-			data->fingers[id].y > edgetouch_y) {
-				edgetouch_counter++;
-				printk("[TSP] EdgeTouch counter: [%d]\n", edgetouch_counter);
-			}
-		}
-	}
-
 	if (data->fingers[id].state == MXT224_STATE_RELEASE)
 		data->fingers[id].state = MXT224_STATE_INACTIVE;
 	else {
 		data->fingers[id].state = MXT224_STATE_MOVE;
 		count++;
-	}
-
-	if (calibration_auto) {
-		if (data->fingers[id].state == MXT224_STATE_INACTIVE) {
-			if (edgetouch_counter >= calibration_edge) {
-				printk("[TSP] Auto calibration ON!!!\n");
-				mxt224_ta_probe(vbus_state);
-				calibrate_chip();
-				edgetouch_counter = 0;
-			}
-		}
 	}
 
 	input_sync(data->input_dev);
