@@ -830,7 +830,8 @@ void check_chip_calibration(struct mxt224_data *data)
 			}
 		}
 
-		printk(KERN_INFO "[TSP] t: %d  a: %d\n", tch_ch, atch_ch);
+		if (debug_mask)
+			printk(KERN_INFO "[TSP] t: %d  a: %d\n", tch_ch, atch_ch);
 
 		/* send page up command so we can detect
 		   when data updates next time,
