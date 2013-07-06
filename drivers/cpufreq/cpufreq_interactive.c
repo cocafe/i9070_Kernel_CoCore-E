@@ -29,6 +29,7 @@
 #include <linux/workqueue.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <asm/cputime.h>
 
 #define CREATE_TRACE_POINTS
@@ -901,6 +902,22 @@ static struct notifier_block cpufreq_interactive_idle_nb = {
 	.notifier_call = cpufreq_interactive_idle_notifier,
 };
 
+static void cpufreq_replug_thread(struct work_struct *cpufreq_replug_work)
+{
+	int cpu;
+
+	/* For UX500 platform, PRCMU need to update CPU1 policy */
+	msleep(3000);
+
+	for_each_cpu_not(cpu, cpu_online_mask) {
+
+	if (cpu == 0)
+		continue;
+		cpu_up(cpu);
+	}
+}
+static DECLARE_WORK(cpufreq_replug_work, cpufreq_replug_thread);
+
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event)
 {
@@ -966,6 +983,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		cpufreq_register_notifier(
 			&cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 		mutex_unlock(&gov_lock);
+
+		schedule_work(&cpufreq_replug_work);
+
 		break;
 
 	case CPUFREQ_GOV_STOP:
