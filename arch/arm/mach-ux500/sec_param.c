@@ -19,7 +19,7 @@ static ssize_t sec_param_show(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	if (sec_get_param_value) {
 		signed int value = 0;
-		signed char str_val[PARAM_STRING_SIZE];
+		signed char str_val[512];
 
 		sprintf(buf, "  <SecBootloader Parameters>:  \n\n");
 
