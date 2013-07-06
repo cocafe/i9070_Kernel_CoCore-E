@@ -832,7 +832,7 @@ static int init_driver_instance(struct FSA9480_instance *instance, struct i2c_cl
 	instance->prev_event = instance->last_event = current_connection_mask(instance);
 	printk(KERN_INFO "MUIC Initial Event = 0x%08lx\n", instance->last_event);
 
-	/* /sys/class/usb_switch/FSA_SWITCH/* */
+	/* /sys/class/usb_switch/FSA_SWITCH/ */
 	instance->dev = device_create(usb_switch_class, NULL, 0, instance, "%s", "FSA_SWITCH");
 	for (i = 0; i < ARRAY_SIZE(FSA9480_device_attrs); i++) {
 			ret = device_create_file(instance->dev, &FSA9480_device_attrs[i]);
