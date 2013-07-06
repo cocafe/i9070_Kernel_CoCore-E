@@ -31,6 +31,14 @@
 #include <asm/unaligned.h>
 #include <linux/firmware.h>
 #include <linux/input/mt.h>
+#include <linux/ab8500-ponkey.h>
+
+#include <plat/pincfg.h>
+#include <plat/gpio-nomadik.h>
+
+#include <mach/board-sec-u8500.h>
+#include <mach/../../pins-db8500.h>
+#include <mach/../../pins.h>
 
 #if defined(TOUCH_BOOSTER)
 #include <linux/mfd/dbx500-prcmu.h>
@@ -180,6 +188,48 @@ module_param(nexttchdi_con, bool, 0644);
 
 static unsigned int nexttchdi_batt = 0;			/* default: 0 */
 module_param(nexttchdi_batt, uint, 0644);
+
+/* cocafe: SweepToWake */
+#define ABS_THRESHOLD_X			150
+#define ABS_THRESHOLD_Y			240
+
+static int x_press, x_release;
+static int y_press, y_release;
+
+static int x_threshold = ABS_THRESHOLD_X;
+module_param(x_threshold, int, 0644);
+static int y_threshold = ABS_THRESHOLD_Y;
+module_param(y_threshold, int, 0644);
+
+static bool is_suspend = false;
+static bool powering_on = false;
+
+static bool sweep2wake = false;
+module_param(sweep2wake, bool, 0644);
+
+static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
+{
+	powering_on = true;
+
+	pr_err("[TSP] %s fn\n", __func__);
+
+	ab8500_ponkey_emulator(1);	/* press */
+
+	msleep(100);
+
+	ab8500_ponkey_emulator(0);	/* release */
+	
+	powering_on = false;
+}
+static DECLARE_WORK(mxt224e_ponkey_work, mxt224e_ponkey_thread);
+
+/*
+static pin_cfg_t janice_mxt224e_pins_wakeup[] = 
+{
+	GPIO94_GPIO | PIN_OUTPUT_HIGH | PIN_SLPM_OUTPUT_HIGH |
+		PIN_SLPM_WAKEUP_ENABLE | PIN_SLPM_PDIS_DISABLED, 
+};
+*/
 
 /* cocafe: Debugging Prints */
 static bool debug_mask = false;
@@ -1069,7 +1119,7 @@ static void report_input_data(struct mxt224_data *data)
 		goto out;
 
 	#if defined(TOUCH_BOOSTER)
-	if (touchboost) {
+	if (touchboost && !is_suspend) {
 		if (data->fingers[id].state == MXT224_STATE_PRESS) {
 			if (data->finger_cnt == 0) {
 				if (touchboost_ape) {
@@ -1148,6 +1198,23 @@ static void report_input_data(struct mxt224_data *data)
 			printk("[TSP] id[%d] x=%d y=%d z=%d w=%d\n",
 				id , data->fingers[id].x, data->fingers[id].y,
 				data->fingers[id].z, data->fingers[id].w);
+		}
+	}
+
+	if (is_suspend) {
+		if (sweep2wake) {
+			if (data->fingers[0].state == MXT224_STATE_PRESS) {
+				x_press = data->fingers[0].x;
+				y_press = data->fingers[0].y;
+			} else if (data->fingers[0].state == MXT224_STATE_RELEASE) {
+				x_release = data->fingers[0].x;
+				y_release = data->fingers[0].y;
+				if ((abs(x_release - x_press) >= x_threshold) ||
+					(abs(y_release - y_press) >= y_threshold)) {
+						if (!powering_on)
+							schedule_work(&mxt224e_ponkey_work);
+				}
+			}
 		}
 	}
 
@@ -1546,9 +1613,34 @@ static void mxt224_early_suspend(struct early_suspend *h)
 	struct mxt224_data *data =
 			container_of(h, struct mxt224_data, early_suspend);
 
+	is_suspend = true;
+
 	mutex_lock(&data->lock);
 	if (!data->enabled)
 		goto out;
+
+	if (sweep2wake) {
+		if (data->finger_cnt > 0) {
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_APE_OPP,
+				(char *)data->client->name,
+				PRCMU_QOS_DEFAULT_VALUE);
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_DDR_OPP,
+				(char *)data->client->name,
+				PRCMU_QOS_DEFAULT_VALUE);
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_ARM_KHZ,
+				(char *)data->client->name,
+				PRCMU_QOS_DEFAULT_VALUE);
+	
+			data->finger_cnt = 0;
+		}
+	
+		/* nmk_config_pins(janice_mxt224e_pins_wakeup, ARRAY_SIZE(janice_mxt224e_pins_wakeup)); */
+
+		goto out;
+	}
 
 	disable_irq(data->client->irq);
 	data->enabled = 0;
@@ -1573,17 +1665,20 @@ static void mxt224_late_resume(struct early_suspend *h)
 	struct mxt224_data *data =
 			container_of(h, struct mxt224_data, early_suspend);
 
+	is_suspend = false;
+
 	valid_touch = 0;
 
 	mutex_lock(&data->lock);
-	if (data->enabled)
+	if (data->enabled && !sweep2wake)
 		goto out;
+
 	data->enabled = 1;
 
 	mxt224_internal_resume(data);
 
-//	dev_info(&data->client->dev, "vbus_state = %d\n", (int)vbus_state);
 	pr_info("[TSP] vbus_state = %d\n", (int)vbus_state);
+
 	if (!(tsp_deepsleep && vbus_state))
 		mxt224_ta_probe(vbus_state);
 
@@ -1592,7 +1687,8 @@ static void mxt224_late_resume(struct early_suspend *h)
 
 	calibrate_chip();
 
-	enable_irq(data->client->irq);
+	if (!sweep2wake)
+		enable_irq(data->client->irq);
 
 out:
 	mutex_unlock(&data->lock);
