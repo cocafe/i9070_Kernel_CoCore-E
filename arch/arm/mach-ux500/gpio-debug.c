@@ -13,17 +13,18 @@
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <asm/gpio.h>
+#include <plat/gpio-nomadik.h>
 
-static ssize_t janice_gpio_onoff_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+static ssize_t janice_gpio_set_mode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "[pin] [0/1]\n");
+	return sprintf(buf, "[gpio] [0/1]\n");
 }
 
-static ssize_t janice_gpio_onoff_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+static ssize_t janice_gpio_set_mode_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
-	int pin, onoff, ret;
+	int gpio, onoff, ret;
 
-	ret = sscanf(buf, "%d %d", &pin, &onoff);
+	ret = sscanf(buf, "%d %d", &gpio, &onoff);
 
 	if (!ret) {
 		pr_err("janice-gpio: invalid inputs\n");
@@ -35,17 +36,77 @@ static ssize_t janice_gpio_onoff_store(struct kobject *kobj, struct kobj_attribu
 		return -EINVAL;
 	}
 
-	pr_info("janice-gpio: PIN[%03d] [%d]\n", pin, onoff);
+	pr_info("janice-gpio: GPIO[%03d] [%d]\n", gpio, onoff);
 
-	gpio_set_value(pin, onoff);
+	gpio_set_value(gpio, onoff);
 	
 	return count;
 }
 
-static struct kobj_attribute janice_gpio_onoff_interface = __ATTR(gpio, 0600, janice_gpio_onoff_show, janice_gpio_onoff_store);
+static struct kobj_attribute janice_gpio_set_mode_interface = __ATTR(set_mode, 0600, janice_gpio_set_mode_show, janice_gpio_set_mode_store);
+
+static ssize_t janice_gpio_set_pull_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "NMK_GPIO_PULL_NONE = 0\nNMK_GPIO_PULL_UP = 1\nNMK_GPIO_PULL_DOWN = 2\n");
+	return strlen(buf);
+}
+
+static ssize_t janice_gpio_set_pull_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int gpio, pull, ret;
+
+	ret = sscanf(buf, "%d %d", &gpio, &pull);
+
+	if (!ret) {
+		pr_err("janice-gpio: invalid inputs\n");
+		return -EINVAL;
+	}
+
+	if (pull < 0 || pull > 2) {
+		pr_err("janice-gpio: invalid inputs\n");
+		return -EINVAL;
+	}
+
+	nmk_gpio_set_pull(gpio, pull);
+	
+	return count;
+}
+
+static struct kobj_attribute janice_gpio_set_pull_interface = __ATTR(set_pull, 0600, janice_gpio_set_pull_show, janice_gpio_set_pull_store);
+
+static ssize_t janice_gpio_set_slpm_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "NMK_GPIO_SLPM_INPUT(WAKEUP_ENABLE) = 0\nNMK_GPIO_SLPM_NOCHANGE(WAKEUP_DISABLE) = 1\n");
+	return strlen(buf);
+}
+
+static ssize_t janice_gpio_set_slpm_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int gpio, slpm, ret;
+
+	ret = sscanf(buf, "%d %d", &gpio, &slpm);
+
+	if (!ret) {
+		pr_err("janice-gpio: invalid inputs\n");
+		return -EINVAL;
+	}
+
+	if (slpm < 0 || slpm > 1) {
+		pr_err("janice-gpio: invalid inputs\n");
+		return -EINVAL;
+	}
+
+	nmk_gpio_set_slpm(gpio, slpm);
+	
+	return count;
+}
+
+static struct kobj_attribute janice_gpio_set_slpm_interface = __ATTR(set_slpm, 0600, janice_gpio_set_slpm_show, janice_gpio_set_slpm_store);
 
 static struct attribute *janice_gpio_debug_attrs[] = {
-	&janice_gpio_onoff_interface.attr, 
+	&janice_gpio_set_mode_interface.attr, 
+	&janice_gpio_set_pull_interface.attr, 
+	&janice_gpio_set_slpm_interface.attr, 
 	NULL,
 };
 
