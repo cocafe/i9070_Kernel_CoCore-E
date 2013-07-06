@@ -2985,6 +2985,10 @@ static int __init s6e63m0_init(void)
 	dpi_pins = ux500_pins_get("mcde-dpi");
 	if (!dpi_pins)
 		return -EINVAL;
+
+	ret = ux500_pins_enable(dpi_pins);
+	if (ret)
+		pr_err("s6e63m0: failed to enable mcde-dpi pins during init\n");
 	#endif
 
         return ret;
