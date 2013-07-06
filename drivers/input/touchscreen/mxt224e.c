@@ -2380,7 +2380,7 @@ ssize_t disp_all_deltadata_store(struct device *dev, struct device_attribute *at
 
 static ssize_t set_tsp_name_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "ATMEL,XMT224E\n");
+	return sprintf(buf, "ATMEL mxT224E\n");
 }
 
 static ssize_t set_tsp_channel_show(struct device *dev, struct device_attribute *attr, char *buf)
