@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/mfd/abx500.h>
 #include <linux/mfd/abx500/ab5500.h>
+#include <linux/ab8500-ponkey.h>
 
 /* Ponkey time control bits */
 #define AB5500_MCB		0x2F
@@ -175,7 +176,7 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static void ab8500_ponkey_emulator(bool press)
+void ab8500_ponkey_emulator(bool press)
 {
 	if (press) {
 		gpio_keys_setstate(KEY_POWER, true);
