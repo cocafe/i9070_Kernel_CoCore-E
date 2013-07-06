@@ -22,6 +22,7 @@
 #include <linux/tick.h>
 #include <linux/ktime.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -738,6 +739,22 @@ static struct notifier_block __refdata ondemand_cpu_notifier = {
 	.notifier_call = cpu_callback,
 };
 
+static void cpufreq_replug_thread(struct work_struct *cpufreq_replug_work)
+{
+	int cpu;
+
+	/* For UX500 platform, PRCMU need to update CPU1 policy */
+	msleep(3000);
+
+	for_each_cpu_not(cpu, cpu_online_mask) {
+
+	if (cpu == 0)
+		continue;
+		cpu_up(cpu);
+	}
+}
+static DECLARE_WORK(cpufreq_replug_work, cpufreq_replug_thread);
+
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				   unsigned int event)
 {
@@ -822,6 +839,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 		} else
 			dbs_timer_init(this_dbs_info, cpu);
+
+		schedule_work(&cpufreq_replug_work);
+
 		break;
 
 	case CPUFREQ_GOV_STOP:
