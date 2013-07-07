@@ -190,6 +190,7 @@ static unsigned int nexttchdi_batt = 0;			/* default: 0 */
 module_param(nexttchdi_batt, uint, 0644);
 
 /* cocafe: SweepToWake */
+/* FIXME: Will cause ux500 pins wakeup now */
 #define ABS_THRESHOLD_X			150
 #define ABS_THRESHOLD_Y			240
 
@@ -202,14 +203,14 @@ static int y_threshold = ABS_THRESHOLD_Y;
 module_param(y_threshold, int, 0644);
 
 static bool is_suspend = false;
-static bool powering_on = false;
+static bool waking_up = false;
 
 static bool sweep2wake = false;
 module_param(sweep2wake, bool, 0644);
 
 static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
 {
-	powering_on = true;
+	waking_up = true;
 
 	pr_err("[TSP] %s fn\n", __func__);
 
@@ -219,7 +220,7 @@ static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
 
 	ab8500_ponkey_emulator(0);	/* release */
 	
-	powering_on = false;
+	waking_up = false;
 }
 static DECLARE_WORK(mxt224e_ponkey_work, mxt224e_ponkey_thread);
 
@@ -1211,7 +1212,7 @@ static void report_input_data(struct mxt224_data *data)
 				y_release = data->fingers[0].y;
 				if ((abs(x_release - x_press) >= x_threshold) ||
 					(abs(y_release - y_press) >= y_threshold)) {
-						if (!powering_on)
+						if (!waking_up)
 							schedule_work(&mxt224e_ponkey_work);
 				}
 			}
