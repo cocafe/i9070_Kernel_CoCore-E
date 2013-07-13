@@ -4782,6 +4782,10 @@ static ssize_t abb_codec_anagain3_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
+		if (!anagain3_con) {
+			anagain3_hsr = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSR, 4);
+		}
+
 		anagain3_con = true;
 		anagain3_hsl = val;
 		abbamp_control_anagain3();
@@ -4801,7 +4805,31 @@ static ssize_t abb_codec_anagain3_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
+		if (!anagain3_con) {
+			anagain3_hsl = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSL, 4);
+		}
+
 		anagain3_con = true;
+		anagain3_hsr = val;
+		abbamp_control_anagain3();
+
+		new = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		pr_err("abb-codec: REG[%#04x] %#04x -> %#04x\n", REG_ANAGAIN3, old, new);
+		
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_ANAGAIN3_MAX)) {
+			pr_err("abb-codec: invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		anagain3_con = true;
+		anagain3_hsl = val;
 		anagain3_hsr = val;
 		abbamp_control_anagain3();
 
