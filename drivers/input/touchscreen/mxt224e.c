@@ -23,6 +23,8 @@
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
 #include <linux/delay.h>
 #include <linux/earlysuspend.h>
 #include <linux/slab.h>
@@ -198,15 +200,12 @@ static int x_press, x_release;
 static int y_press, y_release;
 
 static int x_threshold = ABS_THRESHOLD_X;
-module_param(x_threshold, int, 0644);
 static int y_threshold = ABS_THRESHOLD_Y;
-module_param(y_threshold, int, 0644);
 
 static bool is_suspend = false;
 static bool waking_up = false;
 
 static bool sweep2wake = false;
-module_param(sweep2wake, bool, 0644);
 
 static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
 {
@@ -223,6 +222,9 @@ static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
 	waking_up = false;
 }
 static DECLARE_WORK(mxt224e_ponkey_work, mxt224e_ponkey_thread);
+
+static void mxt224e_tsp_off(void);
+static void mxt224e_tsp_on(void);
 
 /*
 static pin_cfg_t janice_mxt224e_pins_wakeup[] = 
@@ -1605,6 +1607,44 @@ static int mxt224_internal_resume(struct mxt224_data *data)
 	return 0;
 }
 
+/* Turn off mxT224E touchscreen */
+static void mxt224e_tsp_off(void)
+{
+	struct mxt224_data *data = copy_data;
+
+	mutex_lock(&data->lock);
+	if (data->enabled)
+		data->enabled = 0;
+	mutex_unlock(&data->lock);
+
+	touch_is_pressed = 0;
+
+	disable_irq(data->client->irq);
+	mxt224_internal_suspend(data);
+}
+
+/* Turn on mxT224E touchscreen */
+static void mxt224e_tsp_on(void)
+{
+	struct mxt224_data *data = copy_data;
+
+	mutex_lock(&data->lock);
+
+	mxt224_internal_resume(data);
+
+	if (!data->enabled)
+		data->enabled = 1;
+
+	pr_info("[TSP] vbus_state = %d\n", (int)vbus_state);
+	mxt224_ta_probe(vbus_state);
+
+	calibrate_chip();
+
+	enable_irq(data->client->irq);
+
+	mutex_unlock(&data->lock);
+}
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #define mxt224_suspend	NULL
 #define mxt224_resume	NULL
@@ -2686,6 +2726,85 @@ static const struct attribute_group mxt224_attr_group = {
 	.attrs = mxt224_attrs,
 };
 
+/* mxT224E kobjects */
+static ssize_t mxt224e_sweep2wake_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "enable: %d\n", sweep2wake);
+	sprintf(buf, "%sthreshold_x: %d\n", buf, x_threshold);
+	sprintf(buf, "%sthreshold_y: %d\n", buf, y_threshold);
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_sweep2wake_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	int threshold_tmp;
+
+	if (!strncmp(buf, "on", 2)) {
+		/* In case that we receive cmd in sleep */
+		if (is_suspend && !sweep2wake) {
+			mxt224e_tsp_on();
+		}
+		sweep2wake = true;
+
+		pr_err("[TSP] Sweep2Wake On\n");
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		if (is_suspend && !sweep2wake) {
+			mxt224e_tsp_off();
+		}
+		sweep2wake = false;
+
+		pr_err("[TSP] Sweep2Wake Off\n");
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "threshold_x=", 12)) {
+		ret = sscanf(&buf[12], "%d", &threshold_tmp);
+
+		if ((!ret) || (threshold_tmp > 480)) {
+			pr_err("[TSP] invalid input\n");
+			return -EINVAL;
+		}
+
+		x_threshold = threshold_tmp;
+		
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "threshold_y=", 12)) {
+		ret = sscanf(&buf[12], "%d", &threshold_tmp);
+
+		if ((!ret) || (threshold_tmp > 800)) {
+			pr_err("[TSP] invalid input\n");
+			return -EINVAL;
+		}
+
+		y_threshold = threshold_tmp;
+		
+		return count;
+	}
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_sweep2wake_interface = __ATTR(sweep2wake, 0644, mxt224e_sweep2wake_show, mxt224e_sweep2wake_store);
+
+static struct attribute *mxt224e_attrs[] = {
+	&mxt224e_sweep2wake_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group mxt224e_interface_group = {
+	.attrs = mxt224e_attrs,
+};
+
+static struct kobject *mxt224e_kobject;
+
 static int __devinit mxt224_probe(struct i2c_client *client,
 						const struct i2c_device_id *id)
 {
@@ -3011,6 +3130,19 @@ static int __devinit mxt224_probe(struct i2c_client *client,
 	if (device_create_file(mxt224_noise_test, &dev_attr_set_module_on) < 0)
 		dev_err(&data->client->dev, "Failed to create device file(%s)!\n",
 				dev_attr_set_module_on.attr.name);
+
+
+	mxt224e_kobject = kobject_create_and_add("mxt224e", kernel_kobj);
+
+	if (!mxt224e_kobject) {
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(mxt224e_kobject, &mxt224e_interface_group);
+
+	if (ret) {
+		kobject_put(mxt224e_kobject);
+	}
 
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
