@@ -63,6 +63,7 @@ static unsigned char *image_buf = NULL;
 static int load_lfs_param_value(void);
 static int save_lfs_param_value(void);
 
+#if 0
 static int param_check(unsigned char *addr)
 {
 	status_t 		*status;
@@ -77,6 +78,7 @@ static int param_check(unsigned char *addr)
 	klogi("Checking PARAM... Invalid");
 	return -1;
 }
+#endif
 
 static status_t param_status;
 
@@ -194,7 +196,7 @@ static void param_set_default(void)
 static void param_show_info(void)
 {
 	signed int value = 0;
-	signed char str_val[PARAM_STRING_SIZE];
+	signed char str_val[512];
 
 	klogi("-----------------------------------------------------");
 	klogi("	Information of Parameters");
