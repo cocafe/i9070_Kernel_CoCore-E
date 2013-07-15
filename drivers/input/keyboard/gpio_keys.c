@@ -26,6 +26,10 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/pm_runtime.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
+#include <linux/ab8500-ponkey.h>
+#include <mach/board-sec-u8500.h>
 #ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
 #include <mach/sec_common.h>
 #include <mach/sec_param.h>
@@ -40,6 +44,9 @@ extern struct class *sec_class;
 static bool g_bVolUp;
 static bool g_bPower;
 static bool g_bHome;
+
+static bool emulator_volup = false;
+static bool emulator_voldown = false;
 
 struct gpio_button_data {
 	struct gpio_keys_button *button;
@@ -447,7 +454,7 @@ extern void projector_motor_cw(void);
 extern void projector_motor_ccw(void);
 #endif
 
-static void gpio_keys_report_event(struct gpio_button_data *bdata)
+static int gpio_keys_report_event(struct gpio_button_data *bdata)
 {
 	struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
@@ -474,6 +481,23 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	}
 #endif
 
+	if (button->gpio == VOL_UP_JANICE_R0_0) {
+		if (emulator_volup) {
+			ab8500_ponkey_emulator(state);
+
+			return 0;
+		}
+	}
+
+	if (button->gpio == VOL_DOWN_JANICE_R0_0) {
+		if (emulator_voldown) {
+			ab8500_ponkey_emulator(state);
+
+			return 0;
+		}
+	}
+
+
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
@@ -481,7 +505,10 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 		bdata->key_state = !!state;
 		input_event(input, type, button->code, !!state);
 	}
+
 	input_sync(input);
+
+	return 0;
 }
 
 static void gpio_keys_work_func(struct work_struct *work)
@@ -600,6 +627,59 @@ static void gpio_keys_close(struct input_dev *input)
 	pm_runtime_put(input->dev.parent);
 }
 
+static ssize_t gpio_keys_ponkey_emulator_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "Vol.UP: %s\n", emulator_volup ? "1" : "0");
+	sprintf(buf, "%sVol.DOWN: %s\n", buf, emulator_voldown ? "1" : "0");
+	return strlen(buf);
+}
+
+static ssize_t gpio_keys_ponkey_emulator_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, user;
+
+	if (!strncmp(&buf[0], "volup=", 6)) {
+		ret = sscanf(&buf[6], "%d", &user);
+		if (ret) {
+			emulator_volup = user;
+			pr_info("gpio_keys: %s Vol.UP POnKey\n", user ? "Enable" : "Disable");
+		} else {
+			pr_err("gpio_keys: unknown cmds\n");
+		}
+		
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "voldown=", 8)) {
+		ret = sscanf(&buf[8], "%d", &user);
+		if (ret) {
+			emulator_voldown = user;
+			pr_info("gpio_keys: %s Vol.DOWN POnKey\n", user ? "Enable" : "Disable");
+		} else {
+			pr_err("gpio_keys: unknown cmds\n");
+		}
+		
+		return count;
+	}
+
+	pr_err("gpio_keys: unknown cmds\n");
+	
+	return count;
+}
+
+static struct kobj_attribute gpio_keys_ponkey_emulator_interface = __ATTR(ponkey_emu, 0644, gpio_keys_ponkey_emulator_show, gpio_keys_ponkey_emulator_store);
+
+static struct attribute *gpio_keys_attrs_kobjects[] = {
+	&gpio_keys_ponkey_emulator_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group gpio_keys_interface_group = {
+	.attrs = gpio_keys_attrs_kobjects,
+};
+
+static struct kobject *gpio_keys_kobject;
+
 static int __devinit gpio_keys_probe(struct platform_device *pdev)
 {
 	struct gpio_keys_platform_data *pdata = pdev->dev.platform_data;
@@ -608,6 +688,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	struct input_dev *input;
 	int i, error;
 	int wakeup = 0;
+	int ret;	// To hide warnings
 
 	ddata = kzalloc(sizeof(struct gpio_keys_drvdata) +
 			pdata->nbuttons * sizeof(struct gpio_button_data),
@@ -700,6 +781,18 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	/* Initialize for Forced Upload mode */
 	g_pdata = pdata;
 #endif
+
+	gpio_keys_kobject = kobject_create_and_add("gpio-keys", kernel_kobj);
+
+	if (!gpio_keys_kobject) {
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(gpio_keys_kobject, &gpio_keys_interface_group);
+
+	if (ret) {
+		kobject_put(gpio_keys_kobject);
+	}
 
 	return 0;
 
