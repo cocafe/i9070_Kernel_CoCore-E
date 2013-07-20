@@ -2241,7 +2241,7 @@ rear_camera_type_show(struct device *dev,
 
 	static ssize_t
 rear_flash_enable_store(struct device *dev,
-		struct device_attribute *attr, char *buf, size_t size)
+		struct device_attribute *attr, const char *buf, size_t size)
 {
 	if (buf[0] == '0') {
 		assistive_mode = 0;
@@ -2257,11 +2257,27 @@ rear_flash_enable_store(struct device *dev,
 	return size;
 }
 
+	static ssize_t
+rear_flash_highlight_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	/* Enable/Disable camera rear flash gpio directly */
+
+	if (buf[0] == '0') {
+		/* NOTICE: It is unable to disable the led enabled by entry 'rear_flash' via 'highlight' */
+		gpio_set_value(140, 0);
+	} else {
+		gpio_set_value(140, 1);
+	}
+	return size;
+}
+
 static DEVICE_ATTR(camtype, 0440, rear_camera_type_show, NULL);
 static DEVICE_ATTR(enable, 0220, NULL, rear_flash_enable_store);
 static DEVICE_ATTR(front_camtype, 0440, front_camera_type_show, NULL);
 static DEVICE_ATTR(rear_camtype, 0440, rear_camera_type_show, NULL);
 static DEVICE_ATTR(rear_flash, 0220, NULL, rear_flash_enable_store);
+static DEVICE_ATTR(highlight, 0220, NULL, rear_flash_highlight_store);
 
 void sec_cam_init(void)
 {
@@ -2305,11 +2321,22 @@ void sec_cam_init(void)
 				__func__, dev_attr_rear_flash.attr.name);
 	}
 
+	if (device_create_file(cam_dev_rear, &dev_attr_highlight) < 0) {
+		printk(KERN_DEBUG "%s: failed to create device file, %s\n",
+				__func__, dev_attr_highlight.attr.name);
+	}
+
 
 	cam_dev_flash = device_create(camera_class, NULL, 0, NULL, "flash");
+
 	if (device_create_file(cam_dev_flash, &dev_attr_rear_flash) < 0) {
 		printk(KERN_DEBUG "%s: failed to create device file, %s\n",
 				__func__, dev_attr_rear_flash.attr.name);
+	}
+
+	if (device_create_file(cam_dev_flash, &dev_attr_highlight) < 0) {
+		printk(KERN_DEBUG "%s: failed to create device file, %s\n",
+				__func__, dev_attr_highlight.attr.name);
 	}
 }
 
