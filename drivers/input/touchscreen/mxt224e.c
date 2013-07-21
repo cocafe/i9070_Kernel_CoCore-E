@@ -116,16 +116,9 @@
 #define TOUCHBOOST_FREQ_DEF		400000
 
 static bool touchboost = true;
-module_param(touchboost, bool, 0644);
-
 static bool touchboost_ape = true;
-module_param(touchboost_ape, bool, 0644);
-
 static bool touchboost_ddr = true;
-module_param(touchboost_ddr, bool, 0644);
-
 static unsigned int touchboost_freq = TOUCHBOOST_FREQ_DEF;
-module_param(touchboost_freq, uint, 0644);
 
 /* cocafe: SweepToWake */
 /* FIXME: Will cause ux500 pins wakeup now */
@@ -1001,23 +994,12 @@ static void report_input_data(struct mxt224_data *data)
 						(char *)data->client->name,
 						PRCMU_QOS_DDR_OPP_MAX);
 				}
-				if (	touchboost_freq == 200000 || 
-					touchboost_freq == 400000 || 
-					touchboost_freq == 800000 || 
-					touchboost_freq == 1000000) {
+				/* Allow to disable cpufreq requirement */
+				if (touchboost_freq != 0) {
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_ARM_KHZ,
 						(char *)data->client->name,
 						touchboost_freq);
-				} else {
-					if (touchboost_freq != 0) {
-						printk("[TSP] invalid cpufreq requirement.\n");
-						touchboost_freq = TOUCHBOOST_FREQ_DEF;
-						prcmu_qos_update_requirement(
-							PRCMU_QOS_ARM_KHZ,
-							(char *)data->client->name,
-							TOUCHBOOST_FREQ_DEF);
-					}
 				}
 			}
 
@@ -2808,11 +2790,158 @@ static ssize_t mxt224e_config_t8_store(struct kobject *kobj, struct kobj_attribu
 
 static struct kobj_attribute mxt224e_config_t8_interface = __ATTR(config_t8, 0644, mxt224e_config_t8_show, mxt224e_config_t8_store);
 
+#ifdef TOUCH_BOOSTER
+static void mxt224e_touchboost_clear(void)
+{
+	prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, (char *)copy_data->client->name, PRCMU_QOS_DEFAULT_VALUE);
+	prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP, (char *)copy_data->client->name, PRCMU_QOS_DEFAULT_VALUE);
+	prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ, (char *)copy_data->client->name, PRCMU_QOS_DEFAULT_VALUE);
+}
+
+static ssize_t mxt224e_touchboost_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", touchboost ? "on" : "off");
+}
+
+static ssize_t mxt224e_touchboost_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	int tbuf;
+
+	if (!strncmp(buf, "on", 2)) {
+		touchboost = true;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		touchboost = false;
+	}
+
+	/* In case that user pass 1/0 */
+	ret = sscanf(buf, "%d", &tbuf);
+
+	if (ret) {
+		if ((tbuf == 0) || (tbuf == 1))
+			touchboost = tbuf;
+	}
+
+	if (!touchboost)
+		mxt224e_touchboost_clear();
+
+	pr_err("[TSP] TouchBoost %s\n", touchboost ? "enable" : "disable");
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_touchboost_interface = __ATTR(touchboost, 0644, mxt224e_touchboost_show, mxt224e_touchboost_store);
+
+static ssize_t mxt224e_touchboost_freq_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", touchboost_freq);
+}
+
+static ssize_t mxt224e_touchboost_freq_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	int tbuf;
+
+	ret = sscanf(buf, "%d", &tbuf);
+
+	if (!ret)
+		return -EINVAL;
+
+	if (tbuf != 0 && 
+	    tbuf != 200000 && 
+	    tbuf != 400000 && 
+	    tbuf != 800000 && 
+	    tbuf != 1000000) 
+	{
+		pr_err("[TSP] passed an invalid cpufreq\n");
+		return -EINVAL;
+	}
+
+	touchboost_freq = tbuf;
+
+	mxt224e_touchboost_clear();
+
+	pr_err("[TSP] TouchBoost cpufreq: %d\n", touchboost_freq);
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_touchboost_freq_interface = __ATTR(touchboost_freq, 0644, mxt224e_touchboost_freq_show, mxt224e_touchboost_freq_store);
+
+static ssize_t mxt224e_touchboost_ape_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", touchboost_ape);
+}
+
+static ssize_t mxt224e_touchboost_ape_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	int tbuf;
+
+	ret = sscanf(buf, "%d", &tbuf);
+
+	if (!ret)
+		return -EINVAL;
+
+	if (tbuf != 0 && tbuf != 1) 
+	{
+		pr_err("[TSP] passed an invalid cpufreq\n");
+		return -EINVAL;
+	}
+
+	touchboost_ape = tbuf;
+
+	mxt224e_touchboost_clear();
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_touchboost_ape_interface = __ATTR(touchboost_ape, 0644, mxt224e_touchboost_ape_show, mxt224e_touchboost_ape_store);
+
+static ssize_t mxt224e_touchboost_ddr_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", touchboost_ddr);
+}
+
+static ssize_t mxt224e_touchboost_ddr_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	int tbuf;
+
+	ret = sscanf(buf, "%d", &tbuf);
+
+	if (!ret)
+		return -EINVAL;
+
+	if (tbuf != 0 && tbuf != 1) 
+	{
+		pr_err("[TSP] passed an invalid cpufreq\n");
+		return -EINVAL;
+	}
+
+	touchboost_ddr = tbuf;
+
+	mxt224e_touchboost_clear();
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_touchboost_ddr_interface = __ATTR(touchboost_ddr, 0644, mxt224e_touchboost_ddr_show, mxt224e_touchboost_ddr_store);
+#endif
+
 static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_sweep2wake_interface.attr, 
 	&mxt224e_config_t8_interface.attr, 
 	&mxt224e_config_t9_interface.attr, 
 	&mxt224e_config_t48_interface.attr, 
+#ifdef TOUCH_BOOSTER
+	&mxt224e_touchboost_interface.attr, 
+	&mxt224e_touchboost_freq_interface.attr, 
+	&mxt224e_touchboost_ape_interface.attr, 
+	&mxt224e_touchboost_ddr_interface.attr, 
+#endif
 	NULL,
 };
 
