@@ -2808,7 +2808,7 @@ static ssize_t mxt224e_config_t9_show(struct kobject *kobj, struct kobj_attribut
 	sprintf(buf, "[TOUCH_MULTITOUCHSCREEN_T9]\n\n");
 	sprintf(buf, "%s+------------------+--------+\n", buf);
 	sprintf(buf, "%s|Addr              |Value   |\n", buf);
-	sprintf(buf, "%s+------------------+--------+\n", buf);
+
 	for (i = 0; i <= T9_MAXADDR; i++) {
 		read_mem(copy_data, addr + i, 1, &mbuf);
 
