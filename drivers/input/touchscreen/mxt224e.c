@@ -272,8 +272,6 @@ static struct t48_median_config_t noise_median; /* 110927 gumi noise */
 
 
 static int threshold = 55;
-module_param(threshold, int, 0444);
-
 static int threshold_e = 50;
 
 static int read_mem(struct mxt224_data *data, u16 reg, u8 len, u8 *buf)
