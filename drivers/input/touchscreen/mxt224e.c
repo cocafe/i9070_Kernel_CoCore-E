@@ -108,6 +108,7 @@
 
 #define MAX_USING_FINGER_NUM 10
 
+#define T8_MAXADDR			9
 #define T9_MAXADDR			34
 #define T48_MAXADDR			53
 
@@ -2897,8 +2898,59 @@ static ssize_t mxt224e_config_t9_store(struct kobject *kobj, struct kobj_attribu
 
 static struct kobj_attribute mxt224e_config_t9_interface = __ATTR(config_t9, 0644, mxt224e_config_t9_show, mxt224e_config_t9_store);
 
+static ssize_t mxt224e_config_t8_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	u8 mbuf;
+	u16 addr = 0;
+	u16 size;
+	u32 i;
+
+	get_object_info(copy_data, GEN_ACQUISITIONCONFIG_T8, &size, &addr);
+
+	sprintf(buf, "[GEN_ACQUISITIONCONFIG_T8]\n\n");
+	sprintf(buf, "%s+------------------+--------+\n", buf);
+	sprintf(buf, "%s|Addr              |Value   |\n", buf);
+
+	for (i = 0; i <= T8_MAXADDR; i++) {
+		read_mem(copy_data, addr + i, 1, &mbuf);
+
+		sprintf(buf, "%s+------------------+--------+\n", buf);
+		sprintf(buf, "%s|%-18d|%-8d|\n", buf, i, mbuf);
+	}
+	sprintf(buf, "%s+------------------+--------+\n", buf);
+	
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_config_t8_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u8 val;
+	u16 addr = 0;
+	u16 addr_u;
+	u16 size;
+
+	get_object_info(copy_data, GEN_ACQUISITIONCONFIG_T8, &size, &addr);
+
+	ret = sscanf(buf, "%d %d", (int*)&addr_u, (int*)&val);
+
+	if (!ret) {
+		pr_err("[TSP] invalid inputs\n");
+		return -EINVAL;
+	}
+
+	write_mem(copy_data, addr + addr_u, 1, &val);
+
+	pr_err("[TSP] T8 [%2d] [%d]\n", addr_u, val);
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_config_t8_interface = __ATTR(config_t8, 0644, mxt224e_config_t8_show, mxt224e_config_t8_store);
+
 static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_sweep2wake_interface.attr, 
+	&mxt224e_config_t8_interface.attr, 
 	&mxt224e_config_t9_interface.attr, 
 	&mxt224e_config_t48_interface.attr, 
 	NULL,
