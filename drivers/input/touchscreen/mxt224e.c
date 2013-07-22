@@ -2574,7 +2574,7 @@ static const struct attribute_group mxt224_attr_group = {
 /* mxT224E kobjects */
 static ssize_t mxt224e_sweep2wake_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	sprintf(buf, "enable: %d\n", sweep2wake);
+	sprintf(buf, "status: %s\n", sweep2wake ? "on" : "off");
 	sprintf(buf, "%sthreshold_x: %d\n", buf, x_threshold);
 	sprintf(buf, "%sthreshold_y: %d\n", buf, y_threshold);
 	return strlen(buf);
