@@ -116,6 +116,9 @@
 #define T46_MAXADDR			7
 #define T48_MAXADDR			53
 
+static bool threshold_t48_req = false;
+static u8 threshold_t48_val = 17;
+
 /* cocafe: Touch Booster Control */
 #define TOUCHBOOST_FREQ_DEF		400000
 
@@ -619,7 +622,12 @@ static void mxt224_ta_probe(int __vbus_state)
 			obj_address+8, 1, &noise_threshold);
 	}
 
-
+	/* TODO: Write registers after TA probe */
+	if (threshold_t48_req) {
+		ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
+		write_mem(copy_data, obj_address + 35, 1, &threshold_t48_val);
+		pr_err("[TSP] threshold_t48!!\n");
+	}
 }
 
 void mxt224e_ts_change_vbus_state(bool vbus_status) {
@@ -3150,6 +3158,84 @@ static ssize_t mxt224e_tsp_calibrate_store(struct kobject *kobj, struct kobj_att
 
 static struct kobj_attribute mxt224e_tsp_calibrate_interface = __ATTR(calibrate_tsp, 0644, NULL, mxt224e_tsp_calibrate_store);
 
+static ssize_t mxt224e_threshold_t48_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	u8 mbuf;
+	u16 addr = 0;
+	u16 size;
+
+	get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size, &addr);
+
+	read_mem(copy_data, addr + 35, 1, &mbuf);
+
+	sprintf(buf,   "status: %s\n", threshold_t48_req ? "on" : "off");
+	sprintf(buf, "%smem: %d\n", buf, mbuf);
+	sprintf(buf, "%sval: %d\n", buf, threshold_t48_val);
+
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_threshold_t48_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u8  val;
+	u16 addr = 0;
+	u16 size;
+
+	/* Fetch config data */
+	get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size, &addr);
+
+	if (!strncmp(buf, "on", 2)) {
+		threshold_t48_req = true;
+		
+		pr_info("[TSP] threshold_t48 %s\n", threshold_t48_req ? "on" : "off");
+
+		if (!is_suspend) {
+			write_mem(copy_data, addr + 35, 1, &threshold_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		threshold_t48_req = false;
+
+		pr_info("[TSP] threshold_t48 %s\n", threshold_t48_req ? "on" : "off");
+
+		if (!is_suspend) {
+			val = 17;
+
+			write_mem(copy_data, addr + 35, 1, &val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "val=", 4)) {
+		ret = sscanf(&buf[4], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		threshold_t48_val = val;
+
+		if (threshold_t48_req) {
+			write_mem(copy_data, addr + 35, 1, &threshold_t48_val);
+		}
+
+		return count;
+	}
+
+	pr_err("[TSP] unknown command\n");
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_threshold_t48_interface = __ATTR(threshold_t48, 0644, mxt224e_threshold_t48_show, mxt224e_threshold_t48_store);
+
 static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_sweep2wake_interface.attr, 
 	&mxt224e_config_t7_interface.attr, 
@@ -3166,6 +3252,7 @@ static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_touchboost_ddr_interface.attr, 
 #endif
 	&mxt224e_tsp_calibrate_interface.attr, 
+	&mxt224e_threshold_t48_interface.attr, 
 	NULL,
 };
 
