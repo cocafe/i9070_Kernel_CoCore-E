@@ -623,10 +623,12 @@ static void mxt224_ta_probe(int __vbus_state)
 	}
 
 	/* TODO: Write registers after TA probe */
-	if (threshold_t48_req) {
-		ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
-		write_mem(copy_data, obj_address + 35, 1, &threshold_t48_val);
-		pr_err("[TSP] threshold_t48!!\n");
+	if (!is_suspend) {
+		if (threshold_t48_req) {
+			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
+			write_mem(copy_data, obj_address + 35, 1, &threshold_t48_val);
+			pr_err("[TSP] threshold_t48!!\n");
+		}
 	}
 }
 
