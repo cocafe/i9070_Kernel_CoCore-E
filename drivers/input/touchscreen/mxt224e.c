@@ -2980,6 +2980,23 @@ static ssize_t mxt224e_touchboost_ddr_store(struct kobject *kobj, struct kobj_at
 static struct kobj_attribute mxt224e_touchboost_ddr_interface = __ATTR(touchboost_ddr, 0644, mxt224e_touchboost_ddr_show, mxt224e_touchboost_ddr_store);
 #endif
 
+static ssize_t mxt224e_tsp_calibrate_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+
+	if (is_suspend)
+		return count;
+
+	mxt224_ta_probe(vbus_state);
+
+	calibrate_chip();
+
+	pr_err("[TSP] Calibrate now!\n");
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_tsp_calibrate_interface = __ATTR(calibrate_tsp, 0644, NULL, mxt224e_tsp_calibrate_store);
+
 static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_sweep2wake_interface.attr, 
 	&mxt224e_config_t8_interface.attr, 
@@ -2992,6 +3009,7 @@ static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_touchboost_ape_interface.attr, 
 	&mxt224e_touchboost_ddr_interface.attr, 
 #endif
+	&mxt224e_tsp_calibrate_interface.attr, 
 	NULL,
 };
 
