@@ -113,6 +113,7 @@
 #define T9_MAXADDR			34
 #define T19_MAXADDR			15
 #define T38_MAXADDR			7
+#define T46_MAXADDR			7
 #define T48_MAXADDR			53
 
 /* cocafe: Touch Booster Control */
@@ -2691,6 +2692,56 @@ static ssize_t mxt224e_config_t48_store(struct kobject *kobj, struct kobj_attrib
 
 static struct kobj_attribute mxt224e_config_t48_interface = __ATTR(config_t48, 0644, mxt224e_config_t48_show, mxt224e_config_t48_store);
 
+static ssize_t mxt224e_config_t46_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	u8 mbuf;
+	u16 addr = 0;
+	u16 size;
+	u32 i;
+
+	get_object_info(copy_data, SPT_CTECONFIG_T46, &size, &addr);
+
+	sprintf(buf, "[SPT_CTECONFIG_T46]\n\n");
+	sprintf(buf, "%s+------------------+--------+\n", buf);
+	sprintf(buf, "%s|Addr              |Value   |\n", buf);
+
+	for (i = 0; i <= T46_MAXADDR; i++) {
+		read_mem(copy_data, addr + i, 1, &mbuf);
+
+		sprintf(buf, "%s+------------------+--------+\n", buf);
+		sprintf(buf, "%s|%-18d|%-8d|\n", buf, i, mbuf);
+	}
+	sprintf(buf, "%s+------------------+--------+\n", buf);
+	
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_config_t46_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u8 val;
+	u16 addr = 0;
+	u16 addr_u;
+	u16 size;
+
+	get_object_info(copy_data, SPT_CTECONFIG_T46, &size, &addr);
+
+	ret = sscanf(buf, "%d %d", (int*)&addr_u, (int*)&val);
+
+	if (!ret) {
+		pr_err("[TSP] invalid inputs\n");
+		return -EINVAL;
+	}
+
+	write_mem(copy_data, addr + addr_u, 1, &val);
+
+	pr_err("[TSP] T46 [%2d] [%d]\n", addr_u, val);
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_config_t46_interface = __ATTR(config_t46, 0644, mxt224e_config_t46_show, mxt224e_config_t46_store);
+
 static ssize_t mxt224e_config_t38_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	u8 mbuf;
@@ -3106,6 +3157,7 @@ static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_config_t9_interface.attr, 
 	&mxt224e_config_t19_interface.attr, 
 	&mxt224e_config_t38_interface.attr, 
+	&mxt224e_config_t46_interface.attr, 
 	&mxt224e_config_t48_interface.attr, 
 #ifdef TOUCH_BOOSTER
 	&mxt224e_touchboost_interface.attr, 
