@@ -116,6 +116,9 @@
 #define T46_MAXADDR			7
 #define T48_MAXADDR			53
 
+static bool numtouch_t48_req = false;
+static u8 numtouch_t48_val = 10;
+
 static bool threshold_t48_req = false;
 static u8 threshold_t48_val = 17;
 
@@ -636,6 +639,11 @@ static void mxt224_ta_probe(int __vbus_state)
 
 	/* TODO: Write registers after TA probe */
 	if (!is_suspend) {
+		if (numtouch_t48_req) {
+			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
+			write_mem(copy_data, obj_address + 40, 1, &numtouch_t48_val);
+			pr_err("[TSP] [T48] [numtouch]\n");
+		}
 		if (threshold_t48_req) {
 			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
 			write_mem(copy_data, obj_address + 35, 1, &threshold_t48_val);
@@ -3188,6 +3196,83 @@ static ssize_t mxt224e_tsp_calibrate_store(struct kobject *kobj, struct kobj_att
 
 static struct kobj_attribute mxt224e_tsp_calibrate_interface = __ATTR(calibrate_tsp, 0644, NULL, mxt224e_tsp_calibrate_store);
 
+static ssize_t mxt224e_numtouch_t48_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	u8 mbuf;
+	u16 addr = 0;
+	u16 size;
+
+	get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size, &addr);
+
+	read_mem(copy_data, addr + 40, 1, &mbuf);
+
+	sprintf(buf,   "status: %s\n", numtouch_t48_req ? "on" : "off");
+	sprintf(buf, "%smem: %d\n", buf, mbuf);
+	sprintf(buf, "%sval: %d\n", buf, numtouch_t48_val);
+
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_numtouch_t48_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u8  val;
+	u16 addr = 0;
+	u16 size;
+
+	/* Fetch config data */
+	get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size, &addr);
+
+	if (!strncmp(buf, "on", 2)) {
+		numtouch_t48_req = true;
+		
+		pr_info("[TSP] numtouch_t48 %s\n", numtouch_t48_req ? "on" : "off");
+
+		if (!is_suspend) {
+			write_mem(copy_data, addr + 40, 1, &numtouch_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		numtouch_t48_req = false;
+
+		pr_info("[TSP] numtouch_t48 %s\n", numtouch_t48_req ? "on" : "off");
+
+		if (!is_suspend) {
+			val = 10;
+			write_mem(copy_data, addr + 40, 1, &val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "val=", 4)) {
+		ret = sscanf(&buf[4], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		numtouch_t48_val = val;
+
+		if (numtouch_t48_req) {
+			write_mem(copy_data, addr + 40, 1, &numtouch_t48_val);
+		}
+
+		return count;
+	}
+
+	pr_err("[TSP] unknown command\n");
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_numtouch_t48_interface = __ATTR(numtouch_t48, 0644, mxt224e_numtouch_t48_show, mxt224e_numtouch_t48_store);
+
 static ssize_t mxt224e_threshold_t48_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	u8 mbuf;
@@ -3516,6 +3601,7 @@ static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_touchboost_ddr_interface.attr, 
 #endif
 	&mxt224e_tsp_calibrate_interface.attr, 
+	&mxt224e_numtouch_t48_interface.attr, 
 	&mxt224e_threshold_t48_interface.attr, 
 	&mxt224e_parameter1_t48_interface.attr, 
 	&mxt224e_parameter2_t48_interface.attr, 
