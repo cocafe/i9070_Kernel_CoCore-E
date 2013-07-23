@@ -119,6 +119,18 @@
 static bool threshold_t48_req = false;
 static u8 threshold_t48_val = 17;
 
+static bool parameter1_t48_req = false;
+static u32 parameter1_t48_addr;
+static u8 parameter1_t48_val;
+
+static bool parameter2_t48_req = false;
+static u32 parameter2_t48_addr;
+static u8 parameter2_t48_val;
+
+static bool parameter3_t48_req = false;
+static u32 parameter3_t48_addr;
+static u8 parameter3_t48_val;
+
 /* cocafe: Touch Booster Control */
 #define TOUCHBOOST_FREQ_DEF		400000
 
@@ -628,6 +640,21 @@ static void mxt224_ta_probe(int __vbus_state)
 			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
 			write_mem(copy_data, obj_address + 35, 1, &threshold_t48_val);
 			pr_err("[TSP] threshold_t48!!\n");
+		}
+		if (parameter1_t48_req) {
+			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
+			write_mem(copy_data, obj_address + parameter1_t48_addr, 1, &parameter1_t48_val);
+			pr_err("[TSP] parameter1_t48!!\n");
+		}
+		if (parameter2_t48_req) {
+			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
+			write_mem(copy_data, obj_address + parameter2_t48_addr, 1, &parameter2_t48_val);
+			pr_err("[TSP] parameter2_t48!!\n");
+		}
+		if (parameter3_t48_req) {
+			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
+			write_mem(copy_data, obj_address + parameter3_t48_addr, 1, &parameter3_t48_val);
+			pr_err("[TSP] parameter3_t48!!\n");
 		}
 	}
 }
@@ -3238,6 +3265,240 @@ static ssize_t mxt224e_threshold_t48_store(struct kobject *kobj, struct kobj_att
 
 static struct kobj_attribute mxt224e_threshold_t48_interface = __ATTR(threshold_t48, 0644, mxt224e_threshold_t48_show, mxt224e_threshold_t48_store);
 
+static ssize_t mxt224e_parameter1_t48_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "status: %s\n", parameter1_t48_req ? "on" : "off");
+	sprintf(buf, "%saddr: %d\n", buf, parameter1_t48_addr);
+	sprintf(buf, "%sval: %d\n", buf, parameter1_t48_val);
+
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_parameter1_t48_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u8  val;
+	u16 addr = 0;
+	u16 size;
+
+	/* Fetch config data */
+	get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size, &addr);
+
+	if (!strncmp(buf, "on", 2)) {
+		parameter1_t48_req = true;
+		
+		pr_info("[TSP] parameter1_t48 %s\n", parameter1_t48_req ? "on" : "off");
+
+		if (!is_suspend) {
+			write_mem(copy_data, addr + parameter1_t48_addr, 1, &parameter1_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		parameter1_t48_req = false;
+
+		pr_info("[TSP] parameter1_t48 %s\n", parameter1_t48_req ? "on" : "off");
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "val=", 4)) {
+		ret = sscanf(&buf[4], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		parameter1_t48_val = val;
+
+		if (parameter1_t48_req) {
+			write_mem(copy_data, addr + parameter1_t48_addr, 1, &parameter1_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "addr=", 5)) {
+		ret = sscanf(&buf[5], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		parameter1_t48_addr = val;
+
+		return count;
+	}
+
+	pr_err("[TSP] unknown command\n");
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_parameter1_t48_interface = __ATTR(parameter1_t48, 0644, mxt224e_parameter1_t48_show, mxt224e_parameter1_t48_store);
+
+static ssize_t mxt224e_parameter2_t48_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "status: %s\n", parameter2_t48_req ? "on" : "off");
+	sprintf(buf, "%saddr: %d\n", buf, parameter2_t48_addr);
+	sprintf(buf, "%sval: %d\n", buf, parameter2_t48_val);
+
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_parameter2_t48_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u8  val;
+	u16 addr = 0;
+	u16 size;
+
+	/* Fetch config data */
+	get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size, &addr);
+
+	if (!strncmp(buf, "on", 2)) {
+		parameter2_t48_req = true;
+		
+		pr_info("[TSP] parameter2_t48 %s\n", parameter2_t48_req ? "on" : "off");
+
+		if (!is_suspend) {
+			write_mem(copy_data, addr + parameter2_t48_addr, 1, &parameter2_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		parameter2_t48_req = false;
+
+		pr_info("[TSP] parameter2_t48 %s\n", parameter2_t48_req ? "on" : "off");
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "val=", 4)) {
+		ret = sscanf(&buf[4], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		parameter2_t48_val = val;
+
+		if (parameter2_t48_req) {
+			write_mem(copy_data, addr + parameter2_t48_addr, 1, &parameter2_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "addr=", 5)) {
+		ret = sscanf(&buf[5], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		parameter2_t48_addr = val;
+
+		return count;
+	}
+
+	pr_err("[TSP] unknown command\n");
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_parameter2_t48_interface = __ATTR(parameter2_t48, 0644, mxt224e_parameter2_t48_show, mxt224e_parameter2_t48_store);
+
+static ssize_t mxt224e_parameter3_t48_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "status: %s\n", parameter3_t48_req ? "on" : "off");
+	sprintf(buf, "%saddr: %d\n", buf, parameter3_t48_addr);
+	sprintf(buf, "%sval: %d\n", buf, parameter3_t48_val);
+
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_parameter3_t48_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u8  val;
+	u16 addr = 0;
+	u16 size;
+
+	/* Fetch config data */
+	get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size, &addr);
+
+	if (!strncmp(buf, "on", 2)) {
+		parameter3_t48_req = true;
+		
+		pr_info("[TSP] parameter3_t48 %s\n", parameter3_t48_req ? "on" : "off");
+
+		if (!is_suspend) {
+			write_mem(copy_data, addr + parameter3_t48_addr, 1, &parameter3_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		parameter3_t48_req = false;
+
+		pr_info("[TSP] parameter3_t48 %s\n", parameter3_t48_req ? "on" : "off");
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "val=", 4)) {
+		ret = sscanf(&buf[4], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		parameter3_t48_val = val;
+
+		if (parameter3_t48_req) {
+			write_mem(copy_data, addr + parameter3_t48_addr, 1, &parameter3_t48_val);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "addr=", 5)) {
+		ret = sscanf(&buf[5], "%d", (int *)&val);
+
+		if (!ret) {
+			pr_err("[TSP] invalid inputs\n");
+
+			return -EINVAL;
+		}
+
+		parameter3_t48_addr = val;
+
+		return count;
+	}
+
+	pr_err("[TSP] unknown command\n");
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_parameter3_t48_interface = __ATTR(parameter3_t48, 0644, mxt224e_parameter3_t48_show, mxt224e_parameter3_t48_store);
+
 static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_sweep2wake_interface.attr, 
 	&mxt224e_config_t7_interface.attr, 
@@ -3255,6 +3516,9 @@ static struct attribute *mxt224e_attrs[] = {
 #endif
 	&mxt224e_tsp_calibrate_interface.attr, 
 	&mxt224e_threshold_t48_interface.attr, 
+	&mxt224e_parameter1_t48_interface.attr, 
+	&mxt224e_parameter2_t48_interface.attr, 
+	&mxt224e_parameter3_t48_interface.attr, 
 	NULL,
 };
 
