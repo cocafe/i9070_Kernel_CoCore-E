@@ -639,22 +639,22 @@ static void mxt224_ta_probe(int __vbus_state)
 		if (threshold_t48_req) {
 			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
 			write_mem(copy_data, obj_address + 35, 1, &threshold_t48_val);
-			pr_err("[TSP] threshold_t48!!\n");
+			pr_err("[TSP] [T48] [threshold]\n");
 		}
 		if (parameter1_t48_req) {
 			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
 			write_mem(copy_data, obj_address + parameter1_t48_addr, 1, &parameter1_t48_val);
-			pr_err("[TSP] parameter1_t48!!\n");
+			pr_err("[TSP] [T48] [parameter1]\n");
 		}
 		if (parameter2_t48_req) {
 			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
 			write_mem(copy_data, obj_address + parameter2_t48_addr, 1, &parameter2_t48_val);
-			pr_err("[TSP] parameter2_t48!!\n");
+			pr_err("[TSP] [T48] [parameter2]\n");
 		}
 		if (parameter3_t48_req) {
 			ret = get_object_info(copy_data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
 			write_mem(copy_data, obj_address + parameter3_t48_addr, 1, &parameter3_t48_val);
-			pr_err("[TSP] parameter3_t48!!\n");
+			pr_err("[TSP] [T48] [parameter3]\n");
 		}
 	}
 }
