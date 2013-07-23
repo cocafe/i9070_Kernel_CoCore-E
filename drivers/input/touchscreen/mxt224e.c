@@ -807,7 +807,8 @@ void check_chip_calibration(struct mxt224_data *data)
 						write_mem(copy_data, object_address+8, 1, &copy_data->atchfrccalthr_e);
 						write_mem(copy_data, object_address+9, 1, &copy_data->atchfrccalratio_e);
 					} else {
-						printk(KERN_INFO "[TSP] vbus_state = %d\n", (int)vbus_state);
+						printk(KERN_INFO "[TSP] vbus_state: %d (%s)\n", (int)vbus_state, 
+										vbus_state ? "TA" : "Battery");
 						if (vbus_state == 0)
 							mxt224_ta_probe(vbus_state);
 					}
