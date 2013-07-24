@@ -1620,7 +1620,7 @@ static void mxt224_late_resume(struct early_suspend *h)
 
 	mxt224_internal_resume(data);
 
-	pr_info("[TSP] vbus_state = %d\n", (int)vbus_state);
+	pr_info("[TSP] vbus state: %d (%s)\n", (int)vbus_state, vbus_state ? "TA" : "Batt");
 
 	if (!(tsp_deepsleep && vbus_state))
 		mxt224_ta_probe(vbus_state);
