@@ -46,20 +46,34 @@
 
 /* cocafe: Real end of charged */
 #include <linux/ab8500-ponkey.h>
+#include <linux/earlysuspend.h>
 
 #define CHARGING_PAUSED			-1
 #define CHARGING_STOPPED		0
 #define CHARGING_WORKING		1
+
+static struct early_suspend ab8500_chargalg_earlysuspend;
 
 static int charging_stats = CHARGING_STOPPED;
 
 static bool eoc_noticed = 0;
 static bool eoc_first = 0;
 static bool eoc_real = 0;
+static bool is_suspend = 0;
 
-static void eoc_wakeup_work(struct work_struct eoc_wakeup_thread)
+static void ab8500_chargalg_early_suspend(struct early_suspend *h)
 {
-	pr_err("[EOC] ----[ Real EOC ]----\n");
+	is_suspend = 1;
+}
+
+static void ab8500_chargalg_late_resume(struct early_suspend *h)
+{
+	is_suspend = 0;
+}
+
+static void eoc_wakeup_thread(struct work_struct *eoc_wakeup_work)
+{
+	pr_err("[abb-chargalg] [fn] EOC wakeup\n");
 
 	ab8500_ponkey_emulator(1);
 	msleep(100);
@@ -67,7 +81,7 @@ static void eoc_wakeup_work(struct work_struct eoc_wakeup_thread)
 
 	eoc_noticed = 1;
 }
-static DECLARE_WORK(eoc_wakeup_thread, eoc_wakeup_work);
+static DECLARE_WORK(eoc_wakeup_work, eoc_wakeup_thread);
 
 enum ab8500_chargers {
 	NO_CHG,
@@ -1005,8 +1019,8 @@ for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, EOC_COND_CNT_1ST);
 				dev_dbg(di->dev, "Charging is end\n");
 				eoc_real = 1;
 				/* Wakeup device to notice user */
-				if (!eoc_noticed)
-					schedule_work_on(0, &eoc_wakeup_thread);
+				if (!eoc_noticed && is_suspend)
+					schedule_work_on(0, &eoc_wakeup_work);
 			} else {
 				dev_dbg(di->dev,
 				" real EOC limit reached for the %d"
@@ -2716,6 +2730,12 @@ static int __devinit ab8500_chargalg_probe(struct platform_device *pdev)
 		pr_info("abb-chargalg: faile to register sysfs group\n");
 		kobject_put(abb_chargalg_kobject);
 	}
+
+	ab8500_chargalg_earlysuspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	ab8500_chargalg_earlysuspend.suspend = ab8500_chargalg_early_suspend;
+	ab8500_chargalg_earlysuspend.resume = ab8500_chargalg_late_resume;
+
+	register_early_suspend(&ab8500_chargalg_earlysuspend);
 
 	/* Run the charging algorithm */
 	queue_delayed_work(di->chargalg_wq, &di->chargalg_periodic_work, 0);
