@@ -384,7 +384,7 @@ struct workqueue_struct *wdog_kick_wq;
 static void wdog_kick_req_work(struct work_struct *work)
 {
 	ux500_wdt_ops->kick(wdog_id);
-	pr_info("ux500_wdt : reloaded by kernel kicker\n");
+//	pr_info("ux500_wdt : reloaded by kernel kicker\n");
 }
 
 
