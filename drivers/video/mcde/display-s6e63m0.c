@@ -760,8 +760,6 @@ static int s6e63m0_apply_config(struct mcde_display_device *ddev)
 {
 	int ret;
 
-	pr_info("%s: Called\n", __func__);
-
 	if (!ddev->update_flags)
 		return 0;
 
