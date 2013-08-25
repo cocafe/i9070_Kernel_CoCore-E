@@ -147,7 +147,7 @@ static unsigned int touchboost_freq = TOUCHBOOST_FREQ_DEF;
 
 /* cocafe: SweepToWake */
 /* FIXME: Will cause ux500 pins wakeup now */
-#define ABS_THRESHOLD_X			150
+#define ABS_THRESHOLD_X			120
 #define ABS_THRESHOLD_Y			240
 
 static int x_press, x_release;
