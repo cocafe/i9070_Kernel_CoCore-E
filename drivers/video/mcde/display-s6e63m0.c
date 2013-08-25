@@ -2860,7 +2860,7 @@ static int s6e63m0_set_power_mode(struct mcde_display_device *ddev,
 	}
 
 	if (orig_mode != ddev->power_mode)
-		dev_warn(&ddev->dev, "Power from mode %d to %d\n",
+		pr_err("[S6E63M0] Power from mode %d to %d\n",
 			orig_mode, ddev->power_mode);
 
 	ret =  mcde_chnl_set_power_mode(ddev->chnl_state, ddev->power_mode);
@@ -3168,7 +3168,7 @@ static int s6e63m0_mcde_panel_resume(struct mcde_display_device *ddev)
 	int ret;
 //	struct s6e63m0 *lcd = dev_get_drvdata(&ddev->dev);
 	DPI_DISP_TRACE;
-	dev_info(&ddev->dev, "Invoked %s\n", __func__);
+	pr_err("[S6E63M0] MCDE panel resumed\n");
 
 	/* set_power_mode will handle call platform_enable */
 	ret = ddev->set_power_mode(ddev, MCDE_DISPLAY_PM_STANDBY);
@@ -3184,7 +3184,7 @@ static int s6e63m0_mcde_panel_suspend(struct mcde_display_device *ddev, pm_messa
 	int ret = 0;
 //	struct s6e63m0 *lcd = dev_get_drvdata(&ddev->dev);
 
-	dev_info(&ddev->dev, "Invoked %s\n", __func__);
+	pr_err("[S6E63M0] MCDE panel suspended\n");
 
 	/*
 	 * when lcd panel is suspend, lcd panel becomes off
@@ -3217,7 +3217,7 @@ static pin_cfg_t janice_resume_pins[] = {
 static int dpi_display_platform_enable(struct s6e63m0 *lcd)
 {
 	int res = 0;
-	dev_info(lcd->dev, "%s\n", __func__);
+	pr_err("[S6E63M0] Display enabled\n");
 	nmk_config_pins(janice_resume_pins, ARRAY_SIZE(janice_resume_pins));
 	res = ux500_pins_enable(dpi_pins);
 	if (res)
@@ -3228,7 +3228,7 @@ static int dpi_display_platform_enable(struct s6e63m0 *lcd)
 static int dpi_display_platform_disable(struct s6e63m0 *lcd)
 {
 	int res = 0;
-	dev_info(lcd->dev, "%s\n", __func__);
+	pr_err("[S6E63M0] Display disabled\n");
 	nmk_config_pins(janice_sleep_pins, ARRAY_SIZE(janice_sleep_pins));
 
 	/* pins disabled to save power */
