@@ -569,7 +569,7 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 		di->bat->bat_type[id].r_to_t_tbl,
 		di->bat->bat_type[id].n_temp_tbl_elements, adc);
 	if (temp != prev)
-		pr_info("%s: adc(%d), temp(%d)\n", __func__, adc, temp);
+		pr_info("[ABB-BTEMP] adc(%d), temp(%d)\n", adc, temp);
 	prev = temp;
 
 
