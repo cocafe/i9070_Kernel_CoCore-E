@@ -727,7 +727,7 @@ static int __init snd_usb_audio_init(void)
 		return -EINVAL;
 	}
 
-	switch_audio_detection.name = "usb_audio";
+	switch_audio_detection.name = "snd_usb_audio";
 	switch_dev_register(&switch_audio_detection);
 	return usb_register(&usb_audio_driver);
 }
