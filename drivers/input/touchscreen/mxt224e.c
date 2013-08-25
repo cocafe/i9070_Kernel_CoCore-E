@@ -719,7 +719,7 @@ void check_chip_calibration(struct mxt224_data *data)
 		if (try_ctr > 10) {
 
 			/* Failed! */
-			printk(KERN_ERR "[TSP] Diagnostic Data did not update!!\n");
+			printk(KERN_ERR "[TSP] Diagnostic data didn't update!!\n");
 			mxt_timer_state = 0;
 			break;
 		}
@@ -791,7 +791,7 @@ void check_chip_calibration(struct mxt224_data *data)
 		if (tch_ch+atch_ch >= 25) {
 			/* cal was bad - must recalibrate
 			   and check afterwards */
-			printk(KERN_ERR "[TSP] tch_ch+atch_ch  Calibration was bad\n");
+			printk(KERN_ERR "[TSP] tch_ch+atch_ch Calibration was bad\n");
 			calibrate_chip();
 			mxt_timer_state = 0;
 			mxt_time_point = jiffies_to_msecs(jiffies);
@@ -855,7 +855,7 @@ void check_chip_calibration(struct mxt224_data *data)
 				/* we cannot confirm if good or bad -
 				   we must wait for next touch message
 				   to confirm */
-				printk(KERN_ERR "[TSP] Calibration was not decided yet\n");
+				printk(KERN_ERR "[TSP] Calibration is waiting\n");
 				cal_check_flag = 1u;
 				mxt_timer_state = 0;
 				mxt_time_point = jiffies_to_msecs(jiffies);
