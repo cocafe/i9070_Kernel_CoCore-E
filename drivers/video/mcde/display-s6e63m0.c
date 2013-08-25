@@ -191,6 +191,56 @@ static int gamma_val;
 static bool illumination_req = false;
 static unsigned int illumination_val = ILLUMINATION_MIN;
 
+/* cocafe: S6E63M0 PRCMU LCDCLK */
+/* 60+++ 	79872000	unsafe
+ * 60++		66560000	unsafe
+ * 60+		57051428	unsafe
+ * 60		49920000
+ * 50		39936000
+ * 45		36305454
+ * 40		33280000
+ */
+#include <linux/mfd/dbx500-prcmu.h>
+#include <linux/mfd/db8500-prcmu.h>
+
+#define LCDCLK_SET(clk)		prcmu_set_clock_rate(PRCMU_LCDCLK, (unsigned long) clk);
+
+struct lcdclk_prop
+{
+	char *name;
+	unsigned int clk;
+};
+
+static struct lcdclk_prop lcdclk_prop[] = {
+	[0] = {
+		.name = "60Hz",
+		.clk = 49920000,
+	},
+	[1] = {
+		.name = "50Hz",
+		.clk = 39936000,
+	},
+	[2] = {
+		.name = "45Hz",
+		.clk = 36305454,
+	},
+	[3] = {
+		.name = "40Hz",
+		.clk = 33280000,
+	},
+};
+
+static unsigned int lcdclk_usr = 0;	/* 60fps */
+
+static void s6e63m0_lcdclk_thread(struct work_struct *s6e6m0_lcdclk_work)
+{
+	msleep(200);
+
+	pr_err("[S6E63M0] LCDCLK %dHz\n", lcdclk_prop[lcdclk_usr].clk);
+
+	LCDCLK_SET(lcdclk_prop[lcdclk_usr].clk);
+}
+static DECLARE_WORK(s6e63m0_lcdclk_work, s6e63m0_lcdclk_thread);
 
 #ifdef SMART_DIMMING
 #define LDI_MTP_LENGTH 21
@@ -2677,6 +2727,47 @@ static ssize_t s6e63m0_sysfs_store_mcde_chnl(struct device *dev,
 static DEVICE_ATTR(mcde_chnl, 0644,
 		s6e63m0_sysfs_show_mcde_chnl, s6e63m0_sysfs_store_mcde_chnl);
 
+static ssize_t s6e63m0_sysfs_show_lcdclk(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	int i;
+	bool matched;
+
+	sprintf(buf, "Current: %s\n\n", lcdclk_prop[lcdclk_usr].name);
+
+	for (i = 0; i <= 3; i++) {
+		if (i == lcdclk_usr)
+			matched = true;
+		else
+			matched = false;
+
+		sprintf(buf, "%s[%d][%s] %s\n", buf, i, matched ? "*" : " ", lcdclk_prop[i].name);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t s6e63m0_sysfs_store_lcdclk(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	int ret, tmp;
+
+	ret = sscanf(buf, "%d", &tmp);
+	if (!ret || (tmp < 0) || (tmp > 3)) {
+		pr_err("[S6E63M0] Bad cmd\n");
+		return -EINVAL;
+	}
+
+	lcdclk_usr = tmp;
+
+	schedule_work(&s6e63m0_lcdclk_work);
+
+	return len;
+}
+
+static DEVICE_ATTR(lcdclk, 0644, s6e63m0_sysfs_show_lcdclk, s6e63m0_sysfs_store_lcdclk);
+
 /* TODO: Debug the panel id issue */
 static ssize_t s6e63m0_sysfs_show_panel_smtid(struct device *dev,
 				      struct device_attribute *attr, char *buf)
@@ -2993,6 +3084,10 @@ static int __devinit s6e63m0_mcde_panel_probe(struct mcde_display_device *ddev)
 	if (ret < 0)
 		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
 
+	ret = device_create_file(&(ddev->dev), &dev_attr_lcdclk);
+	if (ret < 0)
+		dev_err(&(ddev->dev), "failed to add sysfs entries\n");
+
 	lcd->spi_drv.driver.name	= "pri_lcd_spi";
 	lcd->spi_drv.driver.bus		= &spi_bus_type;
 	lcd->spi_drv.driver.owner	= THIS_MODULE;
@@ -3166,6 +3261,11 @@ static void s6e63m0_mcde_panel_late_resume(struct early_suspend *earlysuspend)
 
 	dpi_display_platform_enable(lcd);
 	s6e63m0_mcde_panel_resume(lcd->ddev);
+
+	if (lcdclk_usr != 0) {
+		pr_err("[S6E63M0] Rebasing LCDCLK...\n");
+		schedule_work(&s6e63m0_lcdclk_work);
+	}
 }
 #endif
 
