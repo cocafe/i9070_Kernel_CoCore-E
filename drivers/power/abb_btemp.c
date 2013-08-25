@@ -591,7 +591,7 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 		temp = ab8500_btemp_res_to_temp(di,
 			di->bat->bat_type[id].r_to_t_tbl,
 			di->bat->bat_type[id].n_temp_tbl_elements, rbat);
-		pr_info("%s: rbat(%d), temp(%d)\n", __func__, rbat, temp);
+		pr_info("[ABB-BTEMP] rbat(%d), temp(%d)\n", rbat, temp);
 	} else {
 		vntc = ab8500_gpadc_convert(di->gpadc, BTEMP_BALL);
 		if (vntc < 0) {
@@ -609,7 +609,7 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 			di->bat->bat_type[id].r_to_t_tbl,
 			di->bat->bat_type[id].n_temp_tbl_elements, rntc);
 		prev = temp;
-		pr_info("%s: vntc(%d), rntc(%d), temp(%d)\n", __func__, vntc, rntc, temp);
+		pr_info("[ABB-BTEMP] vntc(%d), rntc(%d), temp(%d)\n", vntc, rntc, temp);
 	}
 #endif
 	dev_dbg(di->dev, "Battery temperature is %d\n", temp);
