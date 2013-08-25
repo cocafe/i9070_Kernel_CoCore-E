@@ -2256,7 +2256,7 @@ static void ab8500_fg_algorithm(struct ab8500_fg *di)
 	ab8500_fg_reenable_charging(di);
 
 	if (di->discharge_state != AB8500_FG_DISCHARGE_INITMEASURING)
-		pr_info("[FG_DATA] %dmAh/%dmAh %d%% (Prev %dmAh %d%%) %dmV %d "
+		pr_info("[ABB-FG] %dmAh/%dmAh %d%% (Prev %dmAh %d%%) %dmV %d "
 			"%d %dmA "
 			"%dmA %d %d %d %d %d %d %d %d %d %d %d %d %d "
 			"%d %d %d %d %d %x %d\n",
