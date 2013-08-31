@@ -638,14 +638,14 @@ static u8 t48_config_e[] = {PROCG_NOISESUPPRESSION_T48,
 				3, 132, MXT224E_CALCFG_BATT, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0,
 				6,	6, 0, 0, 48, 4, 48, 10, 0, 100, 5, 0, 100, 0, 5,
 				0, 0, 0, 0, 0, 0, 0, MXT224E_THRESHOLD_BATT, 2, 3, 1, 81, MXT224_MAX_MT_FINGERS, 5, 40, 235, 235,
-				10, 10, 170, 50, 143, 88, 18, 15, 0 };
+				10, 10, 170, 50, 143, 80, 18, 15, 0 };
 
 static u8 t48_config_chrg_e[] = {PROCG_NOISESUPPRESSION_T48,
 				3, 132, MXT224E_CALCFG_CHRG, 0, 0, 0, 0, 0, 10, 20, 0, 0, 0,
 				6,	6, 0, 0, 64, 4, 64, 10,
 				0, 10, 5, 0, 15, 0, 20,
 				0, 0, 0, 0, 0, 0, 0, MXT224E_THRESHOLD_CHRG, 2, 5, 2, 81, MXT224_MAX_MT_FINGERS, 5, 40, 235, 235,
-				10, 10, 170, 50, 143, 88, 18, 15, 0 };
+				10, 10, 170, 50, 143, 80, 18, 15, 0 };
 
 static u8 end_config_e[] = {RESERVED_T255};
 
