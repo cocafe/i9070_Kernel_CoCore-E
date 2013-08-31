@@ -1145,7 +1145,7 @@ static ssize_t prcmu_sysfs_registers_store(struct kobject *kobj, struct kobj_att
 	return count;
 }
 
-static struct kobj_attribute prcmu_sysfs_registers_interface = __ATTR(registers, 0200, NULL, prcmu_sysfs_registers_store);
+static struct kobj_attribute prcmu_sysfs_registers_interface = __ATTR(regs, 0200, NULL, prcmu_sysfs_registers_store);
 
 static struct attribute *prcmu_sysfs_debug_attrs[] = {
 	&prcmu_sysfs_registers_interface.attr, 
