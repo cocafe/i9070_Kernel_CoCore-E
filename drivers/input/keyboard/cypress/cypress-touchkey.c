@@ -83,8 +83,8 @@ static u8 touchkey_threshold;
 #define PRESS_BIT_MASK		0X08
 #define KEYCODE_BIT_MASK	0X07
 
-#define TOUCHKEY_LOG(k, v) dev_notice(&info->client->dev, "key[%d] %d\n", k, v);
-#define FUNC_CALLED dev_notice(&info->client->dev, "%s: called.\n", __func__);
+#define TOUCHKEY_LOG(k, v) pr_info("[Touchkey] Key[%d] %d\n", k, v);
+#define FUNC_CALLED pr_info("[Touchkey] [fn] %s\n", __func__);
 
 #define NUM_OF_RETRY_UPDATE	5
 #define NUM_OF_RETRY_I2C	2
