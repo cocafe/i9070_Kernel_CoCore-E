@@ -362,7 +362,7 @@ static void cypress_touchkey_con_hw(struct cypress_touchkey_info *info, bool fla
 		}
 	}
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	dev_notice(&info->client->dev, "%s : called with flag %d.\n", __func__, flag);
+	pr_info("[Touchkey] [fn] %s [flag %d]\n", __func__, flag);
 #endif
 }
 
