@@ -2484,75 +2484,11 @@ static ssize_t abb_chargalg_eoc_real_show(struct kobject *kobj, struct kobj_attr
 
 static struct kobj_attribute abb_chargalg_eoc_real_interface = __ATTR(eoc_real, 0444, abb_chargalg_eoc_real_show, NULL);
 
-static ssize_t abb_chargalg_chargalg_control_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
-{
-	sprintf(buf, "[Suspended]:\n");
-	sprintf(buf, "%sAC: %s\n", buf, p_di->susp_status.ac_suspended ? "Y" : "N");
-	sprintf(buf, "%sUSB: %s\n", buf, p_di->susp_status.usb_suspended ? "Y" : "N");
-	sprintf(buf, "%sChar: %s\n", buf, p_di->susp_status.suspended_change ? "Y" : "N");
-
-	return strlen(buf);
-}
-
-static ssize_t abb_chargalg_chargalg_control_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	if (!strncmp(buf, "stop", 4)) {
-		/* Disable charging */
-		p_di->susp_status.ac_suspended = true;
-		p_di->susp_status.usb_suspended = true;
-		p_di->susp_status.suspended_change = true;
-		/* Trigger a state change */
-		queue_work(p_di->chargalg_wq,
-			&p_di->chargalg_work);
-
-		return count;
-	}
-
-	if (!strncmp(buf, "start", 5)) {
-		pr_err("abb-chargalg: resched charger work queue\n");
-
-		/* Trigger a state change */
-		queue_work(p_di->chargalg_wq,
-			&p_di->chargalg_work);
-		
-		return count;
-	}
-
-	if (!strncmp(buf, "AC", 2)) {
-		/* Enable AC Charging */
-		p_di->susp_status.ac_suspended = false;
-		p_di->susp_status.suspended_change = true;
-		/* Trigger a state change */
-		queue_work(p_di->chargalg_wq,
-			&p_di->chargalg_work);
-
-		return count;
-	}
-
-	if (!strncmp(buf, "USB", 3)) {
-		/* Enable USB charging */
-		p_di->susp_status.usb_suspended = false;
-		p_di->susp_status.suspended_change = true;
-		/* Trigger a state change */
-		queue_work(p_di->chargalg_wq,
-			&p_di->chargalg_work);
-
-		return count;
-	}
-
-	pr_err("abb-chargalg: cmd: [AC] [USB] [stop] [start]\n");
-
-	return count;
-}
-
-static struct kobj_attribute abb_chargalg_chargalg_control_interface = __ATTR(chargalg, 0644, abb_chargalg_chargalg_control_show, abb_chargalg_chargalg_control_store);
-
 static struct attribute *abb_chargalg_attrs[] = {
 	&abb_chargalg_charging_stats_interface.attr, 
 	&abb_chargalg_eoc_stats_interface.attr, 
 	&abb_chargalg_eoc_first_interface.attr, 
 	&abb_chargalg_eoc_real_interface.attr, 
-	&abb_chargalg_chargalg_control_interface.attr, 
 	NULL,
 };
 
