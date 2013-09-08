@@ -96,6 +96,9 @@ extern bool vbus_state;
 static struct workqueue_struct *touchkey_wq;
 static struct work_struct update_work;
 
+static bool debug_mask = false;
+module_param(debug_mask, bool, 0644);
+
 static bool suspend_con = false;
 module_param(suspend_con, bool, 0644);
 
@@ -276,7 +279,8 @@ static void cypress_touchkey_work(struct work_struct *work)
 	}
 
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	TOUCHKEY_LOG(info->keycode[code], press);
+	if (debug_mask)
+		TOUCHKEY_LOG(info->keycode[code], press);
 #endif
 
 	if (touch_is_pressed && press) {
