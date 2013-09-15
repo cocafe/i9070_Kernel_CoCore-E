@@ -361,6 +361,10 @@ config SEC_PARAM_DEBUG
 	bool "SBL PARAM debug module"
 	default n
 
+config DB8500_IOMEM_DEBUG
+	bool "DB8500 io address debugger"
+	default n
+
 source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
 source "arch/arm/mach-ux500/test/Kconfig"

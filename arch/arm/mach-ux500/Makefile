@@ -132,3 +132,4 @@ obj-$(CONFIG_SEC_PARAM_DEBUG)		+= sec_param.o
 obj-$(CONFIG_JANICE_GPIO_DEBUG)		+= gpio-debug.o
 obj-$(CONFIG_JANICE_DVFS_DEBUG)		+= dvfs-debug.o
 obj-$(CONFIG_DB8500_CLOCK_CONTROL)	+= clock-con.o
+obj-$(CONFIG_DB8500_IOMEM_DEBUG)	+= ioaddr-dbg.o
