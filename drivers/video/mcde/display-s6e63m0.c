@@ -1624,7 +1624,7 @@ static int update_brightness(struct s6e63m0 *lcd, u8 force)
 	if ((force) || ((lcd->ldi_state) &&
 				(lcd->current_brightness != lcd->bl))) {
 
-	printk("s6e63m0: brightness [%d] gamma [%d]\n", bl, lcd->bl);
+	printk("[S6E63M0] Brightness: %d BL: %d\n", bl, lcd->bl);
 
 		ret = s6e63m0_set_elvss(lcd);
 		if (ret) {
