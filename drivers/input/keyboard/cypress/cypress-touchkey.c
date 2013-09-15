@@ -176,7 +176,7 @@ static void cypress_touchkey_brightness_set
 	if (info->current_status && !touchkey_update_status)
 		queue_work(info->led_wq, &info->led_work);
 	else
-		dev_notice(&info->client->dev, "%s under suspend status or FW updating\n", __func__);
+		pr_err("[TouchKey] Set brightness: under suspend status or FW updating\n");
 }
 #endif
 
