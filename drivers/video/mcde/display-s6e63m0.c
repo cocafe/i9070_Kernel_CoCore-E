@@ -1942,7 +1942,7 @@ static ssize_t auto_brightness_store(struct device *dev,
 		return rc;
 	else {
 		if (lcd->auto_brightness != value) {
-			dev_info(dev, "%s - %d, %d\n", __func__, lcd->auto_brightness, value);
+			pr_err("[S6E63M0] Auto Brightness %d ==> %d\n", lcd->auto_brightness, value);
 			mutex_lock(&lcd->lcd_lock);
 			lcd->auto_brightness = value;
 			mutex_unlock(&lcd->lcd_lock);
