@@ -15,6 +15,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
@@ -124,6 +125,9 @@ extern int register_reboot_notifier(struct notifier_block *nb);
 extern bool vbus_state;
 
 extern unsigned int system_rev;
+
+static bool debug_mask = 0;
+
 /* This list came from ab8500_chargalg.c */
 static char *states[] = {
 	"HANDHELD_INIT",
@@ -2255,41 +2259,43 @@ static void ab8500_fg_algorithm(struct ab8500_fg *di)
 
 	ab8500_fg_reenable_charging(di);
 
-	if (di->discharge_state != AB8500_FG_DISCHARGE_INITMEASURING)
-		pr_info("[ABB-FG] %dmAh/%dmAh %d%% (Prev %dmAh %d%%) %dmV %d "
-			"%d %dmA "
-			"%dmA %d %d %d %d %d %d %d %d %d %d %d %d %d "
-			"%d %d %d %d %d %x %d\n",
-			di->bat_cap.mah/1000,
-			di->bat_cap.max_mah_design/1000,
-			DIV_ROUND_CLOSEST(di->bat_cap.permille, 10),
-			di->bat_cap.prev_mah/1000,
-			di->bat_cap.prev_percent,
-			di->vbat,
-			di->vbat_adc,
-			di->vbat_adc_compensated,
-			di->inst_curr,
-			di->avg_curr,
-			di->accu_charge,
-			di->bat->charge_state,
-			di->flags.charging,
-			di->charge_state,
-			di->discharge_state,
-			di->high_curr_mode,
-			di->recovery_needed,
-			di->bat->fg_res,
-			di->vbat_cal_offset,
-			di->new_capacity,
-			di->param_capacity,
-			di->initial_capacity_calib,
-			di->flags.fully_charged,
-			di->flags.fully_charged_1st,
-			di->bat->batt_res,
-			di->smd_on,
-			di->max_cap_changed,
-			di->flags.chg_timed_out,
-			di->input_curr_reg,
-			di->reenable_charing);
+	if (debug_mask) {
+		if (di->discharge_state != AB8500_FG_DISCHARGE_INITMEASURING)
+			pr_info("[ABB-FG] %dmAh/%dmAh %d%% (Prev %dmAh %d%%) %dmV %d "
+				"%d %dmA "
+				"%dmA %d %d %d %d %d %d %d %d %d %d %d %d %d "
+				"%d %d %d %d %d %x %d\n",
+				di->bat_cap.mah/1000,
+				di->bat_cap.max_mah_design/1000,
+				DIV_ROUND_CLOSEST(di->bat_cap.permille, 10),
+				di->bat_cap.prev_mah/1000,
+				di->bat_cap.prev_percent,
+				di->vbat,
+				di->vbat_adc,
+				di->vbat_adc_compensated,
+				di->inst_curr,
+				di->avg_curr,
+				di->accu_charge,
+				di->bat->charge_state,
+				di->flags.charging,
+				di->charge_state,
+				di->discharge_state,
+				di->high_curr_mode,
+				di->recovery_needed,
+				di->bat->fg_res,
+				di->vbat_cal_offset,
+				di->new_capacity,
+				di->param_capacity,
+				di->initial_capacity_calib,
+				di->flags.fully_charged,
+				di->flags.fully_charged_1st,
+				di->bat->batt_res,
+				di->smd_on,
+				di->max_cap_changed,
+				di->flags.chg_timed_out,
+				di->input_curr_reg,
+				di->reenable_charing);
+	}
 }
 
 /**
