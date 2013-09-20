@@ -5339,6 +5339,10 @@ int __meminit init_per_zone_wmark_min(void)
 		min_free_kbytes = 128;
 	if (min_free_kbytes > 65536)
 		min_free_kbytes = 65536;
+
+	/* To avoid page allocation failure */
+	min_free_kbytes = 8192;
+
 	setup_per_zone_wmarks();
 	refresh_zone_stat_thresholds();
 	setup_per_zone_lowmem_reserve();
