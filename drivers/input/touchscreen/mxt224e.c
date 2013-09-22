@@ -2,6 +2,7 @@
  *  Copyright (C) 2010, Samsung Electronics Co. Ltd. All Rights Reserved.
  *
  *  Modified: Huang Ji (cocafe@xda-developers.com)
+ *  Modified: Harsh Panchal (mr.harsh@xda-developers.com)
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -44,6 +45,7 @@
 
 #if defined(TOUCH_BOOSTER)
 #include <linux/mfd/dbx500-prcmu.h>
+#include <linux/cpufreq.h>
 #endif
 
 #define OBJECT_TABLE_START_ADDRESS	7
@@ -160,6 +162,20 @@ static bool is_suspend = false;
 static bool waking_up = false;
 
 static bool sweep2wake = false;
+
+/* TODO: get ongoing governor info */
+static bool is_powersave = false;
+
+static void get_governor(char gov_harsh[16])
+{
+	struct cpufreq_policy policy;
+	cpufreq_get_policy(&policy,0);
+	strcpy(gov_harsh,policy.governor->name);
+	if (strcmp(gov_harsh, "powersave"))
+		is_powersave=false;
+	else
+		is_powersave=true;
+}
 
 static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
 {
@@ -1025,6 +1041,8 @@ static void report_input_data(struct mxt224_data *data)
 {
 	int id;
 	int count = 0;
+	char gov_info[16];
+	get_governor(gov_info);
 
 	if (!valid_touch)
 		return;
@@ -1033,9 +1051,10 @@ static void report_input_data(struct mxt224_data *data)
 
 	if (data->fingers[id].state == MXT224_STATE_INACTIVE)
 		goto out;
+	
 
 	#if defined(TOUCH_BOOSTER)
-	if (touchboost && !is_suspend) {
+	if (touchboost && !is_suspend && !is_powersave) {
 		if (data->fingers[id].state == MXT224_STATE_PRESS) {
 			if (data->finger_cnt == 0) {
 				if (touchboost_ape) {
