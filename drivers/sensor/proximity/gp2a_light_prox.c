@@ -169,6 +169,7 @@ struct gp2a_info {
 	int gpio;
 	int value;
 	bool als_supported;
+	bool chip_state;
 	int alsout;
 	int lux;
 	int adc;
@@ -533,23 +534,10 @@ static int gp2a_dev_create(struct i2c_client *client)
 #endif
 	struct gp2a_platform_data *platdata = client->dev.platform_data;
 
-	/* 1 - Preliminary checks */
-	if (gp2a) {
-		pr_warn("%s: Device driver was already created!", __func__);
-		goto out;
-	}
 	if (!platdata || !gpio_is_valid(platdata->ps_vout_gpio)) {
 		gp2a_err("%s: No GPIO configured for device (%s)",
 			 __func__, client->name);
 		ret = -ENODEV;
-		goto out;
-	}
-	/* 2 - Allocate the structure  */
-	gp2a = kzalloc(sizeof(*gp2a), GFP_KERNEL);
-	if (!gp2a) {
-		gp2a_err("%s: Failed to allocate %d bytes!",
-			 __func__, sizeof(*gp2a));
-		ret = -ENOMEM;
 		goto out;
 	}
 
@@ -1031,6 +1019,11 @@ static int gp2a_i2c_read(struct i2c_client *client, u8 reg, u8 * val,
 	u8 buf[2];
 	struct i2c_msg msg[2];
 
+	if (gp2a->chip_state == false) {
+		gp2a_err("%s: chip init fail \n", __func__);
+		return 0;
+	}
+
 	buf[0] = reg;
 	msg[0].addr = client->addr;
 	msg[0].flags = 1;
@@ -1167,14 +1160,22 @@ static int __devinit gp2a_i2c_probe(struct i2c_client *client,
 	unsigned char value;
 
 	pr_info("%s: probe start!\n", __func__);
+	/* 2 - Allocate the structure  */
+	gp2a = kzalloc(sizeof(*gp2a), GFP_KERNEL);
+	if (!gp2a) {
+		gp2a_err("%s: Failed to allocate %d bytes!",
+			 __func__, sizeof(*gp2a));
+		return -ENOMEM;
+	}
 
+	gp2a->chip_state = true;
 	gp2a_dbg("-> %s(client=%s, id=%s), i2c addr %d",
 		 __func__, client->name, id->name, client->addr);
 
 	ret = gp2a_i2c_read(client, GP2A_REG_PROX, &value, 1);
 	if (ret < 0) {
 		pr_emerg("not the gp2a\n");
-		return ret;
+		gp2a->chip_state = false;
 	} else {
 		pr_emerg("\t[%02d]: 0x%02x\n", GP2A_REG_PROX, value);
 	}
