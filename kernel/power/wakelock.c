@@ -298,15 +298,15 @@ static void suspend(struct work_struct *work)
 			pr_info("fail to send whitelist\n");
 			return;
 		} else {
+			if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
+				if (debug_mask & DEBUG_SUSPEND)
+					pr_info("suspend: abort suspend after processing white list\n");
+				return;
+			}
 			ret1 = tx_ap_state(AP_STATE_SLEEP);
 			pr_info("tx_ap_state(SLEEP): %d\n", ret1);
 			if (unlikely(ret1 != 0)) {
 				pr_info("fail to send SLEEP IPC\n");
-				return;
-			}
-			if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
-				if (debug_mask & DEBUG_SUSPEND)
-					pr_info("suspend: abort suspend after processing white list\n");
 				return;
 			}
 		}
