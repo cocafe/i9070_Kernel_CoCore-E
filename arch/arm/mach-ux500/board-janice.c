@@ -574,7 +574,7 @@ static const u8 *mxt224_config[] = {
 /*
 	Configuration for MXT224-E
 */
-#define MXT224E_THRESHOLD_BATT			17	/* Default: 22 */
+#define MXT224E_THRESHOLD_BATT			15	/* Default: 22 */
 #define MXT224E_THRESHOLD_CHRG			20	/* Default: 25 */
 #define MXT224E_CALCFG_BATT			0x72 	//114
 #define MXT224E_CALCFG_CHRG			0x72 
