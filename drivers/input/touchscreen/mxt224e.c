@@ -140,7 +140,7 @@ static u8 parameter3_t48_val;
 /* cocafe: Touch Booster Control */
 #define TOUCHBOOST_FREQ_DEF		400000
 
-static bool touchboost = true;
+static bool touchboost = false;
 static bool touchboost_ape = true;
 static bool touchboost_ddr = true;
 static unsigned int touchboost_freq = TOUCHBOOST_FREQ_DEF;
