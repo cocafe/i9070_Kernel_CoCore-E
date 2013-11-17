@@ -127,6 +127,7 @@ extern bool vbus_state;
 extern unsigned int system_rev;
 
 static bool debug_mask = 0;
+module_param(debug_mask, bool, 0644);
 
 /* This list came from ab8500_chargalg.c */
 static char *states[] = {
