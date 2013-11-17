@@ -51,6 +51,7 @@
 	struct ab8500_btemp, btemp_psy);
 
 static bool debug_mask = 0;
+module_param(debug_mask, bool, 0644);
 
 enum battery_monitoring_state {
 	temperature_monitoring_off = 0 ,
