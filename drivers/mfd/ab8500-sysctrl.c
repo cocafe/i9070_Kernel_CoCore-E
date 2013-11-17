@@ -17,6 +17,8 @@
 #include <linux/time.h>
 #include <linux/hwmon.h>
 
+#include <linux/moduleparam.h>
+
 /* RtcCtrl bits */
 #define AB8500_ALARM_MIN_LOW  0x08
 #define AB8500_ALARM_MIN_MID 0x09
@@ -24,6 +26,9 @@
 #define RTC_ALARM_ENABLE 0x4
 
 static struct device *sysctrl_dev;
+
+static bool force_pwroff = false;
+module_param(force_pwroff, bool, 0644);
 
 void ab8500_power_off(void)
 {
@@ -73,7 +78,7 @@ void ab8500_power_off(void)
         abx500_get_register_interruptible(sysctrl_dev, AB8500_CHARGER,
                                           AB8500_CH_STATUS1_REG, &data);
 
-	if (!charger_present && !(data & 0x01))
+	if ((!charger_present && !(data & 0x01)) || force_pwroff)
 		goto shutdown;
 
 
