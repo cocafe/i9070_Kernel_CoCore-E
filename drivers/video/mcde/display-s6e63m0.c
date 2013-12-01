@@ -2361,7 +2361,10 @@ static DEVICE_ATTR(brightness_update, 0644,
 static ssize_t s6e63m0_sysfs_show_illumination(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d\n", illumination_val);
+	sprintf(buf, "Illumination control [%s]\n", illumination_req ? "*" : " ");
+	sprintf(buf, "%sillumination val: [%d]\n", buf, illumination_val);
+
+	return strlen(buf);
 }
 
 static ssize_t s6e63m0_sysfs_store_illumination(struct device *dev,
