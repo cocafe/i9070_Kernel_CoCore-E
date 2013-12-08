@@ -60,6 +60,12 @@
 #include <wl_cfgp2p.h>
 #include <wl_android.h>
 
+#include <linux/moduleparam.h>
+
+/* PM mode in userspace */
+static bool dhdpm_fast = true;
+module_param(dhdpm_fast, bool, 0644);
+
 #ifdef PROP_TXSTATUS
 #include <dhd_wlfc.h>
 #endif
@@ -3791,7 +3797,12 @@ wl_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 
 #if !defined(SUPPORT_PM2_ONLY)
 	/* android has special hooks to change pm when kernel suspended */
-	pm = enabled ? ((dhd->in_suspend) ? PM_MAX : PM_FAST) : PM_OFF;
+	if (dhdpm_fast)
+		/* Use PM_FAST only instead of PM_MAX */
+		pm = enabled ? PM_FAST : PM_OFF;
+	else
+		/* Depends on suspend state */
+		pm = enabled ? ((dhd->in_suspend) ? PM_MAX : PM_FAST) : PM_OFF;
 #else
 	pm = enabled ? PM_FAST : PM_OFF;
 #endif /* SUPPORT_PM2_ONLY */
