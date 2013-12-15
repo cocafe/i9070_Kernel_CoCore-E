@@ -747,7 +747,7 @@ static int charging_readproc(char *page, char **start, off_t off,
 				ab8500_power_registers[i].region, 
 				ab8500_power_registers[i].address, &c);
 		if (ret>=0) {
-			len+=sprintf(page+len,"(%#02x %#02x)%s = 0x%02x\n", 
+			len+=sprintf(page+len,"(%#04x %#04x)%s = 0x%02x\n", 
 					ab8500_power_registers[i].region, 
 					ab8500_power_registers[i].address, 
 					ab8500_power_registers[i].name, c);
