@@ -16,6 +16,7 @@
  */
 
 #define TOUCH_BOOSTER
+/* #define TOUCH_DEBUGGER */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -777,8 +778,10 @@ void check_chip_calibration(struct mxt224_data *data)
 			}
 		}
 
+		#ifdef TOUCH_DEBUGGER
 		if (debug_mask)
 			printk(KERN_INFO "[TSP] t: %d  a: %d\n", tch_ch, atch_ch);
+		#endif
 
 		/* send page up command so we can detect
 		   when data updates next time,
@@ -1098,6 +1101,7 @@ static void report_input_data(struct mxt224_data *data)
 				ABS_MT_TOUCH_MAJOR, data->fingers[id].w);
 	}
 
+	#ifdef TOUCH_DEBUGGER
 	if (debug_mask) {	/* This is noisy */	/* But helpful in debugging */
 		if (data->fingers[id].state == MXT224_STATE_PRESS || data->fingers[id].state == MXT224_STATE_RELEASE) {
 			printk("[TSP] id[%d] x=%d y=%d z=%d w=%d\n",
@@ -1105,6 +1109,7 @@ static void report_input_data(struct mxt224_data *data)
 				data->fingers[id].z, data->fingers[id].w);
 		}
 	}
+	#endif
 
 	if (is_suspend) {
 		if (sweep2wake) {
