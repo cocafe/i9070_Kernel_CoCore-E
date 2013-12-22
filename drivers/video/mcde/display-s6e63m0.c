@@ -1905,7 +1905,7 @@ device_attribute *attr, const char *buf, size_t size)
 	if (rc < 0)
 		return rc;
 	else{
-		dev_info(dev, "acl_set_store - %d, %d\n", lcd->acl_enable, value);
+		pr_info("[S6E63M0] Power reduce %d ==> %d\n", lcd->acl_enable, value);
 		if (lcd->acl_enable != value) {
 			lcd->acl_enable = value;
 			if (lcd->ldi_state)
@@ -2000,7 +2000,7 @@ static ssize_t s6e63m0_sysfs_store_gamma_mode(struct device *dev,
 		dev_err(dev, "there are only 2 types of gamma mode(0:2.2, 1:1.9)\n");
 	}
 	else
-		dev_info(dev, "%s :: gamma_mode=%d\n", __FUNCTION__, lcd->gamma_mode);
+		pr_info("[S6E63M0] Gamma mode ==> %d\n", lcd->gamma_mode);
 
 	if (lcd->ldi_state)
 	{
