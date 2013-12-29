@@ -146,10 +146,14 @@ static bool touchboost_ape = true;
 static bool touchboost_ddr = true;
 static unsigned int touchboost_freq = TOUCHBOOST_FREQ_DEF;
 
-/* cocafe: SweepToWake */
-/* FIXME: Will cause ux500 pins wakeup now */
+/* cocafe: SweepToWake with wakelock implementation */
 #define ABS_THRESHOLD_X			120
 #define ABS_THRESHOLD_Y			240
+
+#if CONFIG_HAS_WAKELOCK
+#include <linux/wakelock.h>
+static struct wake_lock s2w_wakelock;
+#endif
 
 static int x_press, x_release;
 static int y_press, y_release;
@@ -2639,6 +2643,10 @@ static ssize_t mxt224e_sweep2wake_show(struct kobject *kobj, struct kobj_attribu
 	sprintf(buf, "status: %s\n", sweep2wake ? "on" : "off");
 	sprintf(buf, "%sthreshold_x: %d\n", buf, x_threshold);
 	sprintf(buf, "%sthreshold_y: %d\n", buf, y_threshold);
+	#if CONFIG_HAS_WAKELOCK
+	sprintf(buf, "%swakelock_ena: %d\n", buf, wake_lock_active(&s2w_wakelock));
+	#endif
+
 	return strlen(buf);
 }
 
@@ -2654,6 +2662,10 @@ static ssize_t mxt224e_sweep2wake_store(struct kobject *kobj, struct kobj_attrib
 		}
 		sweep2wake = true;
 
+		#if CONFIG_HAS_WAKELOCK
+		wake_lock(&s2w_wakelock);
+		#endif
+
 		pr_err("[TSP] Sweep2Wake On\n");
 
 		return count;
@@ -2664,6 +2676,10 @@ static ssize_t mxt224e_sweep2wake_store(struct kobject *kobj, struct kobj_attrib
 			mxt224e_tsp_off();
 		}
 		sweep2wake = false;
+
+		#if CONFIG_HAS_WAKELOCK
+		wake_unlock(&s2w_wakelock);
+		#endif
 
 		pr_err("[TSP] Sweep2Wake Off\n");
 
@@ -4045,6 +4061,9 @@ static int __devinit mxt224_probe(struct i2c_client *client,
 		kobject_put(mxt224e_kobject);
 	}
 
+#if CONFIG_HAS_WAKELOCK
+	wake_lock_init(&s2w_wakelock, WAKE_LOCK_SUSPEND, "sweep2wake_wakelock");
+#endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
@@ -4104,6 +4123,10 @@ static int __devexit mxt224_remove(struct i2c_client *client)
 	prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP, (char *)client->name);
 	prcmu_qos_remove_requirement(PRCMU_QOS_DDR_OPP, (char *)client->name);
 	prcmu_qos_remove_requirement(PRCMU_QOS_ARM_KHZ, (char *)client->name);
+#endif
+
+#if CONFIG_HAS_WAKELOCK
+	wake_lock_destroy(&s2w_wakelock);
 #endif
 
 	kfree(data->objects);
