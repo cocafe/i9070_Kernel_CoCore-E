@@ -5524,7 +5524,7 @@ static ssize_t abb_codec_addiggain2_show(struct kobject *kobj,
 	sprintf(buf, "%s\n", buf);
 
 	sprintf(buf, "%sGain(mem):\t%02d (%s)\n", buf, gain_mem, addiggain2_volmap[gain_mem]);
-	sprintf(buf, "%sGain(user):\t%02d (%s)\n", buf, hsldiggain_v, addiggain2_volmap[addiggain2_v]);
+	sprintf(buf, "%sGain(user):\t%02d (%s)\n", buf, addiggain2_v, addiggain2_volmap[addiggain2_v]);
 
 	return strlen(buf);
 }
