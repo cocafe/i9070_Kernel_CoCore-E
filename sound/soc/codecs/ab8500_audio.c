@@ -528,7 +528,7 @@ static void abbamp_control_classdwg(void)
 #define MUTE_AD2_MAX				0x3F
 
 static bool addiggain2_con = false;
-static unsigned int addiggain2_v = 16;
+static unsigned int addiggain2_v = 25;
 static unsigned int addiggain2_ms = 1000;
 
 static char *addiggain2_volmap[] = 
