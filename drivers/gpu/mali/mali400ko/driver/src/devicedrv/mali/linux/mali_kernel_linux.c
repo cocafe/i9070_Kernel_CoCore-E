@@ -92,6 +92,10 @@ extern bool mali_pp_scheduler_balance_jobs;
 module_param(mali_pp_scheduler_balance_jobs, bool, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_pp_scheduler_balance_jobs, "Mali PP forces balance jobs at starts");
 
+extern int mali_oskmem_allocorder;
+module_param(mali_oskmem_allocorder, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_utilization_sampling_rate, "Mali OS kernel memory allocation order");
+
 #if MALI_TIMELINE_PROFILING_ENABLED
 extern int mali_boot_profiling;
 module_param(mali_boot_profiling, int, S_IRUSR | S_IRGRP | S_IROTH);
