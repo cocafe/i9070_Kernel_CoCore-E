@@ -11,6 +11,9 @@
  * License Terms: GNU General Public License v2
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
+ * 
+ * Modified: Huang Ji (cocafe@xda-developers.com)
+ * 
  */
 
 #include <linux/init.h>
@@ -38,6 +41,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
 #include <mach/board-sec-u8500.h>
 #include <mach/sec_param.h>
 #include <linux/kernel.h>
@@ -128,6 +133,10 @@ extern unsigned int system_rev;
 
 static bool debug_mask = 0;
 module_param(debug_mask, bool, 0644);
+
+static unsigned int uLowBatZero = LOWBAT_ZERO_VOLTAGE;
+static unsigned int uLowBatTolerance = LOWBAT_TOLERANCE;
+static bool bLowBatWakelock = 1;
 
 /* This list came from ab8500_chargalg.c */
 static char *states[] = {
@@ -393,6 +402,8 @@ struct ab8500_fg {
 	struct wake_lock cc_wake_lock;
 };
 static LIST_HEAD(ab8500_fg_list);
+
+struct ab8500_fg *static_fg;
 
 /**
  * ab8500_fg_get() - returns a reference to the primary AB8500 fuel gauge
@@ -1629,11 +1640,11 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 	if (di->flags.low_bat) {
 		if (!di->lpm_chg_mode) {
 			if (percent <= 1  &&
-			    di->vbat <= LOWBAT_ZERO_VOLTAGE && !changed) {
+			    di->vbat <= uLowBatZero && !changed) {
 				di->lowbat_poweroff = true;
 			} else if ((percent > 1 && !di->flags.charging) ||
 				   (percent <= 1 &&
-				    di->vbat > LOWBAT_ZERO_VOLTAGE)) {
+				    di->vbat > uLowBatZero)) {
 				/* battery capacity will be getting low to 1%.
 				   we're waiting for it */
 				dev_info(di->dev,
@@ -1661,7 +1672,7 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 	}
 
 	if (di->lowbat_poweroff_locked) {
-		if (percent <= 1 && di->vbat <= LOWBAT_ZERO_VOLTAGE
+		if (percent <= 1 && di->vbat <= uLowBatZero
 		    && !changed)
 			di->lowbat_poweroff = true;
 
@@ -1672,8 +1683,8 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 		}
 	}
 
-	if ((percent == 0 && di->vbat <= LOWBAT_ZERO_VOLTAGE) ||
-		(percent <= 1 && di->vbat <= LOWBAT_ZERO_VOLTAGE && !changed))
+	if ((percent == 0 && di->vbat <= uLowBatZero) ||
+		(percent <= 1 && di->vbat <= uLowBatZero && !changed))
 		di->lowbat_poweroff = true;
 
 	if (di->lowbat_poweroff && di->lpm_chg_mode) {
@@ -2341,7 +2352,7 @@ static void ab8500_fg_low_bat_work(struct work_struct *work)
 	vbat = ab8500_comp_fg_bat_voltage(di, true);
 
 	/* Check if LOW_BAT still fulfilled */
-	if (vbat < di->bat->fg_params->lowbat_threshold + LOWBAT_TOLERANCE) {
+	if (vbat < di->bat->fg_params->lowbat_threshold + uLowBatTolerance) {
 		di->flags.low_bat = true;
 		dev_warn(di->dev, "Battery voltage still LOW\n");
 
@@ -2460,7 +2471,9 @@ static irqreturn_t ab8500_fg_lowbatf_handler(int irq, void *_di)
 	struct ab8500_fg *di = _di;
 
 	if (!di->flags.low_bat_delay) {
-		wake_lock_timeout(&di->lowbat_wake_lock, 20 * HZ);
+		if (bLowBatWakelock)
+			wake_lock_timeout(&di->lowbat_wake_lock, 20 * HZ);
+
 		dev_warn(di->dev, "Battery voltage is below LOW threshold\n");
 		di->flags.low_bat_delay = true;
 		/*
@@ -3095,6 +3108,118 @@ static int ab8500_fg_reboot_call(struct notifier_block *self,
 	return NOTIFY_DONE;
 }
 
+static ssize_t abb_fg_lowbat_zero_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "%d mV\n", uLowBatZero);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_fg_lowbat_zero_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, vBuf;
+
+	ret = sscanf(buf, "%u", &vBuf);
+
+	if ((!ret) || (vBuf < 0)) {
+		pr_err("[ABB-FG] Invalid value\n");
+		
+		return count;
+	}
+
+	pr_info("[ABB-FG] LowBat Zero %d ==> %d mV\n", uLowBatZero, vBuf);
+	uLowBatZero = vBuf;
+
+	return count;
+}
+
+static struct kobj_attribute abb_fg_lowbat_zero_interface = __ATTR(lowbat_zero, 0644, abb_fg_lowbat_zero_show, abb_fg_lowbat_zero_store);
+
+static ssize_t abb_fg_lowbat_tolerance_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "%d mV\n", uLowBatTolerance);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_fg_lowbat_tolerance_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, vBuf;
+
+	ret = sscanf(buf, "%u", &vBuf);
+
+	if ((!ret) || (vBuf < 0)) {
+		pr_err("[ABB-FG] Invalid value\n");
+		
+		return count;
+	}
+
+	pr_info("[ABB-FG] LowBat Tolerance %d ==> %d mV\n", uLowBatTolerance, vBuf);
+	uLowBatTolerance = vBuf;
+
+	return count;
+}
+
+static struct kobj_attribute abb_fg_lowbat_tolerance_interface = __ATTR(lowbat_tolerance, 0644, abb_fg_lowbat_tolerance_show, abb_fg_lowbat_tolerance_store);
+
+static ssize_t abb_fg_refresh_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int vBuf;
+
+	sscanf(buf, "%d", &vBuf);
+
+	if(vBuf) {
+		ab8500_fg_reinit();
+		pr_info("[ABB-FG] Refreshing battery stats\n");
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_fg_refresh_interface = __ATTR(fg_refresh, 0644, NULL, abb_fg_refresh_store);
+
+static ssize_t abb_fg_use_wakelock_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "%d\n", bLowBatWakelock);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_fg_use_wakelock_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, vBuf;
+
+	ret = sscanf(buf, "%u", &vBuf);
+
+	if ((!ret) || (vBuf < 0)) {
+		pr_err("[ABB-FG] Invalid value\n");
+		
+		return count;
+	}
+
+	pr_info("[ABB-FG] LowBat Wakelock %d ==> %d\n", bLowBatWakelock, vBuf);
+
+	bLowBatWakelock = vBuf;
+
+	return count;
+}
+
+static struct kobj_attribute abb_fg_use_wakelock_interface = __ATTR(lowbat_wakelock, 0644, abb_fg_use_wakelock_show, abb_fg_use_wakelock_store);
+
+static struct attribute *abb_fg_attrs[] = {
+	&abb_fg_lowbat_zero_interface.attr, 
+	&abb_fg_lowbat_tolerance_interface.attr, 
+	&abb_fg_refresh_interface.attr, 
+	&abb_fg_use_wakelock_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group abb_fg_interface_group = {
+	.attrs = abb_fg_attrs,
+};
+
+static struct kobject *abb_fg_kobject;
+
 static int __devexit ab8500_fg_remove(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -3110,6 +3235,7 @@ static int __devexit ab8500_fg_remove(struct platform_device *pdev)
 	wake_lock_destroy(&di->lowbat_poweroff_wake_lock);
 	wake_lock_destroy(&di->cc_wake_lock);
 
+	kobject_put(abb_fg_kobject);
 	flush_scheduled_work();
 	power_supply_unregister(&di->fg_psy);
 	platform_set_drvdata(pdev, NULL);
@@ -3307,6 +3433,23 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
 	di->calib_state = AB8500_FG_CALIB_INIT;
 	/* Run the FG algorithm */
 	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
+
+	/* Create a pointer to the di structure */
+	static_fg = di;
+
+	abb_fg_kobject = kobject_create_and_add("abb-fg", kernel_kobj);
+
+	if (!abb_fg_kobject) {
+		pr_err("[ABB-FG] Failed to create kobjects\n");
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(abb_fg_kobject, &abb_fg_interface_group);
+
+	if (ret) {
+		pr_err("[ABB-FG] Failed to register sysfs\n");
+		kobject_put(abb_fg_kobject);
+	}
 
 	return ret;
 
