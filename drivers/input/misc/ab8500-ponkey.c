@@ -155,7 +155,7 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
 		info->key_state = true;
 		input_report_key(info->idev, KEY_POWER, true);
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		dev_info(info->idev->dev.parent, "Power KEY pressed %d\n", KEY_POWER);
+		pr_info("[ABB-POnKey] Power KEY pressed %d\n", KEY_POWER);
 #endif
 	} else if (irq == info->irq_dbr) {
 		if (info->pcut_wa && !cancel_delayed_work_sync(&info->pcut_work))
@@ -166,7 +166,7 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
 		info->key_state = false;
 		input_report_key(info->idev, KEY_POWER, false);
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		dev_info(info->idev->dev.parent, "Power KEY released %d\n", KEY_POWER);
+		pr_info("[ABB-POnKey] Power KEY released %d\n", KEY_POWER);
 #endif
 
 	}
@@ -182,13 +182,13 @@ void ab8500_ponkey_emulator(bool press)
 		gpio_keys_setstate(KEY_POWER, true);
 		p_info->key_state = true;
 		input_report_key(p_info->idev, KEY_POWER, true);
-		pr_err("abb-POnKey: emulate Power Key PRESS\n");
+		pr_err("[ABB-POnKey] Emulate Power Key PRESS\n");
 		input_sync(p_info->idev);
 	} else if (!press) {
 		gpio_keys_setstate(KEY_POWER, false);
 		p_info->key_state = false;
 		input_report_key(p_info->idev, KEY_POWER, false);
-		pr_err("abb-POnKey: emulate Power Key RELEASE\n");
+		pr_err("[ABB-POnKey] Emulate Power Key RELEASE\n");
 		input_sync(p_info->idev);
 	}
 }
@@ -199,7 +199,7 @@ static unsigned int emu_sleep = 500;
 
 static void abb_ponkey_emulator_thread(struct work_struct *abb_ponkey_emulator_work)
 {
-	pr_err("abb-POnKey: emulator thread called, timer = %d\n", emu_sleep);
+	pr_err("[ABB-POnKey] Emulator thread called, timer = %d\n", emu_sleep);
 
 	emu_working = true;
 
@@ -220,7 +220,7 @@ static ssize_t abb_ponkey_emulator_store(struct kobject *kobj, struct kobj_attri
 	ret = sscanf(buf, "%d", &slp);
 
 	if ((ret < 0) || (slp < 0)) {
-		pr_err("abb-POnKey: invalid inputs\n");
+		pr_err("[ABB-POnKey] Invalid inputs\n");
 		return -EINVAL;
 	}
 
@@ -228,7 +228,7 @@ static ssize_t abb_ponkey_emulator_store(struct kobject *kobj, struct kobj_attri
 		emu_sleep = slp;
 		schedule_work(&abb_ponkey_emulator_work);
 	} else {
-		pr_err("abb-POnKey: emulator thread is working\n");
+		pr_err("[ABB-POnKey] Emulator thread is working\n");
 	}
 
 	return count;
