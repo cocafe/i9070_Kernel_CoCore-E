@@ -750,11 +750,17 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
 		cypress_touchkey_suspend(&info->client->dev);
 
 	/* In some cases, led doesn't turn off */
-	if (bTouch2Wake)
-		cypress_touchkey_brightness_set(&info->leds, LED_OFF);
+	if (bTouch2Wake) {
+		if (info->brightness > 0) {
+			pr_err("[TouchKey] LED is on in suspend, turning OFF...\n");
+			cypress_touchkey_brightness_set(&info->leds, LED_OFF);
+		}
+	}
 
 	#ifdef CONFIG_LEDS_CLASS
-	info->current_status = 0;
+	if(!bTouch2Wake)
+		/* Allow to enable LED with Touch2Wake */
+		info->current_status = 0;
 	#endif
 }
 
