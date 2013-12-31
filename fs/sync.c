@@ -29,6 +29,8 @@
 			SYNC_FILE_RANGE_WAIT_AFTER)
 
 #include <linux/earlysuspend.h>
+#include <linux/notifier.h>
+#include <linux/reboot.h>
 
 /*
  * fsync mode:
@@ -492,7 +494,7 @@ static void fsync_early_suspend(struct early_suspend *h)
 
 	/* Do fsync */
 	if (fsync_mode == 2) {
-		pr_info("fsync: dynamic fsync syncing\n");
+		pr_info("[FSYNC] Dynamic fsync syncing\n");
 		wakeup_flusher_threads(0);
 		sync_filesystems(0);
 		sync_filesystems(1);
@@ -507,9 +509,9 @@ static void fsync_late_resume(struct early_suspend *h)
 static ssize_t fsync_mode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	sprintf(buf, "%d\n\n", fsync_mode);
-	sprintf(buf, "%s0: fsync on\n", buf);
-	sprintf(buf, "%s1: fsync off\n", buf);
-	sprintf(buf, "%s2: fsync dynamic\n", buf);
+	sprintf(buf, "%s0: FSYNC On\n", buf);
+	sprintf(buf, "%s1: FSYNC Off\n", buf);
+	sprintf(buf, "%s2: FSYNC Dynamic\n", buf);
 
 	return strlen(buf);
 }
@@ -522,11 +524,11 @@ static ssize_t fsync_mode_store(struct kobject *kobj, struct kobj_attribute *att
 	ret = sscanf(buf, "%d", &mode_wanted);
 
 	if ((ret < 0) || (mode_wanted < 0) || (mode_wanted > 2)) {
-		pr_info("fsync: invalid inputs\n");
+		pr_info("[FSYNC] invalid inputs\n");
 		return -EINVAL;
 	}
 
-	pr_info("fsync: fsync mode %02d -> %02d\n", fsync_mode, mode_wanted);
+	pr_info("[FSYNC] fsync mode %d ==> %d\n", fsync_mode, mode_wanted);
 
 	fsync_mode = mode_wanted;
 
@@ -546,6 +548,27 @@ static struct attribute_group fsync_interface_group = {
 
 static struct kobject *fsync_kobject;
 
+static int fsync_reboot_handler(struct notifier_block *this, unsigned long code, void *unused)
+{
+	if (code == SYS_DOWN || code == SYS_HALT) {
+		if (fsync_mode >= 1) {
+			fsync_mode = 0;
+
+			wakeup_flusher_threads(0);
+			sync_filesystems(0);
+			sync_filesystems(1);
+
+			pr_warn("[FSYNC] Reboot handler flushing data\n");
+		}
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block fsync_control_notifier = {
+	.notifier_call = fsync_reboot_handler,
+};
+
 static int __init fsync_module_init(void)
 {
 	int ret;
@@ -553,14 +576,14 @@ static int __init fsync_module_init(void)
 	fsync_kobject = kobject_create_and_add("fsync", kernel_kobj);
 
 	if (!fsync_kobject) {
-		pr_info("fsync: faile to create kobjects\n");
+		pr_info("[FSYNC] Failed to create kobjects\n");
 		return -ENOMEM;
 	}
 
 	ret = sysfs_create_group(fsync_kobject, &fsync_interface_group);
 
 	if (ret) {
-		pr_info("fsync: faile to create sysfs group\n");
+		pr_info("[FSYNC] Failed to create sysfs group\n");
 		kobject_put(fsync_kobject);
 	}
 
@@ -569,8 +592,9 @@ static int __init fsync_module_init(void)
 	early_suspend.resume = fsync_late_resume;
 
 	register_early_suspend(&early_suspend);
+	register_reboot_notifier(&fsync_control_notifier);
 
-	pr_info("fsync: fsync control registered.");
+	pr_info("[FSYNC] FSync control registered.");
 
 	return 0;
 }
