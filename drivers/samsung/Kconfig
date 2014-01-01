@@ -11,13 +11,6 @@ config SAMSUNG_MODULES
 	  Say Y to enable Samsung kernel modules. j4fs and param
 	  modules are included.
 
-config J4FS
-	tristate "Samsung J4FS support"
-	depends on SAMSUNG_MODULES
-	default m
-	help
-	  Say Y to enable Samsung J4FS support.
-
 config SAMSUNG_PARAM
 	tristate "Samsung Param-Partition Support"
 	depends on SAMSUNG_MODULES
@@ -27,5 +20,7 @@ config SAMSUNG_PARAM
 
 
 source "drivers/samsung/startup_reason/Kconfig"
+
+source "drivers/samsung/j4fs/Kconfig"
 
 endmenu
