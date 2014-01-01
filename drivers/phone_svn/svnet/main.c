@@ -26,6 +26,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/workqueue.h>
 #include <linux/list.h>
 #include <linux/jiffies.h>
@@ -113,6 +114,9 @@ struct svnet {
 
 static struct svnet *svnet_dev;
 
+bool svnet_wakelock = 1;
+module_param(svnet_wakelock, bool, 0644);
+
 #ifdef SVNET_WAKELOCK_ENABLE
 static inline void _wake_lock_init(struct svnet *sn)
 {
@@ -128,22 +132,28 @@ static inline void _wake_lock_destroy(struct svnet *sn)
 
 static inline void _wake_lock_timeout(struct svnet *sn)
 {
-	wake_lock_timeout(&sn->wlock, sn->wake_time);
+	if (svnet_wakelock)
+		wake_lock_timeout(&sn->wlock, sn->wake_time);
 }
 
 void _non_fmt_wakelock_timeout() {
-	if (svnet_dev)
-		_wake_lock_timeout(svnet_dev);
+	if (svnet_dev) {
+		if (svnet_wakelock)
+			_wake_lock_timeout(svnet_dev);
+	}
 }
 
 static inline void _wake_process_lock_timeout(struct svnet *sn)
 {
-	wake_lock_timeout(&sn->wlock, sn->wake_process_time);
+	if (svnet_wakelock)
+		wake_lock_timeout(&sn->wlock, sn->wake_process_time);
 }
 
 void _fmt_wakelock_timeout() {
-	if (svnet_dev)
+	if (svnet_dev) {
+		if (svnet_wakelock)
 		_wake_process_lock_timeout(svnet_dev);
+	}
 }
 
 static inline void _wake_lock_settime(struct svnet *sn, long time)
