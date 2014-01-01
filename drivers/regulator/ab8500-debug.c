@@ -2320,14 +2320,14 @@ int __devinit ab8500_regulator_debug_init(struct platform_device *plf)
 	abb_regu_kobject = kobject_create_and_add("abb-regu", kernel_kobj);
 
 	if (!abb_regu_kobject) {
-		pr_err("abb-regu: faile to register sysfs\n");
+		pr_err("abb-regu: Failed to register sysfs\n");
 		return -ENOMEM;
 	}
 
 	ret = sysfs_create_group(abb_regu_kobject, &abb_regu_interface_group);
 
 	if (ret) {
-		pr_info("abb-regu: faile to register sysfs\n");
+		pr_info("abb-regu: Failed to register sysfs\n");
 		kobject_put(abb_regu_kobject);
 	}
 

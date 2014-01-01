@@ -2656,14 +2656,14 @@ static int __devinit ab8500_chargalg_probe(struct platform_device *pdev)
 	abb_chargalg_kobject = kobject_create_and_add("abb-chargalg", kernel_kobj);
 
 	if (!abb_chargalg_kobject) {
-		pr_info("abb-chargalg: faile to register sysfs kobj\n");
+		pr_info("abb-chargalg: Failed to register sysfs kobj\n");
 		return -ENOMEM;
 	}
 
 	ret = sysfs_create_group(abb_chargalg_kobject, &abb_chargalg_interface_group);
 
 	if (ret) {
-		pr_info("abb-chargalg: faile to register sysfs group\n");
+		pr_info("abb-chargalg: Failed to register sysfs group\n");
 		kobject_put(abb_chargalg_kobject);
 	}
 
