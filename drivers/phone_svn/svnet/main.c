@@ -114,7 +114,7 @@ struct svnet {
 
 static struct svnet *svnet_dev;
 
-bool svnet_wakelock = 1;
+bool svnet_wakelock = 0;
 module_param(svnet_wakelock, bool, 0644);
 
 #ifdef SVNET_WAKELOCK_ENABLE
