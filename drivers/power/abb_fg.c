@@ -136,7 +136,7 @@ module_param(debug_mask, bool, 0644);
 
 static unsigned int uLowBatZero = LOWBAT_ZERO_VOLTAGE;
 static unsigned int uLowBatTolerance = LOWBAT_TOLERANCE;
-static bool bLowBatWakelock = 1;
+static bool bLowBatWakelock = 0;
 
 /* This list came from ab8500_chargalg.c */
 static char *states[] = {
