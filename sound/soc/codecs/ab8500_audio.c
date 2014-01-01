@@ -258,7 +258,8 @@ struct ab8500_codec_drvdata {
 };
 
 /* cocafe: ABBamp module */
-#define ABBAMP_VERSION_TAG			"2.4"
+#define ABBAMP_VERSION_TAG			"2.4.5"
+#define ABBAMP_LAST_UPDATE			"2014.01.01"
 #define ABBAMP_DEBUG_LEVEL			0
 
 #define REG_FULLBITS				0xFF		/* 1111 1111 */
@@ -276,7 +277,7 @@ static void abbamp_control_hsrdiggain(void);
 static void abbamp_control_classdhpg(void);
 static void abbamp_control_classdwg(void);
 
-//static void abbamp_control_ponup(bool power_on);
+/* static void abbamp_control_ponup(void); */
 static void abbamp_control_hs(void);
 static void abbamp_control_hf(void);
 static void abbamp_control_earpiece(void);
@@ -404,6 +405,83 @@ static void abbamp_control_hsdaclowpow(void)
 static void abbamp_control_hshpen(void)
 {
 	abbamp_write(REG_ANACONF1, REG_ANACONF1_HSHPEN, 1, hshpen_v);
+}
+
+/* AnaConf4
+ * Analog Output Enable.
+ * 
+ * [7] DisPdVss
+ * 0: Internal pull down on VssVcphs is enabled.
+ * 1: Internal pull down on VssVcphs is disabled.
+ * 
+ * [6] EnEar
+ * 0: The Ear Class-AB driver is powered down
+ * 1: The Ear Class-AB driver is powered up
+ * 
+ * [5] EnHsL
+ * 0: The HsL Driver is powered down
+ * 1: The HsL Driver is powered up
+ * 
+ * [4] EnHsR
+ * 0: The HsR Driver is powered down
+ * 1: The HsR Driver is powered up
+ * 
+ * [3] EnHfL
+ * 0: The HfL Class-D driver is powered down
+ * 1: The HfL Class-D driver is powered up
+ * 
+ * [2] EnHfR
+ * 0: The HfR Class-D driver is powered down
+ */
+
+/* When these bools are ture, the path will be disable */
+static bool hslanaena_con = false;
+static bool hsranaena_con = false;
+static bool hflanaena_con = false;
+static bool hfranaena_con = false;
+
+static void abbamp_control_hslanaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSL, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHsL widget\n");
+}
+
+static void abbamp_control_hsranaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSR, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHsR widget\n");
+}
+
+static void abbamp_control_hflanaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFL, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHfL widget\n");
+}
+
+static void abbamp_control_hfranaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFR, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHfR widget\n");
+}
+
+
+static void abbamp_control_anaconf4_hs(void)
+{
+	/* When it's TRUE, disable path */
+	if(hslanaena_con)
+		abbamp_control_hslanaena();
+
+	if(hsranaena_con)
+		abbamp_control_hsranaena();
+}
+
+static void abbamp_control_anaconf4_hf(void)
+{
+	if(hflanaena_con)
+		abbamp_control_hflanaena();
+
+	if(hfranaena_con)
+		abbamp_control_hfranaena();
 }
 
 /* ShortCirConf 
@@ -690,27 +768,27 @@ static void abbamp_control_hs(void)
 {
 	if (anagain3_con) {
 		abbamp_control_anagain3();
-		pr_err("[ABB-Codec] AnaGain3\n");
+		pr_err("[ABB-Codec] AnaGain3 widget\n");
 	}
 	if (hslowpow_con) {
 		abbamp_control_hslowpow();
-		pr_err("[ABB-Codec] HsLowPow\n");
+		pr_err("[ABB-Codec] HsLowPow widget\n");
 	}
 	if (hsdaclowpow_con) {
 		abbamp_control_hsdaclowpow();
-		pr_err("[ABB-Codec] HsDacLowPow\n");
+		pr_err("[ABB-Codec] HsDacLowPow widget\n");
 	}
 	if (hshpen_con) {
 		abbamp_control_hshpen();
-		pr_err("[ABB-Codec] HsHpEn\n");
+		pr_err("[ABB-Codec] HsHpEn widget\n");
 	}
 	if (hsldiggain_con) {
 		abbamp_control_hsleardiggain(hsldiggain_v);
-		pr_err("[ABB-Codec] HsLDigGain\n");
+		pr_err("[ABB-Codec] HsLDigGain widget\n");
 	}
 	if (hsrdiggain_con) {
 		abbamp_control_hsrdiggain();
-		pr_err("[ABB-Codec] HsRDigGain\n");
+		pr_err("[ABB-Codec] HsRDigGain widget\n");
 	}
 }
 
@@ -719,7 +797,7 @@ static void abbamp_control_earpiece(void)
 {
 	if (eardiggain_con) {
 		abbamp_control_hsleardiggain(eardiggain_v);
-		pr_err("[ABB-Codec] EarDigGain\n");
+		pr_err("[ABB-Codec] EarDigGain widget\n");
 	}
 }
 
@@ -728,11 +806,11 @@ static void abbamp_control_hf(void)
 {
 	if (classdhpg_con) {
 		abbamp_control_classdhpg();
-		pr_err("[ABB-Codec] ClassD-HPG\n");
+		pr_err("[ABB-Codec] ClassD-HPG widget\n");
 	}
 	if (classdwg_con) {
 		abbamp_control_classdwg();
-		pr_err("[ABB-Codec] ClassD-WG\n");
+		pr_err("[ABB-Codec] ClassD-WG widget\n");
 	}
 }
 
@@ -741,7 +819,7 @@ static void abbamp_control_addiggain(void)
 {
 	if (addiggain2_con) {
 		schedule_work(&abbamp_ad2_work);
-		pr_err("[ABB-Codec] AD2-DigGain\n");
+		pr_err("[ABB-Codec] AD2-DigGain widget\n");
 	}
 }
 
@@ -1693,6 +1771,7 @@ static int hs_dapm_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		hs_ponup = true;
 		abbamp_control_hs();
+		abbamp_control_anaconf4_hs();
 		if (abbamp_dbg >= 1) {
 			pr_info("[ABB-Codec] Hs Power On\n");
 		}
@@ -1715,6 +1794,7 @@ static int ihfr_dapm_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_PRE_PMU:
 		hf_ponup = true;
 		abbamp_control_hf();
+		abbamp_control_anaconf4_hf();
 		if (abbamp_dbg >= 1) {
 			pr_info("[ABB-Codec] IHfR Power On\n");
 		}
@@ -4649,7 +4729,7 @@ static struct kobj_attribute abb_codec_dbg_interface = __ATTR(codec_dbg, 0644,
 static ssize_t abb_codec_vertag_show(struct kobject *kobj, 
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "Codec: %s\nABBamp: %s\n", ab850x_codec_id, ABBAMP_VERSION_TAG);
+	return sprintf(buf, "Codec: %s\nABBamp: %s (%s)\n", ab850x_codec_id, ABBAMP_VERSION_TAG, ABBAMP_LAST_UPDATE);
 }
 
 static struct kobj_attribute abb_codec_vertag_interface = __ATTR(codec_ver, 0444, 
@@ -5319,6 +5399,102 @@ static ssize_t abb_codec_anaconf1_show(struct kobject *kobj,
 static struct kobj_attribute abb_codec_anaconf1_interface = __ATTR(anaconf1, 0444, 
 				abb_codec_anaconf1_show, NULL);
 
+static ssize_t abb_codec_anaconf4_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "Analog Path Enable:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%s[IDX][DIS][MEM]\n", buf);
+	sprintf(buf, "%s[2]  [%d]  [%s]  Headset Left Enable\n", buf, 
+			hslanaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHSL, 1) ? "*" : " ");
+	sprintf(buf, "%s[3]  [%d]  [%s]  Headset Right Enable\n", buf, 
+			hsranaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHSR, 1) ? "*" : " ");
+	sprintf(buf, "%s[4]  [%d]  [%s]  Speaker Left Enable\n", buf, 
+			hflanaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHFL, 1) ? "*" : " ");
+	sprintf(buf, "%s[5]  [%d]  [%s]  Speaker Right Enable\n", buf, 
+			hfranaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHFR, 1) ? "*" : " ");
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_anaconf4_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int sft, dis, ret;
+	
+	/* CMD: Index Disable? */
+	ret = sscanf(buf, "%d %d", &sft, &dis);
+	
+	if ((ret < 0) || (sft < 2) || (sft > 5) || ((dis != 0) && (dis != 1)))
+	{
+		pr_err("[ABB-Codec] invalid inputs\n");
+		return -EINVAL;
+	}
+
+	switch (sft)
+	{
+		case 2:
+			if (dis) {
+				/* Disable */
+				hslanaena_con = true;
+			} else {
+				hslanaena_con = false;
+				
+				/* Restore default state */
+				if (hs_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSL, 1, 1);
+			}
+
+			break;
+
+		case 3:
+			if (dis) {
+				hsranaena_con = true;
+			} else {
+				hsranaena_con = false;
+
+				if (hs_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSR, 1, 1);
+			}
+
+			break;
+
+		case 4:
+			if (dis) {
+				hflanaena_con = true;
+			} else {
+				hflanaena_con = false;
+
+				if (hf_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFL, 1, 1);
+			}
+
+			break;
+
+		case 5:
+			if (dis) {
+				hfranaena_con = true;
+			} else {
+				hfranaena_con = false;
+
+				if (hf_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFR, 1, 1);
+			}
+
+			break;
+	}
+
+	abbamp_control_anaconf4_hs();
+	abbamp_control_anaconf4_hf();
+
+	pr_info("[ABB-Codec] AnaConf4 [%d] : [%d]\n", sft, abbamp_read(REG_ANACONF4, sft, 1));
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_anaconf4_interface = __ATTR(anaconf4, 0644, 
+				abb_codec_anaconf4_show, abb_codec_anaconf4_store);
+
 static ssize_t abb_codec_shortcir_show(struct kobject *kobj, 
 		struct kobj_attribute *attr, char *buf)
 {
@@ -5598,6 +5774,7 @@ static struct attribute *abb_codec_attrs[] = {
 	&abb_codec_hsdaclowpow_interface.attr, 
 	&abb_codec_hshpen_interface.attr, 
 	&abb_codec_anaconf1_interface.attr, 
+	&abb_codec_anaconf4_interface.attr, 
 	&abb_codec_eardiggain_interface.attr, 
 	&abb_codec_shortcir_interface.attr, 
 	&abb_codec_classdhpg_interface.attr, 
