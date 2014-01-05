@@ -109,6 +109,8 @@ module_param(debug_mask, bool, 0644);
 
 static bool bTouch2Wake = false;
 
+static bool led_disabled = false;
+
 extern int touch_is_pressed;
 struct cypress_touchkey_info {
 	struct i2c_client			*client;
@@ -183,7 +185,7 @@ static void cypress_touchkey_brightness_set
 	if (info->current_status && !touchkey_update_status)
 		queue_work(info->led_wq, &info->led_work);
 	else
-		pr_err("[TouchKey] Set brightness: under suspend status or FW updating\n");
+		pr_err("[TouchKey] Not allowed to set LED backlight\n");
 }
 #endif
 
@@ -521,8 +523,39 @@ static ssize_t cypress_touch2wake_store(struct kobject *kobj, struct kobj_attrib
 
 static struct kobj_attribute cypress_touch2wake_interface = __ATTR(touch2wake, 0644, cypress_touch2wake_show, cypress_touch2wake_store);
 
+static ssize_t cypress_forceled_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "%s\n", led_disabled ? "on" : "off");
+
+	return strlen(buf);
+}
+
+static ssize_t cypress_forceled_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	if (!strncmp(buf, "on", 2)) {
+		info->current_status = 0;
+		led_disabled  = 1;
+		pr_err("[TouchKey] LED Off\n");
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		info->current_status = 1;
+		led_disabled = 0;
+		pr_err("[TouchKey] LED On\n");
+
+		return count;
+	}
+		
+	return count;
+}
+
+static struct kobj_attribute cypress_forceled_interface = __ATTR(led_disable, 0644, cypress_forceled_show, cypress_forceled_store);
+
 static struct attribute *cypress_attrs[] = {
 	&cypress_touch2wake_interface.attr, 
+	&cypress_forceled_interface.attr, 
 	NULL,
 };
 
@@ -773,8 +806,10 @@ static void cypress_touchkey_late_resume(struct early_suspend *h)
 
 	#ifdef CONFIG_LEDS_CLASS
 	/*led sysfs write led value before resume process is not executed */
-	info->current_status = 1;
-	queue_work(info->led_wq, &info->led_work);
+	if (!led_disabled) {
+		info->current_status = 1;
+		queue_work(info->led_wq, &info->led_work);
+	}
 	#endif
 }
 #endif
