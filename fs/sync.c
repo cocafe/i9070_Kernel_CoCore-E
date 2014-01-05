@@ -508,10 +508,10 @@ static void fsync_late_resume(struct early_suspend *h)
 
 static ssize_t fsync_mode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	sprintf(buf, "%d\n\n", fsync_mode);
-	sprintf(buf, "%s0: FSYNC On\n", buf);
-	sprintf(buf, "%s1: FSYNC Off\n", buf);
-	sprintf(buf, "%s2: FSYNC Dynamic\n", buf);
+
+	sprintf(buf,   "[%s][0] FSYNC On\n", (fsync_mode == 0) ? "*" : " ");
+	sprintf(buf, "%s[%s][1] FSYNC Off\n", buf, (fsync_mode == 1) ? "*" : " ");
+	sprintf(buf, "%s[%s][2] FSYNC Dynamic\n", buf, (fsync_mode == 2) ? "*" : " ");
 
 	return strlen(buf);
 }
