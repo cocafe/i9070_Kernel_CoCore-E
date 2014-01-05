@@ -1042,49 +1042,51 @@ static void report_input_data(struct mxt224_data *data)
 		goto out;
 
 	#if defined(TOUCH_BOOSTER)
-	if (touchboost && !is_suspend) {
-		if (data->fingers[id].state == MXT224_STATE_PRESS) {
-			if (data->finger_cnt == 0) {
-				if (touchboost_ape) {
-					prcmu_qos_update_requirement(
-						PRCMU_QOS_APE_OPP,
-						(char *)data->client->name,
-						PRCMU_QOS_APE_OPP_MAX);
+	if (touchboost) {
+		if (!is_suspend) {
+			if (data->fingers[id].state == MXT224_STATE_PRESS) {
+				if (data->finger_cnt == 0) {
+					if (touchboost_ape) {
+						prcmu_qos_update_requirement(
+							PRCMU_QOS_APE_OPP,
+							(char *)data->client->name,
+							PRCMU_QOS_APE_OPP_MAX);
+					}
+					if (touchboost_ddr) {
+						prcmu_qos_update_requirement(
+							PRCMU_QOS_DDR_OPP,
+							(char *)data->client->name,
+							PRCMU_QOS_DDR_OPP_MAX);
+					}
+					/* Allow to disable cpufreq requirement */
+					if (touchboost_freq != 0) {
+						prcmu_qos_update_requirement(
+							PRCMU_QOS_ARM_KHZ,
+							(char *)data->client->name,
+							touchboost_freq);
+					}
 				}
-				if (touchboost_ddr) {
+
+				data->finger_cnt++;
+
+			} else if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+				if (data->finger_cnt > 0)
+					data->finger_cnt--;
+	
+				if (data->finger_cnt == 0) {
+					prcmu_qos_update_requirement(
+						PRCMU_QOS_APE_OPP,(
+						char *)data->client->name,
+						PRCMU_QOS_DEFAULT_VALUE);
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_DDR_OPP,
 						(char *)data->client->name,
-						PRCMU_QOS_DDR_OPP_MAX);
-				}
-				/* Allow to disable cpufreq requirement */
-				if (touchboost_freq != 0) {
+						PRCMU_QOS_DEFAULT_VALUE);
 					prcmu_qos_update_requirement(
 						PRCMU_QOS_ARM_KHZ,
 						(char *)data->client->name,
-						touchboost_freq);
+						PRCMU_QOS_DEFAULT_VALUE);
 				}
-			}
-
-			data->finger_cnt++;
-
-		} else if (data->fingers[id].state == MXT224_STATE_RELEASE) {
-			if (data->finger_cnt > 0)
-				data->finger_cnt--;
-	
-			if (data->finger_cnt == 0) {
-				prcmu_qos_update_requirement(
-					PRCMU_QOS_APE_OPP,(
-					char *)data->client->name,
-					PRCMU_QOS_DEFAULT_VALUE);
-				prcmu_qos_update_requirement(
-					PRCMU_QOS_DDR_OPP,
-					(char *)data->client->name,
-					PRCMU_QOS_DEFAULT_VALUE);
-				prcmu_qos_update_requirement(
-					PRCMU_QOS_ARM_KHZ,
-					(char *)data->client->name,
-					PRCMU_QOS_DEFAULT_VALUE);
 			}
 		}
 	}
