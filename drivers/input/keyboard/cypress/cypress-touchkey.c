@@ -548,6 +548,11 @@ static ssize_t cypress_forceled_store(struct kobject *kobj, struct kobj_attribut
 	if (!strncmp(buf, "off", 3)) {
 		info->current_status = 1;
 		led_disabled = 0;
+
+		if (info->brightness > 0) {
+			cypress_touchkey_brightness_set(&info->leds, LED_FULL);
+		}
+
 		pr_err("[TouchKey] LED On\n");
 
 		return count;
