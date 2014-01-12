@@ -568,6 +568,15 @@ static unsigned int uksm_run = 0;
 static DECLARE_WAIT_QUEUE_HEAD(uksm_thread_wait);
 static DEFINE_MUTEX(uksm_thread_mutex);
 
+#define UKSM_RUNBACKGROUND
+
+#ifdef UKSM_RUNBACKGROUND
+#include <linux/earlysuspend.h>
+static struct early_suspend uksm_early_suspend;
+
+static unsigned int uksm_run_background = 0;
+#endif /* UKSM_RUNBACKGROUND */
+
 /*
  * List vma_slot_new is for newly created vma_slot waiting to be added by
  * ksmd. If one cannot be added(e.g. due to it's too small), it's moved to
@@ -5046,6 +5055,34 @@ static ssize_t run_store(struct kobject *kobj, struct kobj_attribute *attr,
 }
 UKSM_ATTR(run);
 
+#ifdef UKSM_RUNBACKGROUND
+static ssize_t run_background_show(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf)
+{
+	return sprintf(buf, "%u\n", uksm_run_background);
+}
+
+static ssize_t run_background_store(struct kobject *kobj, struct kobj_attribute *attr,
+			 const char *buf, size_t count)
+{
+	int ret;
+	unsigned long flags;
+
+	ret = strict_strtoul(buf, 10, &flags);
+
+	if (ret)
+		return -EINVAL;
+
+	if (flags != 0 && flags != 1)
+		return -EINVAL;
+
+	uksm_run_background = flags;
+
+	return count;
+}
+UKSM_ATTR(run_background);
+#endif /* UKSM_RUNBACKGROUND */
+
 static ssize_t abundant_threshold_show(struct kobject *kobj,
 				     struct kobj_attribute *attr, char *buf)
 {
@@ -5316,6 +5353,9 @@ static struct attribute *uksm_attrs[] = {
 	&sleep_millisecs_attr.attr,
 	&cpu_governor_attr.attr,
 	&run_attr.attr,
+#ifdef UKSM_RUNBACKGROUND
+	&run_background_attr.attr,
+#endif /* UKSM_RUNBACKGROUND */
 	&ema_per_page_time_attr.attr,
 	&pages_shared_attr.attr,
 	&pages_sharing_attr.attr,
@@ -5553,6 +5593,28 @@ struct page *ksm_does_need_to_copy(struct page *page,
 	return new_page;
 }
 
+#ifdef UKSM_RUNBACKGROUND
+static void uksm_earlysuspend(struct early_suspend *h)
+{
+	if (uksm_run_background) {
+		uksm_run = 1;
+
+		if (uksm_run & UKSM_RUN_MERGE)
+			wake_up_interruptible(&uksm_thread_wait);
+	}
+}
+
+static void uksm_lateresume(struct early_suspend *h)
+{
+	if (uksm_run_background) {
+		uksm_run = 0;
+
+		if (uksm_run & UKSM_RUN_MERGE)
+			wake_up_interruptible(&uksm_thread_wait);
+	}
+}
+#endif /* UKSM_RUNBACKGROUND */
+
 static int __init uksm_init(void)
 {
 	struct task_struct *uksm_thread;
@@ -5583,6 +5645,14 @@ static int __init uksm_init(void)
 		err = PTR_ERR(uksm_thread);
 		goto out_free;
 	}
+
+#ifdef UKSM_RUNBACKGROUND
+	uksm_early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	uksm_early_suspend.suspend = uksm_earlysuspend;
+	uksm_early_suspend.resume = uksm_lateresume;
+
+	register_early_suspend(&uksm_early_suspend);
+#endif /* UKSM_RUNBACKGROUND */
 
 #ifdef CONFIG_SYSFS
 	err = sysfs_create_group(mm_kobj, &uksm_attr_group);
