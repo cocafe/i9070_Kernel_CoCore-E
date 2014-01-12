@@ -3287,7 +3287,7 @@ static ssize_t abb_charger_control_store(struct kobject *kobj, struct kobj_attri
 
 static struct kobj_attribute abb_charger_control_interface = __ATTR(charger_hw, 0644, abb_charger_control_show, abb_charger_control_store);
 
-static ssize_t abb_charger_stats_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+static ssize_t abb_charger_data_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	struct ab8500_charger *di = static_di;
 
@@ -3302,12 +3302,12 @@ static ssize_t abb_charger_stats_show(struct kobject *kobj, struct kobj_attribut
 	return strlen(buf);
 }
 
-static struct kobj_attribute abb_charger_stats_interface = __ATTR(charger_stats, 0444, abb_charger_stats_show, NULL);
+static struct kobj_attribute abb_charger_data_interface = __ATTR(charger_data, 0444, abb_charger_data_show, NULL);
 
 static struct attribute *abb_charger_attrs[] = {
 	&abb_charger_current_interface.attr, 
 	&abb_charger_control_interface.attr, 
-	&abb_charger_stats_interface.attr, 
+	&abb_charger_data_interface.attr, 
 	NULL,
 };
 
