@@ -518,7 +518,7 @@ static unsigned int uksm_sleep_saved;
 static unsigned int uksm_max_cpu_percentage;
 
 /* For minimum performance cost on Android, use LOW or QUIET */
-static int uksm_cpu_governor = 2;
+static int uksm_cpu_governor = 0;
 
 static char *uksm_cpu_governor_str[4] = { "full", "medium", "low", "quiet" };
 
