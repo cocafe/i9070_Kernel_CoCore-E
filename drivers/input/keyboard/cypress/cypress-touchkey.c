@@ -683,7 +683,7 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 	}
 
 #if CONFIG_HAS_WAKELOCK
-	wake_lock_init(&t2w_wakelock, WAKE_LOCK_SUSPEND, "touch2wake_wakelock");
+	wake_lock_init(&t2w_wakelock, WAKE_LOCK_SUSPEND, "t2w_wakelock");
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
