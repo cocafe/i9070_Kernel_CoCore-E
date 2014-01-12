@@ -15,7 +15,7 @@
  *
  */
 
-#define TOUCH_BOOSTER
+/* #define TOUCH_BOOSTER */
 /* #define TOUCH_DEBUGGER */
 
 #include <linux/kernel.h>
@@ -139,12 +139,16 @@ static u32 parameter3_t48_addr;
 static u8 parameter3_t48_val;
 
 /* cocafe: Touch Booster Control */
+#ifdef TOUCH_BOOSTER
+
 #define TOUCHBOOST_FREQ_DEF		400000
 
 static bool touchboost = false;
 static bool touchboost_ape = true;
 static bool touchboost_ddr = true;
 static unsigned int touchboost_freq = TOUCHBOOST_FREQ_DEF;
+
+#endif /* TOUCH_BOOSTER */
 
 /* cocafe: SweepToWake with wakelock implementation */
 #define ABS_THRESHOLD_X			120
@@ -1574,6 +1578,8 @@ static void mxt224_early_suspend(struct early_suspend *h)
 		goto out;
 
 	if (sweep2wake) {
+
+		#ifdef TOUCH_BOOSTER
 		if (data->finger_cnt > 0) {
 			prcmu_qos_update_requirement(
 				PRCMU_QOS_APE_OPP,
@@ -1590,6 +1596,7 @@ static void mxt224_early_suspend(struct early_suspend *h)
 	
 			data->finger_cnt = 0;
 		}
+		#endif /* TOUCH_BOOSTER */
 	
 		/* nmk_config_pins(janice_mxt224e_pins_wakeup, ARRAY_SIZE(janice_mxt224e_pins_wakeup)); */
 
