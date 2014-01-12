@@ -4064,7 +4064,7 @@ static int __devinit mxt224_probe(struct i2c_client *client,
 	}
 
 #if CONFIG_HAS_WAKELOCK
-	wake_lock_init(&s2w_wakelock, WAKE_LOCK_SUSPEND, "sweep2wake_wakelock");
+	wake_lock_init(&s2w_wakelock, WAKE_LOCK_SUSPEND, "s2w_wakelock");
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
