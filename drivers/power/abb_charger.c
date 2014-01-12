@@ -3277,7 +3277,7 @@ static ssize_t abb_charger_control_store(struct kobject *kobj, struct kobj_attri
 
 		ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER, AB8500_MCH_CTRL1, val);
 		if (ret)
-			pr_err("[ABB-Charger] Failed to Enable Charger!!!\n");
+			pr_err("[ABB-Charger] Failed to Disable Charger!!!\n");
 
 		return count;
 	}
