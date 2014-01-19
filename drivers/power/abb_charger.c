@@ -3193,12 +3193,10 @@ static ssize_t abb_charger_current_store(struct kobject *kobj, struct kobj_attri
 		bCurrentControl = false;
 
 		/* Restore Params */
-		/*
-		di->bat->ta_chg_current = vChargeCurrent;
-		di->bat->ta_chg_current_input = vChargeCurrent;
-		di->bat->usb_chg_current = vChargeCurrent;
-		di->bat->usb_chg_current_input = vChargeCurrent;
-		*/
+		di->bat->ta_chg_current = 800;
+		di->bat->ta_chg_current_input = di->bat->chg_params->ac_curr_max;
+		di->bat->usb_chg_current = 500;
+		di->bat->usb_chg_current_input = di->bat->chg_params->usb_curr_max;
 
 		return count;
 	}
