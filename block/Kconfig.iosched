@@ -146,7 +146,7 @@ choice
 		bool "ZEN" if IOSCHED_ZEN=y
 
 	config DEFAULT_SIOPLUS
-		bool "SIOPLUS" if IOSCHED_ SIOPLUS=y
+		bool "SIOPLUS" if IOSCHED_SIOPLUS=y
 
 	config DEFAULT_NOOP
 		bool "No-op"
