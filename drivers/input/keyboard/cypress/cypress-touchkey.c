@@ -494,6 +494,8 @@ static ssize_t cypress_touch2wake_show(struct kobject *kobj, struct kobj_attribu
 
 static ssize_t cypress_touch2wake_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
+	int ret;
+
 	if (!strncmp(buf, "on", 2)) {
 		bTouch2Wake = true;
 
@@ -517,6 +519,20 @@ static ssize_t cypress_touch2wake_store(struct kobject *kobj, struct kobj_attrib
 
 		return count;
 	}
+
+	#if CONFIG_HAS_WAKELOCK
+	/* For development activity */
+	if (!strncmp(&buf[0], "wakelock=", 9)) {
+		sscanf(&buf[9], "%d", &ret);
+
+		if (!ret)
+			wake_unlock(&t2w_wakelock);
+		else
+			wake_lock(&t2w_wakelock);
+		
+		return count;
+	}
+	#endif
 		
 	return count;
 }
