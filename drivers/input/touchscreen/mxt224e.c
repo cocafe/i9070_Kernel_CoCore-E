@@ -2720,6 +2720,20 @@ static ssize_t mxt224e_sweep2wake_store(struct kobject *kobj, struct kobj_attrib
 		
 		return count;
 	}
+
+	#if CONFIG_HAS_WAKELOCK
+	/* For development activity */
+	if (!strncmp(&buf[0], "wakelock=", 9)) {
+		sscanf(&buf[9], "%d", &ret);
+
+		if (!ret)
+			wake_unlock(&s2w_wakelock);
+		else
+			wake_lock(&s2w_wakelock);
+		
+		return count;
+	}
+	#endif
 		
 	return count;
 }
