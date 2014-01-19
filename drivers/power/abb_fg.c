@@ -138,6 +138,32 @@ static unsigned int uLowBatZero = LOWBAT_ZERO_VOLTAGE;
 static unsigned int uLowBatTolerance = LOWBAT_TOLERANCE;
 static bool bLowBatWakelock = 0;
 
+
+/*
+ * cocafe: Cycle Charging Control - Similar to Battery Life Extender by Ezekeel
+ */
+
+/* Cycle charging control toggle */
+static bool cycle_charging = false;
+
+/* Count that fg calirated */
+static unsigned int count_calibrated = 0;
+
+/* Count that battery discharged */
+static unsigned int count_discharged = 0;
+
+/* Count that battery recharged */
+static unsigned int count_recharged = 0;
+
+/* Threshold to trigger refreshing */
+static unsigned int threshold_reinit = 20;
+
+/* Threshold that recharging starts in % */ 
+static unsigned int threshold_rechar = 30;
+
+/* Threshold that charging stops in % */
+static unsigned int threshold_dischar = 45;
+
 /* This list came from ab8500_chargalg.c */
 static char *states[] = {
 	"HANDHELD_INIT",
@@ -2246,6 +2272,46 @@ static void ab8500_fg_read_input_current_reg(struct ab8500_fg *di)
 	di->input_curr_reg = (int)reg;
 }
 
+static void ab8500_fg_charger_control(struct ab8500_fg *di, bool on) 
+{
+	int ret;
+	char val, tmp;
+
+	if (on) {
+		pr_info("[ABB-FG] Enabling Charger\n");
+
+		abx500_get_register_interruptible(di->dev, AB8500_CHARGER, AB8500_MCH_CTRL1, &tmp);
+		val = tmp | MAIN_CH_ENA;
+
+		ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER, AB8500_MCH_CTRL1, val);
+		if (ret)
+			pr_err("[ABB-FG] Failed to Enable Charger!!!\n");
+
+	} else {
+		pr_info("[ABB-FG] Disabling Charger\n");
+
+		abx500_get_register_interruptible(di->dev, AB8500_CHARGER, AB8500_MCH_CTRL1, &tmp);
+		val = tmp & 0xFE;
+
+		ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER, AB8500_MCH_CTRL1, val);
+		if (ret)
+			pr_err("[ABB-FG] Failed to Disable Charger!!!\n");
+	}
+}
+
+static int ab8500_fg_charger_status(struct ab8500_fg *di) 
+{
+	int ret;
+	char tmp;
+
+	abx500_get_register_interruptible(di->dev, AB8500_CHARGER, AB8500_MCH_CTRL1, &tmp);
+	
+	/*
+	 * 1: On 0: Off 
+	 */
+	return (tmp & 1);
+}
+
 /**
  * ab8500_fg_algorithm() - Entry point for the FG algorithm
  * @di:		pointer to the ab8500_fg structure
@@ -2307,6 +2373,43 @@ static void ab8500_fg_algorithm(struct ab8500_fg *di)
 				di->flags.chg_timed_out,
 				di->input_curr_reg,
 				di->reenable_charing);
+	}
+
+	if (cycle_charging) {
+		/* Works in charging only */
+		if (vbus_state) {
+			/* When charger is online */
+			if (ab8500_fg_charger_status(di)) {
+				if (DIV_ROUND_CLOSEST(di->bat_cap.permille, 10) > threshold_dischar) {
+				
+					ab8500_fg_charger_control(di, false);
+
+					count_discharged++;
+				}
+			}
+
+			/* When charger is offline */
+			if (!ab8500_fg_charger_status(di)) {
+				if (count_discharged) {
+					if (DIV_ROUND_CLOSEST(di->bat_cap.permille, 10) < threshold_rechar) {
+
+						ab8500_fg_charger_control(di, true);
+
+						count_recharged++;
+					}
+				}
+			}
+
+			count_calibrated++;
+
+			if (count_calibrated >= threshold_reinit) {
+				/* Refresh FG machine completely */
+				ab8500_fg_reinit();
+				pr_info("[ABB-FG] ReInit triggered \n");
+
+				count_calibrated = 0;
+			}
+		}
 	}
 }
 
@@ -3206,10 +3309,83 @@ static ssize_t abb_fg_use_wakelock_store(struct kobject *kobj, struct kobj_attri
 
 static struct kobj_attribute abb_fg_use_wakelock_interface = __ATTR(lowbat_wakelock, 0644, abb_fg_use_wakelock_show, abb_fg_use_wakelock_store);
 
+static ssize_t abb_fg_cycle_charging_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "Cycle Charging Control:\n\n");
+	sprintf(buf, "%sEnable [%s]\n\n", buf, cycle_charging ? "*" : " ");
+	sprintf(buf, "%sThreshold ReInit [%d]\n", buf, threshold_reinit);
+	sprintf(buf, "%sThreshold ReCharge [%d %%]\n", buf, threshold_rechar);
+	sprintf(buf, "%sThreshold DisCharge [%d %%]\n\n", buf, threshold_dischar);
+	sprintf(buf, "%sDisCharge Count [%d]\n", buf, count_discharged);
+	sprintf(buf, "%sCalibrate Count [%d]\n", buf, count_calibrated);
+
+	return strlen(buf);
+}
+
+#define __CHECK_INVAL	\
+	if (!ret) {	\
+		pr_err("[ABB-FG] Invalid value\n");	\
+		\
+		return -EINVAL;	\
+	}	
+
+
+static ssize_t abb_fg_cycle_charging_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, val;
+
+	if (!strncmp(buf, "on", 2)) {
+		cycle_charging = true;
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		cycle_charging = false;
+
+		return count;
+	}
+
+	if (!strncmp(buf, "reinit=", 7)) {
+		ret = sscanf(&buf[7], "%d", &val);
+		
+		__CHECK_INVAL;
+
+		threshold_reinit = val;
+
+		return count;
+	}
+
+	if (!strncmp(buf, "rechar=", 7)) {
+		ret = sscanf(&buf[7], "%d", &val);
+		
+		__CHECK_INVAL;
+
+		threshold_rechar = val;
+
+		return count;
+	}
+
+	if (!strncmp(buf, "dischar=", 8)) {
+		ret = sscanf(&buf[8], "%d", &val);
+		
+		__CHECK_INVAL;
+
+		threshold_dischar = val;
+
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_fg_cycle_charging_interface = __ATTR(fg_cyc, 0644, abb_fg_cycle_charging_show, abb_fg_cycle_charging_store);
+
 static struct attribute *abb_fg_attrs[] = {
 	&abb_fg_lowbat_zero_interface.attr, 
 	&abb_fg_lowbat_tolerance_interface.attr, 
 	&abb_fg_refresh_interface.attr, 
+	&abb_fg_cycle_charging_interface.attr, 
 	&abb_fg_use_wakelock_interface.attr, 
 	NULL,
 };
