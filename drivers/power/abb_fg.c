@@ -1681,7 +1681,8 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 					 percent, di->vbat);
 				di->lowbat_poweroff = false;
 				di->lowbat_poweroff_locked = true;
-				wake_lock(&di->lowbat_poweroff_wake_lock);
+				if(bLowBatWakelock)
+					wake_lock(&di->lowbat_poweroff_wake_lock);
 			} else {
 				/* battery capacity is exceed 1% and/or
 				   charging is enabled */
@@ -1692,7 +1693,8 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 					 percent, di->vbat);
 				di->lowbat_poweroff = false;
 				di->lowbat_poweroff_locked = false;
-				wake_unlock(&di->lowbat_poweroff_wake_lock);
+				if(bLowBatWakelock)
+					wake_unlock(&di->lowbat_poweroff_wake_lock);
 			}
 		}
 	}
@@ -1705,7 +1707,8 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 		if (di->vbat > 3450) {
 			dev_info(di->dev, "Low bat condition is recovered.\n");
 			di->lowbat_poweroff_locked = false;
-			wake_unlock(&di->lowbat_poweroff_wake_lock);
+			if(bLowBatWakelock)
+				wake_unlock(&di->lowbat_poweroff_wake_lock);
 		}
 	}
 
