@@ -2189,50 +2189,8 @@ static ssize_t abb_regu_votg_store(struct kobject *kobj, struct kobj_attribute *
 
 static struct kobj_attribute abb_regu_votg_interface = __ATTR(VOTG, 0644, abb_regu_votg_show, abb_regu_votg_store);
 
-static ssize_t abb_regu_varm_hwmode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
-{
-	unsigned char varm_hwmode = abx500_get_register_interruptible(
-			&pdev->dev, 0x03, 0x03, &varm_hwmode);
-	sprintf(buf, "%s\n", hw_mode_val_name[varm_hwmode]);
-	return strlen(buf);
-}
-
-static ssize_t abb_regu_varm_hwmode_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	int ret;
-	
-	if (!strncmp(buf, "lp", 2))
-	{
-		pr_err("abb-regu: Varm -> hp/lp\n");
-		ret = abx500_set_register_interruptible(&pdev->dev, 0x03, 0x03, 0x00);
-		if (ret < 0) {
-			pr_err("abb-regu: Varm hp/lp failed or no changed\n");
-			return 0;
-		}
-	
-		return count;
-	}
-	
-	if (!strncmp(buf, "off", 3))
-	{
-		pr_err("abb-regu: Varm -> hp/off\n");
-		ret = abx500_set_register_interruptible(&pdev->dev, 0x03, 0x03, 0x01);
-		if (ret < 0) {
-			pr_err("abb-regu: Varm hp/off failed or no changed\n");
-			return 0;
-		}
-	
-		return count;
-	}
-
-	return count;
-}
-
-static struct kobj_attribute abb_regu_varm_hwmode_interface = __ATTR(Varm_hwmode, 0644, abb_regu_varm_hwmode_show, abb_regu_varm_hwmode_store);
-
 static struct attribute *abb_regu_attrs[] = {
 	&abb_regu_votg_interface.attr, 
-	&abb_regu_varm_hwmode_interface.attr, 
 	NULL,
 };
 
