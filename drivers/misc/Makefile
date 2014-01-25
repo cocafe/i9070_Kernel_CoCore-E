@@ -67,5 +67,3 @@ obj-$(CONFIG_U8500_SIM_DETECT)	+= sim_detect.o
 obj-y				+= modem_audio/
 obj-$(CONFIG_USE_DPP2601)	+= projector/
 obj-$(CONFIG_NFC_PN544)		+= pn544.o
-
-obj-$(CONFIG_FSYNC_CONTROL)	+= fsync_control.o

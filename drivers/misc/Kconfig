@@ -656,12 +656,4 @@ source "drivers/misc/modem_audio/Kconfig"
 source "drivers/misc/projector/Kconfig"
 source "drivers/misc/tspdrv/Kconfig"
 
-config FSYNC_CONTROL
-        bool "Support for FSync Control"
-        default y
-        help
-          Say Y here to enable FSync Control
-
-
-
 endif # MISC_DEVICES
