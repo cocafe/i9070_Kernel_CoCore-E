@@ -1289,7 +1289,7 @@ static int median_err_setting(struct mxt224_data *data)
 			write_mem(copy_data, obj_address+22, 1, &value);
 			value = 38;
 			write_mem(copy_data, obj_address+25, 1, &value);
-			value = 40;
+			value = 20;
 			write_mem(copy_data, obj_address+35, 1, &value);
 			value = 81;
 			write_mem(copy_data, obj_address+39, 1, &value);
@@ -3920,7 +3920,7 @@ static int __devinit mxt224_probe(struct i2c_client *client,
 	noise_median.t46_actvsyncsperx_for_mferr = 40;
 	noise_median.t48_mfinvlddiffthr_for_mferr = 12;
 	noise_median.t48_mferrorthr_for_mferr = 19;
-	noise_median.t48_thr_for_mferr = 35;
+	noise_median.t48_thr_for_mferr = 20;
 	noise_median.t48_movfilter_for_mferr = 0;
 #else
 	noise_median.t46_actvsyncsperx_for_mferr = 38;
