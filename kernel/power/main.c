@@ -22,6 +22,12 @@
 #include <linux/mfd/dbx500-prcmu.h>
 #endif /* CONFIG_DVFS_LIMIT */
 
+#ifndef CONFIG_DVFS_LIMIT
+/* To make Samsung DVFS App happy */
+#define DVFS_LIMIT_FAKE
+#include <linux/cpufreq.h>
+#endif
+
 DEFINE_MUTEX(pm_mutex);
 
 static bool debug_mask = false;
@@ -610,6 +616,132 @@ power_attr(cpufreq_max_limit);
 power_attr(cpufreq_min_limit);
 #endif /* CONFIG_DVFS_LIMIT */
 
+#ifdef DVFS_LIMIT_FAKE
+static int cpufreq_max_last_val = 0;
+static int cpufreq_max_limit_val = -1;
+static int cpufreq_min_limit_val = -1;
+
+static ssize_t cpufreq_table_show(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				char *buf)
+{
+	ssize_t count = 0;
+	struct cpufreq_frequency_table *table;
+	struct cpufreq_policy *policy;
+	unsigned int min_freq = ~0;
+	unsigned int max_freq = 0;
+	int i = 0;
+	unsigned int table_length = 0;
+
+	table = cpufreq_frequency_get_table(0);
+	if (!table) {
+		printk(KERN_ERR "%s: Failed to get the cpufreq table\n",
+			__func__);
+		return sprintf(buf, "Failed to get the cpufreq table\n");
+	}
+
+	policy = cpufreq_cpu_get(0);
+	if (policy) {
+	#if 0 /* /sys/devices/system/cpu/cpu0/cpufreq/scaling_min&max_freq */
+		min_freq = policy->min_freq;
+		max_freq = policy->max_freq;
+	#else /* /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min&max_freq */
+		min_freq = policy->cpuinfo.min_freq;
+		max_freq = policy->cpuinfo.max_freq;
+	#endif
+	}
+
+	// Get frequency table length
+	for(table_length = 0; (table[table_length].frequency != CPUFREQ_TABLE_END); table_length++) ;
+
+	for (i = table_length-1; i >= 0; i--) {
+		if ((table[i].frequency == CPUFREQ_ENTRY_INVALID) ||
+		    (table[i].frequency > max_freq) ||
+		    (table[i].frequency < min_freq))
+			continue;
+		count += sprintf(&buf[count], "%d ", table[i].frequency);
+	}
+	count += sprintf(&buf[count], "\n");
+
+	return count;
+}
+
+static ssize_t cpufreq_table_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	printk(KERN_ERR "%s: cpufreq_table is read-only\n", __func__);
+	return -EINVAL;
+}
+
+static ssize_t cpufreq_max_limit_show(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					char *buf)
+{
+	return sprintf(buf, "%d\n", cpufreq_max_limit_val);
+}
+
+static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					const char *buf, size_t n)
+{
+	/* Do as 'scaling_max_freq' do */
+	int ret, cpu = 0;
+	int freq;
+	struct cpufreq_policy new_policy;
+
+	ret = cpufreq_get_policy(&new_policy, 0);
+	if (ret)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%d", &freq);
+	if (!ret)
+		return -EINVAL;
+
+	/* 
+	 * To cheat Samsung DVFS App below
+	 * It sends '-1' to reset max cpufreq
+	 */
+	if (freq == 800000) {
+		/* Save the last max cpufreq */
+		cpufreq_max_last_val = new_policy.max;
+		cpufreq_max_limit_val = 800000;
+		cpufreq_update_freq(0, new_policy.min, 800000);
+	} else {
+		/* 
+		 * Apply the last max cpufreq insteads of 
+		 * the maximum cpufreq in cpufreq table
+		 */
+		cpufreq_max_limit_val = freq;
+		cpufreq_update_freq(0, new_policy.min, cpufreq_max_last_val);
+	}
+
+	for_each_online_cpu(cpu)
+		cpufreq_update_policy(cpu);
+
+	return n;
+}
+
+static ssize_t cpufreq_min_limit_show(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					char *buf)
+{
+	return sprintf(buf, "%d\n", cpufreq_min_limit_val);
+}
+
+static ssize_t cpufreq_min_limit_store(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					const char *buf, size_t n)
+{
+	/* Not used in this peroid */
+	return n;
+}
+
+power_attr(cpufreq_table);
+power_attr(cpufreq_max_limit);
+power_attr(cpufreq_min_limit);
+#endif /* DVFS_LIMIT_FAKE */
+
 static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
@@ -632,6 +764,11 @@ static struct attribute * g[] = {
 	&cpufreq_max_limit_attr.attr,
 	&cpufreq_min_limit_attr.attr,
 #endif /* CONFIG_DVFS_LIMIT */
+#ifdef DVFS_LIMIT_FAKE
+	&cpufreq_table_attr.attr,
+	&cpufreq_max_limit_attr.attr,
+	&cpufreq_min_limit_attr.attr,
+#endif /* DVFS_LIMIT_FAKE */
 	NULL,
 };
 
