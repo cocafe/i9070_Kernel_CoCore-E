@@ -136,9 +136,6 @@ static ssize_t janice_dvfs_arm_store(struct kobject *kobj, struct kobj_attribute
 	ret = sscanf(buf, "%d", &freq);
 
 	if (ret > 0) {
-		if (freq != 200000 && freq != 400000 && freq != 800000 && freq != 1000000)
-			return count;
-
 		pr_err("[DVFS-DBG]: ARM KHz -> %d\n", freq);
 		dvfs_info[DVFS_ARM].freq = freq;
 		dvfs_info[DVFS_ARM].state = REQUEST;
