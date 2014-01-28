@@ -150,7 +150,7 @@ static unsigned int get_nr_run_avg(void)
 #define DEF_SAMPLING_DOWN_FACTOR		(2)
 #define MAX_SAMPLING_DOWN_FACTOR		(100000)
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(5)
-#define DEF_FREQUENCY_UP_THRESHOLD		(85)
+#define DEF_FREQUENCY_UP_THRESHOLD		(80)
 
 /* for multiple freq_step */
 #define DEF_UP_THRESHOLD_DIFF			(5)
