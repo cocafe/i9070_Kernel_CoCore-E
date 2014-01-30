@@ -170,9 +170,16 @@ static bool waking_up = false;
 
 static bool sweep2wake = false;
 
-/* control for pinch2wake */
-static bool pinch2wake = false;
-module_param(pinch2wake, bool, 0644);
+/* Sweep2Sleep - Original code: BOOTMGR@Github */
+/* #define TOUCH_S2S */
+#ifdef TOUCH_S2S
+/* Using 3 fingers */
+#define S2S_FINGERS_USING		2
+#define S2S_THRESHOLD			450
+
+static bool sweep2sleep = false;
+static unsigned int sweep2sleep_y;
+#endif /* TOUCH_S2S */
 
 static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
 {
@@ -1040,8 +1047,6 @@ static void report_input_data(struct mxt224_data *data)
 {
 	int id;
 	int count = 0;
-	int y_up;			// stores value of Y-axis when touch event is completed
-	int y_down;			// stores value of Y-axis when touch event starts
 
 	if (!valid_touch)
 		return;
@@ -1144,20 +1149,19 @@ static void report_input_data(struct mxt224_data *data)
 		}
 	}
 	
-	/* pinch2wake implementation */
-	if (pinch2wake) {
-		if (data->fingers[2].state == MXT224_STATE_PRESS) {	// We are using 3 fingers
-			y_down = data->fingers[2].y;
-		}
-		if (data->fingers[2].state == MXT224_STATE_RELEASE) {
-			y_up = data->fingers[2].y;
-		}
-		if ((y_up - y_down) >= 700) {				// Threshold = 700 pixels
-			ab8500_ponkey_emulator(1);
-			msleep(250);
-			ab8500_ponkey_emulator(0);
+	#ifdef TOUCH_S2S
+	if (!is_suspend) {
+		if (sweep2sleep) {
+			if (data->fingers[S2S_FINGERS_USING].state == MXT224_STATE_PRESS) {
+				sweep2sleep_y = data->fingers[S2S_FINGERS_USING].y;
+			}
+			if (data->fingers[S2S_FINGERS_USING].state == MXT224_STATE_RELEASE) {
+				if (abs(data->fingers[S2S_FINGERS_USING].y - sweep2sleep_y) >= S2S_THRESHOLD)
+					schedule_work(&mxt224e_ponkey_work);
+			}
 		}
 	}
+	#endif /* TOUCH_S2S */
 
 	if (data->fingers[id].state == MXT224_STATE_RELEASE)
 		data->fingers[id].state = MXT224_STATE_INACTIVE;
@@ -2761,6 +2765,39 @@ static ssize_t mxt224e_sweep2wake_store(struct kobject *kobj, struct kobj_attrib
 
 static struct kobj_attribute mxt224e_sweep2wake_interface = __ATTR(sweep2wake, 0644, mxt224e_sweep2wake_show, mxt224e_sweep2wake_store);
 
+#ifdef TOUCH_S2S
+static ssize_t mxt224e_sweep2sleep_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "status: %s\n", sweep2sleep ? "on" : "off");
+	sprintf(buf, "%sthreshold: %d\n", buf, S2S_THRESHOLD);
+
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_sweep2sleep_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	if (!strncmp(buf, "on", 2)) {
+		sweep2sleep = true;
+
+		pr_err("[TSP] Sweep2Sleep On\n");
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		sweep2sleep = false;
+
+		pr_err("[TSP] Sweep2Sleep Off\n");
+
+		return count;
+	}
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_sweep2sleep_interface = __ATTR(sweep2sleep, 0644, mxt224e_sweep2sleep_show, mxt224e_sweep2sleep_store);
+#endif
+
 static ssize_t mxt224e_config_t48_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	u8 mbuf;
@@ -3737,6 +3774,9 @@ static struct kobj_attribute mxt224e_parameter3_t48_interface = __ATTR(parameter
 
 static struct attribute *mxt224e_attrs[] = {
 	&mxt224e_sweep2wake_interface.attr, 
+#ifdef TOUCH_S2S
+	&mxt224e_sweep2sleep_interface.attr, 
+#endif
 	&mxt224e_config_t7_interface.attr, 
 	&mxt224e_config_t8_interface.attr, 
 	&mxt224e_config_t9_interface.attr, 
