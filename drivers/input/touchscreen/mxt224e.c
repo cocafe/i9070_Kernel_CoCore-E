@@ -170,6 +170,10 @@ static bool waking_up = false;
 
 static bool sweep2wake = false;
 
+/* control for pinch2wake */
+static bool pinch2wake = false;
+module_param(pinch2wake, bool, 0644);
+
 static void mxt224e_ponkey_thread(struct work_struct *mxt224e_ponkey_work)
 {
 	waking_up = true;
@@ -1036,6 +1040,8 @@ static void report_input_data(struct mxt224_data *data)
 {
 	int id;
 	int count = 0;
+	int y_up;			// stores value of Y-axis when touch event is completed
+	int y_down;			// stores value of Y-axis when touch event starts
 
 	if (!valid_touch)
 		return;
@@ -1135,6 +1141,21 @@ static void report_input_data(struct mxt224_data *data)
 							schedule_work(&mxt224e_ponkey_work);
 				}
 			}
+		}
+	}
+	
+	/* pinch2wake implementation */
+	if (pinch2wake) {
+		if (data->fingers[2].state == MXT224_STATE_PRESS) {	// We are using 3 fingers
+			y_down = data->fingers[2].y;
+		}
+		if (data->fingers[2].state == MXT224_STATE_RELEASE) {
+			y_up = data->fingers[2].y;
+		}
+		if ((y_up - y_down) >= 700) {				// Threshold = 700 pixels
+			ab8500_ponkey_emulator(1);
+			msleep(250);
+			ab8500_ponkey_emulator(0);
 		}
 	}
 
