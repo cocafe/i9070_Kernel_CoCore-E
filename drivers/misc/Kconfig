@@ -600,12 +600,10 @@ config CLONEDEV_DEBUG
 	  devices.
 
 config NFC_PN544
-        bool "NXP PN544 NFC Controller Driver"
+        tristate "NXP PN544 NFC Controller Driver"
         default n
         help
           NXP PN544 Near Field Communication controller support.
-
-
 
 config U5500_MBOX
 	bool "Mailbox support"
