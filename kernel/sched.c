@@ -85,11 +85,6 @@
 #include <trace/events/sched.h>
 
 
-#if defined(CONFIG_SAMSUNG_ADD_GAFORENSICINFO)
-#include <mach/sec_gaf.h>
-#include <linux/sched.h>
-#endif
-
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
@@ -8120,11 +8115,6 @@ void __init sched_init(void)
 {
 	int i, j;
 	unsigned long alloc_size = 0, ptr;
-
-#if defined(CONFIG_SAMSUNG_ADD_GAFORENSICINFO) && defined (CONFIG_FAIR_GROUP_SCHED)
-	sec_gaf_supply_rqinfo(offsetof(struct rq, curr),
-			  offsetof(struct cfs_rq, rq));
-#endif
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	alloc_size += 2 * nr_cpu_ids * sizeof(void **);
