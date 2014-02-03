@@ -196,7 +196,7 @@ static struct stedma40_chan_cfg sdi0_dma_cfg_tx = {
 
 static struct mmci_platform_data ssg_sdi0_data = {
 	.ocr_mask	= MMC_VDD_29_30,
-	.f_max		= 50000000,
+	.f_max		= 100000000,
 	.capabilities	= MMC_CAP_4_BIT_DATA |
 				MMC_CAP_SD_HIGHSPEED |
 				MMC_CAP_MMC_HIGHSPEED,
@@ -272,7 +272,7 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
 
 static struct mmci_platform_data ssg_sdi1_data = {
 	.ocr_mask	= MMC_VDD_29_30,
-	.f_max		= 50000000,
+	.f_max		= 100000000,
 	.capabilities	= MMC_CAP_4_BIT_DATA |
 				MMC_CAP_SD_HIGHSPEED/*|*/
 				/* MMC_CAP_SDIO_IRQ | */
@@ -328,7 +328,7 @@ static void suspend_resume_handler_sdi2(struct mmc_host *host, bool suspend)
 
 static struct mmci_platform_data ssg_sdi2_data = {
 	.ocr_mask	= MMC_VDD_165_195,
-	.f_max		= 50000000,
+	.f_max		= 100000000,
 	.capabilities	= MMC_CAP_4_BIT_DATA |
 				MMC_CAP_8_BIT_DATA |
 				MMC_CAP_MMC_HIGHSPEED|
