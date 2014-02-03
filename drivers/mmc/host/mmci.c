@@ -43,7 +43,7 @@
 static unsigned int fmax = 515633;
 
 #ifdef _MMC_SAFE_ACCESS_
-mmc_is_available = 0;
+int mmc_is_available = 0;
 EXPORT_SYMBOL(mmc_is_available);
 #endif
 
