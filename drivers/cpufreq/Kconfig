@@ -135,10 +135,6 @@ config CPU_FREQ_DEFAULT_GOV_PEGASUSQ
 	bool "pegasusq"
 	select CPU_FREQ_GOV_PEGASUSQ
 
-config CPU_FREQ_DEFAULT_GOV_NIGHTMARE
-	bool "nightmare"
-	select CPU_FREQ_GOV_NIGHTMARE
-
 config CPU_FREQ_DEFAULT_GOV_SMARTASS2
 	bool "smartass2"
 	select CPU_FREQ_GOV_SMARTASS2
@@ -300,11 +296,6 @@ config CPU_FREQ_GOV_ABYSSPLUG
 
 config CPU_FREQ_GOV_PEGASUSQ
 	tristate "'pegasusq' cpufreq policy governor"
-
-
-config CPU_FREQ_GOV_NIGHTMARE
-	tristate "'nightmare' cpufreq policy governor"
-
 
 config CPU_FREQ_GOV_ONDEMANDQ
 	tristate "'ondemand' cpufreq policy governor"
