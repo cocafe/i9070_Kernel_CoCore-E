@@ -140,13 +140,14 @@ static u8 parameter3_t48_val;
 
 /* cocafe: Touch Booster Control */
 #ifdef TOUCH_BOOSTER
-
 #define TOUCHBOOST_FREQ_DEF		400000
+#define TOUCHBOOST_DELAY_DEF		500
 
-static bool touchboost = false;
+static bool touchboost = true;
 static bool touchboost_ape = true;
 static bool touchboost_ddr = true;
 static unsigned int touchboost_freq = TOUCHBOOST_FREQ_DEF;
+static unsigned int touchboost_delay = TOUCHBOOST_DELAY_DEF;
 
 #endif /* TOUCH_BOOSTER */
 
@@ -1043,6 +1044,53 @@ err:
 	return ret;
 }
 
+#ifdef TOUCH_BOOSTER
+static void mxt224e_touchbooster(struct mxt224_data *data, bool enable)
+{
+	if (enable) {
+		if (touchboost_ape) {
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_APE_OPP,
+				(char *)data->client->name,
+				PRCMU_QOS_APE_OPP_MAX);
+		}
+		if (touchboost_ddr) {
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_DDR_OPP,
+				(char *)data->client->name,
+				PRCMU_QOS_DDR_OPP_MAX);
+		}
+		/* Allow to disable cpufreq requirement */
+		if (touchboost_freq != 0) {
+			prcmu_qos_update_requirement(
+				PRCMU_QOS_ARM_KHZ,
+				(char *)data->client->name,
+				touchboost_freq);
+		}
+	} else {
+		prcmu_qos_update_requirement(
+			PRCMU_QOS_APE_OPP,(
+			char *)data->client->name,
+			PRCMU_QOS_DEFAULT_VALUE);
+		prcmu_qos_update_requirement(
+			PRCMU_QOS_DDR_OPP,
+			(char *)data->client->name,
+			PRCMU_QOS_DEFAULT_VALUE);
+		prcmu_qos_update_requirement(
+			PRCMU_QOS_ARM_KHZ,
+			(char *)data->client->name,
+			PRCMU_QOS_DEFAULT_VALUE);
+	}
+}
+
+struct delayed_work mxt224e_touchbooster_off;
+
+static void mxt224e_touchbooster_offwork(struct work_struct *work)
+{
+	mxt224e_touchbooster(copy_data, false);
+}
+#endif
+
 static void report_input_data(struct mxt224_data *data)
 {
 	int id;
@@ -1058,50 +1106,21 @@ static void report_input_data(struct mxt224_data *data)
 
 	#if defined(TOUCH_BOOSTER)
 	if (touchboost) {
-		if (!is_suspend) {
-			if (data->fingers[id].state == MXT224_STATE_PRESS) {
-				if (data->finger_cnt == 0) {
-					if (touchboost_ape) {
-						prcmu_qos_update_requirement(
-							PRCMU_QOS_APE_OPP,
-							(char *)data->client->name,
-							PRCMU_QOS_APE_OPP_MAX);
-					}
-					if (touchboost_ddr) {
-						prcmu_qos_update_requirement(
-							PRCMU_QOS_DDR_OPP,
-							(char *)data->client->name,
-							PRCMU_QOS_DDR_OPP_MAX);
-					}
-					/* Allow to disable cpufreq requirement */
-					if (touchboost_freq != 0) {
-						prcmu_qos_update_requirement(
-							PRCMU_QOS_ARM_KHZ,
-							(char *)data->client->name,
-							touchboost_freq);
-					}
-				}
+		if (data->fingers[id].state == MXT224_STATE_PRESS) {
+			if (data->finger_cnt == 0) {
+				cancel_delayed_work(&mxt224e_touchbooster_off);
+				mxt224e_touchbooster(data, true);
+			}
 
-				data->finger_cnt++;
+			data->finger_cnt++;
 
-			} else if (data->fingers[id].state == MXT224_STATE_RELEASE) {
-				if (data->finger_cnt > 0)
-					data->finger_cnt--;
-	
-				if (data->finger_cnt == 0) {
-					prcmu_qos_update_requirement(
-						PRCMU_QOS_APE_OPP,(
-						char *)data->client->name,
-						PRCMU_QOS_DEFAULT_VALUE);
-					prcmu_qos_update_requirement(
-						PRCMU_QOS_DDR_OPP,
-						(char *)data->client->name,
-						PRCMU_QOS_DEFAULT_VALUE);
-					prcmu_qos_update_requirement(
-						PRCMU_QOS_ARM_KHZ,
-						(char *)data->client->name,
-						PRCMU_QOS_DEFAULT_VALUE);
-				}
+		} else if (data->fingers[id].state == MXT224_STATE_RELEASE) {
+			if (data->finger_cnt > 0)
+				data->finger_cnt--;
+
+			if (data->finger_cnt == 0) {
+				schedule_delayed_work(&mxt224e_touchbooster_off, 
+					msecs_to_jiffies(touchboost_delay));
 			}
 		}
 	}
@@ -1515,18 +1534,7 @@ static int mxt224_internal_suspend(struct mxt224_data *data)
 	#if defined(TOUCH_BOOSTER)
 	if (touchboost) {
 		if (data->finger_cnt > 0) {
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_APE_OPP,(
-				char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_DDR_OPP,
-				(char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_ARM_KHZ,
-				(char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
+			mxt224e_touchbooster(data, false);
 	
 			data->finger_cnt = 0;
 		}
@@ -1606,18 +1614,7 @@ static void mxt224_early_suspend(struct early_suspend *h)
 
 		#ifdef TOUCH_BOOSTER
 		if (data->finger_cnt > 0) {
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_APE_OPP,
-				(char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_DDR_OPP,
-				(char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
-			prcmu_qos_update_requirement(
-				PRCMU_QOS_ARM_KHZ,
-				(char *)data->client->name,
-				PRCMU_QOS_DEFAULT_VALUE);
+			mxt224e_touchbooster(data, false);
 	
 			data->finger_cnt = 0;
 		}
@@ -3149,12 +3146,6 @@ static ssize_t mxt224e_config_t7_store(struct kobject *kobj, struct kobj_attribu
 static struct kobj_attribute mxt224e_config_t7_interface = __ATTR(config_t7, 0644, mxt224e_config_t7_show, mxt224e_config_t7_store);
 
 #ifdef TOUCH_BOOSTER
-static void mxt224e_touchboost_clear(void)
-{
-	prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, (char *)copy_data->client->name, PRCMU_QOS_DEFAULT_VALUE);
-	prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP, (char *)copy_data->client->name, PRCMU_QOS_DEFAULT_VALUE);
-	prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ, (char *)copy_data->client->name, PRCMU_QOS_DEFAULT_VALUE);
-}
 
 static ssize_t mxt224e_touchboost_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
@@ -3183,7 +3174,7 @@ static ssize_t mxt224e_touchboost_store(struct kobject *kobj, struct kobj_attrib
 	}
 
 	if (!touchboost)
-		mxt224e_touchboost_clear();
+		mxt224e_touchbooster(copy_data, false);
 
 	pr_err("[TSP] TouchBoost %s\n", touchboost ? "enable" : "disable");
 		
@@ -3207,19 +3198,9 @@ static ssize_t mxt224e_touchboost_freq_store(struct kobject *kobj, struct kobj_a
 	if (!ret)
 		return -EINVAL;
 
-	if (tbuf != 0 && 
-	    tbuf != 200000 && 
-	    tbuf != 400000 && 
-	    tbuf != 800000 && 
-	    tbuf != 1000000) 
-	{
-		pr_err("[TSP] passed an invalid cpufreq\n");
-		return -EINVAL;
-	}
-
 	touchboost_freq = tbuf;
 
-	mxt224e_touchboost_clear();
+	mxt224e_touchbooster(copy_data, false);
 
 	pr_err("[TSP] TouchBoost cpufreq: %d\n", touchboost_freq);
 		
@@ -3227,6 +3208,31 @@ static ssize_t mxt224e_touchboost_freq_store(struct kobject *kobj, struct kobj_a
 }
 
 static struct kobj_attribute mxt224e_touchboost_freq_interface = __ATTR(touchboost_freq, 0644, mxt224e_touchboost_freq_show, mxt224e_touchboost_freq_store);
+
+static ssize_t mxt224e_touchboost_delay_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", touchboost_delay);
+}
+
+static ssize_t mxt224e_touchboost_delay_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	int tbuf;
+
+	ret = sscanf(buf, "%d", &tbuf);
+
+	if (!ret)
+		return -EINVAL;
+
+	if (tbuf < 0)
+		return -EINVAL;
+
+	touchboost_delay = tbuf;
+		
+	return count;
+}
+
+static struct kobj_attribute mxt224e_touchboost_delay_interface = __ATTR(touchboost_delay, 0644, mxt224e_touchboost_delay_show, mxt224e_touchboost_delay_store);
 
 static ssize_t mxt224e_touchboost_ape_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
@@ -3251,8 +3257,8 @@ static ssize_t mxt224e_touchboost_ape_store(struct kobject *kobj, struct kobj_at
 
 	touchboost_ape = tbuf;
 
-	mxt224e_touchboost_clear();
-		
+	mxt224e_touchbooster(copy_data, false);
+
 	return count;
 }
 
@@ -3281,8 +3287,8 @@ static ssize_t mxt224e_touchboost_ddr_store(struct kobject *kobj, struct kobj_at
 
 	touchboost_ddr = tbuf;
 
-	mxt224e_touchboost_clear();
-		
+	mxt224e_touchbooster(copy_data, false);
+
 	return count;
 }
 
@@ -3787,6 +3793,7 @@ static struct attribute *mxt224e_attrs[] = {
 #ifdef TOUCH_BOOSTER
 	&mxt224e_touchboost_interface.attr, 
 	&mxt224e_touchboost_freq_interface.attr, 
+	&mxt224e_touchboost_delay_interface.attr, 
 	&mxt224e_touchboost_ape_interface.attr, 
 	&mxt224e_touchboost_ddr_interface.attr, 
 #endif
@@ -4001,7 +4008,7 @@ static int __devinit mxt224_probe(struct i2c_client *client,
 				  PRCMU_QOS_DEFAULT_VALUE);
 	prcmu_qos_add_requirement(PRCMU_QOS_ARM_KHZ, (char *)client->name,
 				  PRCMU_QOS_DEFAULT_VALUE);
-	dev_info(&client->dev, "add_prcmu_qos is added\n");
+	INIT_DELAYED_WORK(&mxt224e_touchbooster_off, mxt224e_touchbooster_offwork);
 #endif
 
 	valid_touch = 0;
