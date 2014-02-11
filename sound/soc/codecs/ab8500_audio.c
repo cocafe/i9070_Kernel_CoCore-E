@@ -258,12 +258,12 @@ struct ab8500_codec_drvdata {
 };
 
 /* cocafe: ABBamp module */
-#define ABBAMP_VERSION_TAG			"2.4.5"
-#define ABBAMP_LAST_UPDATE			"2014.01.01"
+#define ABBAMP_VERSION_TAG			"2.4.6"
+#define ABBAMP_LAST_UPDATE			"2014.02.11"
 #define ABBAMP_DEBUG_LEVEL			0
 
 #define REG_FULLBITS				0xFF		/* 1111 1111 */
-#define REG_FULLWIDTH				0x8		/* 8 bits */
+#define REG_FULLWIDTH				0x08		/* 8 bits */
 
 static int abbamp_read(unsigned int reg, unsigned int shift, unsigned int width);
 static int abbamp_write(unsigned int reg, unsigned int shift, unsigned int width, unsigned int value);
@@ -468,19 +468,19 @@ static void abbamp_control_hfranaena(void)
 static void abbamp_control_anaconf4_hs(void)
 {
 	/* When it's TRUE, disable path */
-	if(hslanaena_con)
+	if (hslanaena_con)
 		abbamp_control_hslanaena();
 
-	if(hsranaena_con)
+	if (hsranaena_con)
 		abbamp_control_hsranaena();
 }
 
 static void abbamp_control_anaconf4_hf(void)
 {
-	if(hflanaena_con)
+	if (hflanaena_con)
 		abbamp_control_hflanaena();
 
-	if(hfranaena_con)
+	if (hfranaena_con)
 		abbamp_control_hfranaena();
 }
 
@@ -1772,15 +1772,9 @@ static int hs_dapm_event(struct snd_soc_dapm_widget *w,
 		hs_ponup = true;
 		abbamp_control_hs();
 		abbamp_control_anaconf4_hs();
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] Hs Power On\n");
-		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		hs_ponup = false;
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] Hs Power Off\n");
-		}
 		mdelay(10);
 		break;
 	}
@@ -1795,17 +1789,11 @@ static int ihfr_dapm_event(struct snd_soc_dapm_widget *w,
 		hf_ponup = true;
 		abbamp_control_hf();
 		abbamp_control_anaconf4_hf();
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] IHfR Power On\n");
-		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		hf_ponup = false;
 		if (hs_ponup) {
 			abbamp_control_hs();
-		}
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] IHfR Power Off\n");
 		}
 		break;
 	}
@@ -1821,17 +1809,11 @@ static int earpiece_dapm_event(struct snd_soc_dapm_widget *w,
 		if (!hs_ponup) {
 			abbamp_control_earpiece();
 		}
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] EarPiece Power On\n");
-		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		ear_ponup = false;
 		if (hs_ponup) {
 			abbamp_control_hs();
-		}
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] EarPiece Power Off\n");
 		}
 		break;
 	}
@@ -1845,17 +1827,26 @@ static int ad2_dapm_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		ad2_ponup = true;
 		abbamp_control_addiggain();
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] ADDigGain2 Power On\n");
-		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		ad2_ponup = false;
 		if (hs_ponup) {
 			abbamp_control_hs();
 		}
-		if (abbamp_dbg >= 1) {
-			pr_info("[ABB-Codec] ADDigGain2 Power Off\n");
+		break;
+	}
+	return 0;
+}
+
+static int ad3_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		if (hs_ponup) {
+			abbamp_control_hs();
 		}
 		break;
 	}
@@ -2160,7 +2151,8 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("AD 3 Select Capture Route",
 			SND_SOC_NOPM, 0, 0, dapm_ad3_select),
 
-	SND_SOC_DAPM_MIXER("AD3 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER_E("AD3 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0, 
+			ad3_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("AD3 Enable", REG_ADPATHENA,
 			REG_ADPATHENA_ENAD34, 0, NULL, 0),
