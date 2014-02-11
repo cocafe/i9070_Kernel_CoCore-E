@@ -116,6 +116,8 @@ static int cpufreq_governor_interactiveq(struct cpufreq_policy *policy,
 		unsigned int event);
 
 /* Variables used in early suspend */
+static int is_suspend = 1;
+
 static void cpu_up_work(void)
 {
 	int cpu;
@@ -140,8 +142,10 @@ static void cpu_down_work(void)
 
 static void interactiveq_cpu_wakeup_thread(struct work_struct *interactiveq_cpu_wakeup_work)
 {
-	msleep(3000);
-	cpu_up_work();
+	if (!is_suspend) {
+		msleep(3000);
+		cpu_up_work();
+	}
 }
 static DECLARE_WORK(interactiveq_cpu_wakeup_work, interactiveq_cpu_wakeup_thread);
 
@@ -149,11 +153,13 @@ static struct early_suspend early_suspend;
 
 static void cpufreq_interactiveq_early_suspend(struct early_suspend *h)
 {
+	is_suspend = 1;
 	cpu_down_work();
 }
 
 static void cpufreq_interactiveq_late_resume(struct early_suspend *h)
-{
+{	
+	is_suspend = 0;
 	cpu_up_work();
 }
 
