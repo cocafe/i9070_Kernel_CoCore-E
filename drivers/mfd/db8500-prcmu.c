@@ -1290,6 +1290,42 @@ _LIVEOPP_ATTR_RW(arm_slot7);
 _LIVEOPP_ATTR_RW(arm_slot8);
 _LIVEOPP_ATTR_RW(arm_slot9);
 
+/* 
+ * DDRPLL Booster
+ * Increasing DDRPLL will scale up related clocks like SGACLK(Mali GPU)
+ * So it may reboot *when* increasing DDRPLL
+ */
+static ssize_t ddrpll_boost_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	int regval;
+	regval = readl(prcmu_base + PRCMU_DDRPLL_REG);
+	if (regval == 0x00050168)
+		sprintf(buf, "off\n");
+	else
+		sprintf(buf, "on\n");
+
+	return strlen(buf);
+}
+
+static ssize_t ddrpll_boost_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, val;
+
+	ret = sscanf(buf, "%d", &val);
+	if (!ret)
+		return -EINVAL;
+
+	if (val)
+		/* @806MHz */
+		writel(0x00010115, prcmu_base + PRCMU_DDRPLL_REG);
+	else
+		/* @798MHz */
+		writel(0x00050168, prcmu_base + PRCMU_DDRPLL_REG);
+
+	return count;
+}
+_LIVEOPP_ATTR_RW(ddrpll_boost);
+
 static struct attribute *liveopp_attrs[] = {
 	&liveopp_ver_interface.attr, 
 	&arm_slot0_interface.attr, 
@@ -1302,6 +1338,7 @@ static struct attribute *liveopp_attrs[] = {
 	&arm_slot7_interface.attr, 
 	&arm_slot8_interface.attr, 
 	&arm_slot9_interface.attr, 
+	&ddrpll_boost_interface.attr, 
 	NULL,
 };
 

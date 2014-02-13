@@ -16,6 +16,7 @@
 
 #define PRCMU_ARMFIX_REG		0x000
 #define PRCMU_ARMPLL_REG		0x088
+#define PRCMU_DDRPLL_REG		0x08C
 
 /*
  * Varm has three voltage selections
