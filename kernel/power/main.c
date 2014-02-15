@@ -620,6 +620,7 @@ power_attr(cpufreq_min_limit);
 static int cpufreq_max_last_val = 0;
 static int cpufreq_max_limit_val = -1;
 static int cpufreq_min_limit_val = -1;
+static int cpufreq_dvfs_powersave = 800000;
 
 static ssize_t cpufreq_table_show(struct kobject *kobj,
 				struct kobj_attribute *attr,
@@ -699,16 +700,19 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 		return -EINVAL;
 
 	/* 
-	 * To cheat Samsung DVFS App below
-	 * It sends '-1' to reset max cpufreq
+	 * To cheat Samsung DVFS App below.
+	 * It sends '-1' to reset max cpufreq.
+	 * Adapted to Samsung DVFS App only.
+	 * Don't use this sysfs interface to tweak
+	 * maximum cpufreq limitation.
 	 */
 	if (freq == 800000) {
 		/* Save the last max cpufreq */
 		cpufreq_max_last_val = new_policy.max;
-		cpufreq_max_limit_val = 800000;
+		cpufreq_max_limit_val = cpufreq_dvfs_powersave;
 		if (cpufreq_max_last_val < 1000000)
 			cpufreq_max_last_val = 1000000;
-		cpufreq_update_freq(0, new_policy.min, 800000);
+		cpufreq_update_freq(0, new_policy.min, cpufreq_max_limit_val);
 	} else {
 		/* 
 		 * Apply the last max cpufreq insteads of 
@@ -720,6 +724,29 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 
 	for_each_online_cpu(cpu)
 		cpufreq_update_policy(cpu);
+
+	return n;
+}
+
+static ssize_t cpufreq_dvfs_powersave_show(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					char *buf)
+{
+	return sprintf(buf, "%d\n", cpufreq_dvfs_powersave);
+}
+
+static ssize_t cpufreq_dvfs_powersave_store(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					const char *buf, size_t n)
+{
+	int ret, val;
+
+	ret = sscanf(buf, "%d\n", &val);
+
+	if (!ret || (val < 0))
+		return -EINVAL;
+
+	cpufreq_dvfs_powersave = val;
 
 	return n;
 }
@@ -742,6 +769,7 @@ static ssize_t cpufreq_min_limit_store(struct kobject *kobj,
 power_attr(cpufreq_table);
 power_attr(cpufreq_max_limit);
 power_attr(cpufreq_min_limit);
+power_attr(cpufreq_dvfs_powersave);
 #endif /* DVFS_LIMIT_FAKE */
 
 static struct attribute * g[] = {
@@ -770,6 +798,7 @@ static struct attribute * g[] = {
 	&cpufreq_table_attr.attr,
 	&cpufreq_max_limit_attr.attr,
 	&cpufreq_min_limit_attr.attr,
+	&cpufreq_dvfs_powersave_attr.attr,
 #endif /* DVFS_LIMIT_FAKE */
 	NULL,
 };
