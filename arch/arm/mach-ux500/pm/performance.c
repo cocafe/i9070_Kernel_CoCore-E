@@ -65,9 +65,11 @@ static void wlan_load(struct work_struct *work)
 
 	if ((num_irqs > old_num_irqs) &&
 	    (num_irqs - old_num_irqs) > WLAN_LIMIT) {
+		/*
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "wlan",
 					     PRCMU_QOS_MAX_VALUE);
+		*/
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "wlan",
 					     PRCMU_QOS_MAX_VALUE);
@@ -89,9 +91,11 @@ static void wlan_load(struct work_struct *work)
 			wlan_pm_qos_is_latency_0 = true;
 		}
 	} else {
+		/*
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "wlan",
 					     PRCMU_QOS_DEFAULT_VALUE);
+		*/
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "wlan",
 					     PRCMU_QOS_DEFAULT_VALUE);
@@ -189,9 +193,11 @@ static void mmc_load(struct work_struct *work)
 	}
 
 	if (!old_mode && new_mode) {
+		/*
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "mmc",
 					     PRCMU_QOS_MAX_VALUE);
+		*/
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "mmc",
 					     PRCMU_QOS_MAX_VALUE);
@@ -201,9 +207,11 @@ static void mmc_load(struct work_struct *work)
 	}
 
 	if (old_mode && !new_mode) {
+		/*
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "mmc",
 					     PRCMU_QOS_DEFAULT_VALUE);
+		*/
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "mmc",
 					     PRCMU_QOS_DEFAULT_VALUE);
