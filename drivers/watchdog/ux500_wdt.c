@@ -51,7 +51,7 @@ MODULE_PARM_DESC(nowayout,
 				__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 static u8 wdog_id;
 static bool wdt_en;
-static bool wdt_auto_off = false;
+static bool wdt_auto_off = true;
 static bool safe_close;
 static struct ux500_wdt_ops *ux500_wdt_ops;
 
