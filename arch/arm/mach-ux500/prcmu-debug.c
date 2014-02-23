@@ -1123,7 +1123,22 @@ fail:
 	return -ENOMEM;
 }
 
-static ssize_t prcmu_sysfs_registers_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+static int reg_last = 0;
+
+static ssize_t prcmu_wreg_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	int reg_val;
+	void __iomem *prcmu_base;
+
+	prcmu_base = __io_address(U8500_PRCMU_BASE);
+	reg_val = readl(prcmu_base + reg_last);
+
+	sprintf(buf, "%#06x: %#010x\n", reg_last, reg_val);
+
+	return strlen(buf);
+}
+
+static ssize_t prcmu_wreg_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
 	int reg, val, err;
 	void __iomem *prcmu_base;
@@ -1138,17 +1153,19 @@ static ssize_t prcmu_sysfs_registers_store(struct kobject *kobj, struct kobj_att
 
 	prcmu_base = __io_address(U8500_PRCMU_BASE);
 
-	pr_info("prcmu-dbg: write addr [%#06x] [%#010x]\n", reg, val);
+	reg_last = reg;
+
+	pr_info("[PRCMU DBG] %#06x: %#010x\n", reg, val);
 
 	writel(val, prcmu_base + reg);
 	
 	return count;
 }
 
-static struct kobj_attribute prcmu_sysfs_registers_interface = __ATTR(regs, 0200, NULL, prcmu_sysfs_registers_store);
+static struct kobj_attribute prcmu_wreg_interface = __ATTR(wreg, 0600, prcmu_wreg_show, prcmu_wreg_store);
 
 static struct attribute *prcmu_sysfs_debug_attrs[] = {
-	&prcmu_sysfs_registers_interface.attr, 
+	&prcmu_wreg_interface.attr, 
 	NULL,
 };
 
