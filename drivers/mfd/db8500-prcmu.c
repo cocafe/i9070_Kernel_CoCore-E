@@ -1017,13 +1017,13 @@ static void db8500_prcmu_get_abb_event_buffer(void __iomem **buf)
 #include <linux/kobject.h>
 #include <linux/mfd/db8500-liveopp.h>
 
-#define LiveOPP_VER			"0.9.6"
+#define LiveOPP_VER			"0.9.7"
 
-/* PRCMU base address */
 static __iomem void *prcmu_base;
 
-/* Last required ARM frequency */
 static unsigned int curr_arm_index = 0;
+
+static int db8500_prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
 
 /**
  * Hard-coded custom ARM OPP table
@@ -1034,15 +1034,10 @@ static unsigned int curr_arm_index = 0;
  * It just an API to call set arm opp function.
  *
  * Setting ARM OPP by PRCMU is setting the ARM clock.
- * 
- * @200MHz: 	This freq depends on ArmFixClk, ARMPLL does nothing.
- * 		While we don't know how does ArmFixClk work, 
- * 		so this real freq is unsure!
- * 
  */
 static struct liveopp_arm_table liveopp_arm[] = {
 //	{100000,  115200,  ARM_50_OPP,  ARM_IGNORE,  0x00000741, 0x00010103, 0x0C, 0x1A, 0xDB, 1, 1},
-	{200000,  200000,  ARM_EXTCLK,  ARM_IGNORE,  0x00000581, 0x00050168, 0x0C, 0x1A, 0xDB, 0, 1},
+	{200000,  192000,  ARM_EXTCLK,  ARM_IGNORE,  0x00000581, 0x00050168, 0x0C, 0x1A, 0xDB, 0, 1},
 	{400000,  399360,  ARM_50_OPP,  ARM_IGNORE,  0x00000741, 0x01050168, 0x0C, 0x1A, 0xDB, 0, 1},
 	{600000,  614400,  ARM_50_OPP,  ARM_IGNORE,  0x00000741, 0x00010110, 0x0C, 0x20, 0xDB, 1, 1},
 	{800000,  798720,  ARM_100_OPP, ARM_IGNORE,  0x00000741, 0x00050168, 0x0B, 0x24, 0xDB, 0, 0},
@@ -1055,31 +1050,62 @@ static struct liveopp_arm_table liveopp_arm[] = {
 //	{1267200, 1267200, ARM_MAX_OPP, ARM_100_OPP, 0x00000741, 0x00010121, 0x0B, 0x3F, 0xCF, 1, 1},
 };
 
-/* Write AB500 registers - NOTICE: Set voltages first */
-static void liveopp_set_voltage(struct liveopp_arm_table table)
+/* 
+ * Hard coded PLL SOC0 data 
+ */
+static struct liveopp_pllsoc0_table liveopp_mali_pllsoc0[] = {
+	{399360,  0x01050168}, 
+	{460800,  0x0001010C}, 
+	{576000,  0x0001010F}, 
+	{614400,  0x00010110}, 
+	{640000,  0x00030132}, 
+	{691200,  0x00010112}, 
+	{729600,  0x00010113}, 
+	{798720,  0x00050168}, 
+	{806400,  0x00010115}, 
+	{844800,  0x00010116}, 
+	{883200,  0x00010117}, 
+	{921600,  0x00010118}, 
+	{960000,  0x00010119}, 
+	{998400,  0x0001011A}, 
+	{1036800, 0x0001011B}, 
+	{1075200, 0x0001011C}, 
+};
+
+/* NOTES: Set voltages first */
+static void liveopp_set_varm(struct liveopp_arm_table table)
 {
 	/* Varm */
-	liveopp_ab8500_write(AB8500_REGU_CTRL2, table.varm_sel, table.varm_raw);
-	/* Vbbp/Vbbn */
-	liveopp_ab8500_write(AB8500_REGU_CTRL2, AB8500_VBB_REG, table.vbbpn_raw);
+	db8500_prcmu_abb_write(AB8500_REGU_CTRL2, table.varm_sel, &table.varm_raw, 1);
+	/* VBBp/VBBn */
+	db8500_prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VBB_REG, &table.vbbpn_raw, 1);
 }
 
-/* Write PRCMU registers */
 static void liveopp_set_armfreq(struct liveopp_arm_table table)
 {
 	/* ArmFixClk */	/* Not used now! */
 	/* writel(table.armfix_raw, prcmu_base + PRCMU_ARMFIX_REG); */
 	/* ARM PLL */
-	writel(table.armpll_raw, prcmu_base + PRCMU_ARMPLL_REG);
+	writel(table.armpll_raw, prcmu_base + PRCMU_PLLARM_REG);
 }
 
-/* Apply LiveOPP configs */
 static void liveopp_apply_table(struct liveopp_arm_table table)
 {
 	if (table.override_volt)
-		liveopp_set_voltage(table);
+		liveopp_set_varm(table);
 	if (table.override_freq)
 		liveopp_set_armfreq(table);
+}
+
+static void liveopp_qos_lock(bool lock)
+{
+	if (lock) {
+		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, LIVEOPP_QOS, PRCMU_QOS_APE_OPP_MAX);
+		prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP, LIVEOPP_QOS, PRCMU_QOS_APE_OPP_MAX);
+	} else {
+		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, LIVEOPP_QOS, PRCMU_QOS_DEFAULT_VALUE);
+		prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP, LIVEOPP_QOS, PRCMU_QOS_DEFAULT_VALUE);
+	}
 }
 
 /* Sysfs helpers */
@@ -1291,40 +1317,122 @@ _LIVEOPP_ATTR_RW(arm_slot8);
 _LIVEOPP_ATTR_RW(arm_slot9);
 
 /* 
- * DDRPLL Booster
- * Increasing DDRPLL will scale up related clocks like SGACLK(Mali GPU)
- * So it may reboot *when* increasing DDRPLL
+ * Mali Clock (SGACLK) Interface
  */
-static ssize_t ddrpll_boost_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+static ssize_t mali_clock_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	int regval;
-	regval = readl(prcmu_base + PRCMU_DDRPLL_REG);
-	if (regval == 0x00050168)
-		sprintf(buf, "off\n");
-	else
-		sprintf(buf, "on\n");
+	int i;
+	int mgtval = 0;
+	int clkdiv = 0;
+	int pllval = 0;
+	int pllsoc, pllddr;
+
+	if (!get_mali_pmstate())
+		mali_platform_pm(true);
+
+	liveopp_qos_lock(true);
+
+	mgtval = readl(prcmu_base + PRCMU_SGACLK_REG);
+	clkdiv = mgtval & PRCM_CLK_MGT_CLKPLLDIV_MASK;
+
+	if (mgtval & PRCM_CLK_MGT_CLKPLLSW_SOC0)
+		pllval = readl(prcmu_base + PRCMU_PLLSOC0_REG);
+	else if (mgtval & PRCM_CLK_MGT_CLKPLLSW_DDR)
+		pllval = readl(prcmu_base + PRCMU_PLLDDR_REG);
+
+	liveopp_qos_lock(false);
+
+	pllsoc = get_pll_freq(readl(prcmu_base + PRCMU_PLLSOC0_REG)) / 1000;
+	pllddr = get_pll_freq(readl(prcmu_base + PRCMU_PLLDDR_REG)) / 1000;
+
+	sprintf(buf,   "Mali GPU Clock (SGACLK):\n\n");
+	sprintf(buf, "%s[CLKMGT] [%#010x]\n", buf, mgtval);
+	sprintf(buf, "%s[CLKDIV] [%d]\n", buf, clkdiv);
+	sprintf(buf, "%s[CLKSRC]\n", buf);
+	sprintf(buf, "%s [%s][0] PLLSOC0 @%dMHz\n", buf, (mgtval & PRCM_CLK_MGT_CLKPLLSW_SOC0) ? "*" : " ", pllsoc);
+	sprintf(buf, "%s [%s][1] PLLDDR  @%dMHz\n", buf, (mgtval & PRCM_CLK_MGT_CLKPLLSW_DDR) ? "*" : " ", pllddr);
+	sprintf(buf, "%s[CLKSEL]\n", buf);
+	
+	if (mgtval & PRCM_CLK_MGT_CLKPLLSW_DDR) {
+		if (clkdiv == 0)
+			return strlen(buf);
+
+		sprintf(buf, "%s [%s][%d] %dMHz\n", buf, "*", 0, get_pll_freq(pllval) / 1000 / clkdiv);
+	} else if (mgtval & PRCM_CLK_MGT_CLKPLLSW_SOC0) {
+		for (i = 0; i < ARRAY_SIZE(liveopp_mali_pllsoc0); i++)
+			sprintf(buf, "%s [%s][%d] %dMHz\n", buf, 
+					(pllval == liveopp_mali_pllsoc0[i].raw) ? "*" : " ", 
+					i, 
+					get_pll_freq(liveopp_mali_pllsoc0[i].raw) / 1000 / clkdiv);
+	}
 
 	return strlen(buf);
 }
 
-static ssize_t ddrpll_boost_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+static ssize_t mali_clock_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
 	int ret, val;
+	int mgtval, newval = 0;
 
-	ret = sscanf(buf, "%d", &val);
-	if (!ret)
-		return -EINVAL;
+	if(!strncmp(buf, "clksrc=", 7)) {
+		ret = sscanf(&buf[7], "%d", &val);
+		if (!ret)
+			return -EINVAL;
 
-	if (val)
-		/* @806MHz */
-		writel(0x00010115, prcmu_base + PRCMU_DDRPLL_REG);
-	else
-		/* @798MHz */
-		writel(0x00050168, prcmu_base + PRCMU_DDRPLL_REG);
+		if (!get_mali_pmstate())
+			mali_platform_pm(true);
+		liveopp_qos_lock(true);
+
+		mgtval = readl(prcmu_base + PRCMU_SGACLK_REG);
+		newval = mgtval & 0xFFFFFF1F;
+		if (val == 0) {
+			newval = newval | PRCM_CLK_MGT_CLKPLLSW_SOC0;
+			writel(newval, prcmu_base + PRCMU_SGACLK_REG);
+		} else if (val == 1) {
+			newval = newval | PRCM_CLK_MGT_CLKPLLSW_DDR;
+			writel(newval, prcmu_base + PRCMU_SGACLK_REG);
+		}
+
+		liveopp_qos_lock(false);
+	
+		return count;
+	}
+
+	if(!strncmp(buf, "clkdiv=", 7)) {
+		ret = sscanf(&buf[7], "%u", &val);
+		if (!ret || val > 0xF || val != 0)
+			return -EINVAL;
+
+		mgtval = readl(prcmu_base + PRCMU_SGACLK_REG);
+		newval = ((mgtval >> 4) << 4) | val;
+		writel(newval, prcmu_base + PRCMU_SGACLK_REG);
+
+		return count;
+	}
+
+	if(!strncmp(buf, "clksel=", 7)) {
+		ret = sscanf(&buf[7], "%u", &val);
+		if (!ret || val > ARRAY_SIZE(liveopp_mali_pllsoc0))
+			return -EINVAL;
+
+		if (!get_mali_pmstate())
+			mali_platform_pm(true);
+		liveopp_qos_lock(true);
+
+		mgtval = readl(prcmu_base + PRCMU_SGACLK_REG);
+		if (mgtval & PRCM_CLK_MGT_CLKPLLSW_SOC0) {
+			newval = liveopp_mali_pllsoc0[val].raw;
+			writel(newval, prcmu_base + PRCMU_PLLSOC0_REG);
+		}
+
+		liveopp_qos_lock(false);
+
+		return count;
+	}
 
 	return count;
 }
-_LIVEOPP_ATTR_RW(ddrpll_boost);
+_LIVEOPP_ATTR_RW(mali_clock);
 
 static struct attribute *liveopp_attrs[] = {
 	&liveopp_ver_interface.attr, 
@@ -1338,7 +1446,7 @@ static struct attribute *liveopp_attrs[] = {
 	&arm_slot7_interface.attr, 
 	&arm_slot8_interface.attr, 
 	&arm_slot9_interface.attr, 
-	&ddrpll_boost_interface.attr, 
+	&mali_clock_interface.attr, 
 	NULL,
 };
 
@@ -1399,6 +1507,44 @@ static int db8500_prcmu_set_arm_opp(u8 opp)
 		       SET_ARM_OPP_TIMEOUT / HZ);
 		r = -EIO;
 	}
+	compute_armss_rate();
+	mutex_unlock(&mb1_transfer.lock);
+
+	prcmu_debug_arm_opp_log(opp);
+
+	return r;
+}
+
+static int db8500_prcmu_set_arm_lopp(u8 opp, int idx)
+{
+	int r;
+
+	if (opp < ARM_NO_CHANGE || opp > ARM_EXTCLK)
+		return -EINVAL;
+
+	trace_u8500_set_arm_opp(opp);
+	r = 0;
+
+	mutex_lock(&mb1_transfer.lock);
+
+	while (readl(PRCM_MBOX_CPU_VAL) & MBOX_BIT(1))
+		cpu_relax();
+
+	writeb(MB1H_ARM_APE_OPP, (tcdm_base + PRCM_MBOX_HEADER_REQ_MB1));
+	writeb(opp, (tcdm_base + PRCM_REQ_MB1_ARM_OPP));
+	writeb(APE_NO_CHANGE, (tcdm_base + PRCM_REQ_MB1_APE_OPP));
+
+	log_this(120, "OPP", opp, NULL, 0);
+	writel(MBOX_BIT(1), PRCM_MBOX_CPU_SET);
+	wait_for_completion_timeout(&mb1_transfer.work, SET_ARM_OPP_TIMEOUT);
+
+	if ((mb1_transfer.ack.header != MB1H_ARM_APE_OPP) ||
+	    (mb1_transfer.ack.arm_opp != opp)) {
+		pr_err("%s: error: timed out (%ds)\n", __func__,
+		       SET_ARM_OPP_TIMEOUT / HZ);
+		r = -EIO;
+	}
+	liveopp_apply_table(liveopp_arm[idx]);
 	compute_armss_rate();
 	mutex_unlock(&mb1_transfer.lock);
 
@@ -1468,9 +1614,7 @@ static int arm_set_rate(unsigned long rate)
 			 * device will freeze and reboot. This is a workaround to fix it.
 			 */
 			db8500_prcmu_set_arm_opp(liveopp_arm[curr_arm_index].arm_opp_rec);
-
-			db8500_prcmu_set_arm_opp(liveopp_arm[i].arm_opp);
-			liveopp_apply_table(liveopp_arm[i]);
+			db8500_prcmu_set_arm_lopp(liveopp_arm[i].arm_opp, i);
 
 			/* Save required frequency index */
 			curr_arm_index = i;
@@ -4015,7 +4159,14 @@ static int __init late(void)
 	trace_set_clr_event("prcmu", NULL, 1);
 
 	#ifdef CONFIG_DB8500_LIVEOPP
-	pr_info("LiveOPP (%s) Initiating...\n", LiveOPP_VER);
+	pr_info("[LiveOPP] Initiating... v%s\n", LiveOPP_VER);
+
+	prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP, LIVEOPP_QOS,
+				  PRCMU_QOS_DEFAULT_VALUE);
+	prcmu_qos_add_requirement(PRCMU_QOS_DDR_OPP, LIVEOPP_QOS,
+				  PRCMU_QOS_DEFAULT_VALUE);
+	prcmu_qos_add_requirement(PRCMU_QOS_ARM_KHZ, LIVEOPP_QOS,
+				  PRCMU_QOS_DEFAULT_VALUE);
 
 	liveopp_kobject = kobject_create_and_add("liveopp", kernel_kobj);
 

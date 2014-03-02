@@ -37,42 +37,6 @@
 struct device *dev;
 struct platform_device *pdev;
 
-/* LiveOPP */
-#ifdef CONFIG_DB8500_LIVEOPP
-#include <linux/mfd/db8500-liveopp.h>
-/**
- * Return 1 on succeess
- */
-int liveopp_ab8500_write(u8 bank, u8 reg, u8 value)
-{
-	int ret;
-
-	ret = abx500_set_register_interruptible(&pdev->dev, bank, reg, value);
-	if (ret) {
-		pr_err("[LiveOPP] Write AB8500 failed (%#04x, %#04x, %#04x)\n", 
-				(int)bank, (int)reg, (int)value);
-		return 0;
-	}
-
-	return 1;
-}
-
-int liveopp_ab8500_read(u8 bank, u8 reg)
-{
-	int ret;
-	u8 buf;
-
-	ret = abx500_get_register_interruptible(&pdev->dev, bank, reg, &buf);
-	if (ret) {
-		pr_err("[LiveOPP] Read AB8500 failed (%#04x, %#04x)\n", 
-				(int)bank, (int)reg);
-		return 0;
-	}
-
-	return (int)buf;
-}
-#endif
-
 /* setting for suspend force (disabled by default) */
 static bool setting_suspend_force = true;
 

@@ -13,10 +13,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#define LIVEOPP_QOS			"liveopp"
 
-#define PRCMU_ARMFIX_REG		0x000
-#define PRCMU_ARMPLL_REG		0x088
-#define PRCMU_DDRPLL_REG		0x08C
+#define PRCMU_ARMFIX_REG		0x0000
+#define PRCMU_SGACLK_REG		0x0014
+#define PRCMU_PLLSOC0_REG		0x0080
+#define PRCMU_PLLSOC1_REG		0x0084
+#define PRCMU_PLLARM_REG		0x0088
+#define PRCMU_PLLDDR_REG		0x008C
 
 /*
  * Varm has three voltage selections
@@ -53,10 +57,21 @@ struct liveopp_arm_table
 	unsigned int armfix_raw;
 	unsigned int armpll_raw;
 	unsigned int varm_sel;
-	unsigned int varm_raw;
-	unsigned int vbbpn_raw;
+	unsigned char varm_raw;
+	unsigned char vbbpn_raw;
 	int override_freq;
 	int override_volt;
+};
+
+/**
+ * struct liveopp_pllsoc0_table - Hard coded PLL SOC0 data 
+ * @freq:	Freq showed in KHz
+ * @raw:	Raw register data
+ */
+struct liveopp_pllsoc0_table
+{
+	unsigned int freq;
+	unsigned int raw;
 };
 
 /* Maximum slots in frequency table */
@@ -85,9 +100,9 @@ enum arm_slots
 #define AB8500_VARM_MIN_UV		700000
 #define AB8500_VARM_MAX_UV		1362500
 
-/* PLLARM in 38400KHz steps */
+/* PLLARM in 38.4MHz steps */
 #define PLLARM_FREQ_STEPS		38400
 
-/* Access AB8500 registers */
-int liveopp_ab8500_write(u8 bank, u8 reg, u8 value);
-int liveopp_ab8500_read(u8 bank, u8 reg);
+/* Mali kernel driver */
+int get_mali_pmstate(void);
+void mali_platform_pm(bool enable);
