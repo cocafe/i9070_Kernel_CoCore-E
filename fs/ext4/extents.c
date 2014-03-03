@@ -2243,10 +2243,13 @@ static int ext4_remove_blocks(handle_t *handle, struct inode *inode,
 				ext4_lblk_t from, ext4_lblk_t to)
 {
 	unsigned short ee_len =  ext4_ext_get_actual_len(ex);
-	int flags = EXT4_FREE_BLOCKS_FORGET;
+	int flags = 0;
 
 	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
-		flags |= EXT4_FREE_BLOCKS_METADATA;
+		flags |= EXT4_FREE_BLOCKS_METADATA | EXT4_FREE_BLOCKS_FORGET;
+	else if (ext4_should_journal_data(inode))
+		flags |= EXT4_FREE_BLOCKS_FORGET;
+
 #ifdef EXTENTS_STATS
 	{
 		struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
