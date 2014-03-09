@@ -47,15 +47,6 @@ static u32 last_utilization;
 static struct work_struct mali_utilization_work;
 static struct workqueue_struct *mali_utilization_workqueue;
 
-#ifdef CONFIG_DB8500_LIVEOPP
-#include <linux/mfd/db8500-liveopp.h>
-int get_mali_pmstate(void)
-{
-	return is_running;
-}
-
-#endif
-
 #if CONFIG_HAS_WAKELOCK
 static struct wake_lock wakelock;
 #endif
@@ -109,16 +100,6 @@ error:
 	MALI_DEBUG_PRINT(1, ("Failed to power up.\n"));
 	MALI_ERROR(_MALI_OSK_ERR_FAULT);
 }
-
-#ifdef CONFIG_DB8500_LIVEOPP
-void mali_platform_pm(bool enable)
-{
-	if (enable)
-		mali_platform_powerup();
-	else
-		mali_platform_powerdown();
-}
-#endif
 
 /* Rationale behind the values for:
 * MALI_HIGH_LEVEL_UTILIZATION_LIMIT and MALI_LOW_LEVEL_UTILIZATION_LIMIT

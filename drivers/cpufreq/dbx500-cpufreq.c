@@ -98,12 +98,7 @@ static int __cpuinit dbx500_cpufreq_init(struct cpufreq_policy *policy)
 	}
 
 	policy->min = policy->cpuinfo.min_freq;
-	#ifdef CONFIG_DB8500_LIVEOPP
-	/* TODO: Limit the maximum frequency @1000MHz */
-	policy->max = 1000000;
-	#else
 	policy->max = policy->cpuinfo.max_freq;
-	#endif
 	policy->cur = dbx500_cpufreq_getspeed(policy->cpu);
 
 	for (i = 0; freq_table[i].frequency != policy->cur; i++)
