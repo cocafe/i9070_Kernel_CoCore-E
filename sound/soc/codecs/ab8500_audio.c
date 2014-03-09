@@ -259,7 +259,6 @@ struct ab8500_codec_drvdata {
 
 /* cocafe: ABBamp module */
 #define ABBAMP_VERSION_TAG			"2.4.6"
-#define ABBAMP_LAST_UPDATE			"2014.02.11"
 #define ABBAMP_DEBUG_LEVEL			0
 
 #define REG_FULLBITS				0xFF		/* 1111 1111 */
@@ -4721,7 +4720,7 @@ static struct kobj_attribute abb_codec_dbg_interface = __ATTR(codec_dbg, 0644,
 static ssize_t abb_codec_vertag_show(struct kobject *kobj, 
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "Codec: %s\nABBamp: %s (%s)\n", ab850x_codec_id, ABBAMP_VERSION_TAG, ABBAMP_LAST_UPDATE);
+	return sprintf(buf, "Codec: %s\nABBamp: %s\n", ab850x_codec_id, ABBAMP_VERSION_TAG);
 }
 
 static struct kobj_attribute abb_codec_vertag_interface = __ATTR(codec_ver, 0444, 
