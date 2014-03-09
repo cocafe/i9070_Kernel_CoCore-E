@@ -27,6 +27,8 @@
 #include <linux/workqueue.h>
 #include <linux/time.h>
 #include <linux/atomic.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
 
 #include <linux/mfd/dbx500-prcmu.h>
 
@@ -3966,6 +3968,64 @@ u8 mcde_get_hw_alignment()
 }
 EXPORT_SYMBOL(mcde_get_hw_alignment);
 
+static ssize_t rreg_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "<Usage>: reg\n");
+	return strlen(buf);
+}
+
+static ssize_t rreg_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, reg, val;
+	
+	ret = sscanf(buf, "%x", &reg);
+	if (!ret)
+		return -EINVAL;
+
+	val = mcde_rreg(reg);
+
+	pr_err("[%s] %#04x : %#04x\n", __func__, reg, val);
+	
+	return count;
+}
+
+static struct kobj_attribute mcde_rreg_interface = __ATTR(rreg, 0644, rreg_show, rreg_store);
+
+static ssize_t wreg_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "<Usage>: reg val\n");
+	return strlen(buf);
+}
+
+static ssize_t wreg_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, reg, val;
+	
+	ret = sscanf(buf, "%x %x", &reg, &val);
+	if (!ret)
+		return -EINVAL;
+
+	pr_err("[%s] %#04x %#04x\n", __func__, reg, val);
+
+	mcde_wreg(reg, val);
+	
+	return count;
+}
+
+static struct kobj_attribute mcde_wreg_interface = __ATTR(wreg, 0644, wreg_show, wreg_store);
+
+static struct attribute *mcde_hw_attrs[] = {
+	&mcde_rreg_interface.attr, 
+	&mcde_wreg_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group mcde_hw_interface_group = {
+	.attrs = mcde_hw_attrs,
+};
+
+static struct kobject *mcde_hw_kobject;
+
 static int __devinit mcde_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -4027,6 +4087,18 @@ static int __devinit mcde_probe(struct platform_device *pdev)
 	ret = enable_mcde_hw_pre()/*enable_mcde_hw()*/;
 	if (ret)
 		goto failed_mcde_enable;
+
+	mcde_hw_kobject = kobject_create_and_add("mcde_hw", kernel_kobj);
+	if (!mcde_hw_kobject) {
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(mcde_hw_kobject, &mcde_hw_interface_group);
+
+	if (ret) {
+		kobject_put(mcde_hw_kobject);
+	}
+
 
 	return 0;
 
