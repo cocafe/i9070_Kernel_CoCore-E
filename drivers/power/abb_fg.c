@@ -138,6 +138,12 @@ static unsigned int uLowBatZero = LOWBAT_ZERO_VOLTAGE;
 static unsigned int uLowBatTolerance = LOWBAT_TOLERANCE;
 static bool bLowBatWakelock = 0;
 
+/* 
+ * Hacky param to prevent SW shutdown at 3200mV
+ * It will be shuted down by HW below 2900mV
+ * while SW shutdown at about 3200mV
+ */
+static unsigned int pwroff_threshold = 3000;
 
 /*
  * cocafe: Cycle Charging Control - Similar to Battery Life Extender by Ezekeel
@@ -1726,13 +1732,22 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 	 * If we have received the LOW_BAT IRQ, set capacity to 0 to initiate
 	 * shutdown
 	 */
-	if (di->lowbat_poweroff) {
+	if (di->lowbat_poweroff && (di->vbat < pwroff_threshold) ) {
 		dev_info(di->dev, "Battery low, set capacity to 0\n");
 		di->bat_cap.prev_percent = 0;
 		di->bat_cap.permille = 0;
 		di->bat_cap.prev_mah = 0;
 		di->bat_cap.mah = 0;
 		changed = true;
+
+		/*
+		 * FIXME: Samsung battery driver needs some time to fresh
+		 * battery stats. Sometimes it will be powered off by HW, 
+		 * instead of soft-method. So refresh fg to notice Samsung 
+		 * battery driver.
+		 */
+		ab8500_fg_reinit();
+		 
 	} else if (di->bat_cap.prev_percent !=
 			percent) {
 		if (percent == 0) {
@@ -3384,12 +3399,36 @@ static ssize_t abb_fg_cycle_charging_store(struct kobject *kobj, struct kobj_att
 
 static struct kobj_attribute abb_fg_cycle_charging_interface = __ATTR(fg_cyc, 0644, abb_fg_cycle_charging_show, abb_fg_cycle_charging_store);
 
+static ssize_t abb_fg_pwroff_threshold_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "%dmV\n\n* HW will shutdown below 2900mV\n", pwroff_threshold);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_fg_pwroff_threshold_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, val;
+
+	ret = sscanf(buf, "%d", &val);
+
+	if (!ret)
+		return -EINVAL;
+
+	pwroff_threshold = val;
+
+	return count;
+}
+
+static struct kobj_attribute abb_fg_pwroff_threshold_interface = __ATTR(pwroff_threshold, 0644, abb_fg_pwroff_threshold_show, abb_fg_pwroff_threshold_store);
+
 static struct attribute *abb_fg_attrs[] = {
 	&abb_fg_lowbat_zero_interface.attr, 
 	&abb_fg_lowbat_tolerance_interface.attr, 
 	&abb_fg_refresh_interface.attr, 
 	&abb_fg_cycle_charging_interface.attr, 
 	&abb_fg_use_wakelock_interface.attr, 
+	&abb_fg_pwroff_threshold_interface.attr, 
 	NULL,
 };
 
