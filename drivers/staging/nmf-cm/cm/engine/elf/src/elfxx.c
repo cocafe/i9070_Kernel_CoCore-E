@@ -329,6 +329,7 @@ void ELF64_UnloadComponent(
 
 t_cm_error ELF64_loadSegment(
         t_elfdescription            *elfhandle,
+        t_memory_handle             *memory,
         t_memory_property           property)
 {
     struct XXElf* ELF = elfhandle->ELF;
@@ -379,6 +380,7 @@ t_cm_error ELF64_loadSegment(
 
 
 static const t_elfmemory* getSectionAddress(
+        t_memory_handle *memories,
         t_elfdescription *elfhandle,
         t_uint32 sectionIdx,
         t_uint32 *sectionOffset,
@@ -398,6 +400,7 @@ static const t_elfmemory* getSectionAddress(
 }
 
 static t_uint32 getSymbolAddress(
+        t_memory_handle             *memories,
         t_elfdescription            *elfhandle,
         t_uint32                    symbolSectionIdx,
         t_uint32                    symbolOffet) {
@@ -462,6 +465,7 @@ t_bool ELFXX_getSymbolLocation(
 #endif
 
 t_cm_error ELF64_relocateSegments(
+        t_memory_handle             *memories,
         t_elfdescription            *elfhandle,
         t_memory_property           property,
         void                        *cbContext) {
@@ -479,7 +483,7 @@ t_cm_error ELF64_relocateSegments(
             continue;
 
         // Relocate only section in memory
-        mapping = getSectionAddress(
+        mapping = getSectionAddress(memories,
                 elfhandle,
                 sec,
                 &sectionOffset,
@@ -520,6 +524,7 @@ t_cm_error ELF64_relocateSegments(
                     break;
                 default:                   // Internal reference in loaded section
                     symbol_addr = getSymbolAddress(
+                            memories,
                             elfhandle,
                             (t_uint32)relocation->st_shndx,
                             relocation->st_value);

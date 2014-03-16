@@ -11,7 +11,6 @@
 #include <inc/nmf-tracedescription.h>
 
 extern t_bool cm_trace_enabled;
-#define TRACE_BUFFER_SIZE                          128
 
 /*************************/
 /* Trace   related stuff */
@@ -44,9 +43,7 @@ void cm_TRC_traceMem(t_nmfTraceAllocCommandDescription command, t_uint8 allocId,
 /* MMDSP trace buffer    */
 /*************************/
 PUBLIC t_cm_error cm_SRV_allocateTraceBufferMemory(t_nmf_core_id coreId, t_cm_domain_id domainId);
-PUBLIC t_cm_error cm_SRV_configureTraceBufferMemory(t_nmf_core_id coreId);
-PUBLIC void cm_SRV_saveTraceBufferMemory(t_nmf_core_id coreId);
-PUBLIC void cm_SRV_freeTraceBufferMemory(t_nmf_core_id coreId);
+PUBLIC void cm_SRV_deallocateTraceBufferMemory(t_nmf_core_id coreId);
 
 
 

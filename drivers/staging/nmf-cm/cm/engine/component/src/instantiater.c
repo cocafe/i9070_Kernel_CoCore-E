@@ -285,6 +285,7 @@ t_cm_error cm_instantiateComponent(const char* templateName,
     }
 
     if((error = cm_ELF_relocatePrivateSegments(
+            component->memories,
             elfhandle,
             template)) != CM_OK)
     {

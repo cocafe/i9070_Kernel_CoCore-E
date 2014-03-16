@@ -87,9 +87,11 @@ void cm_ELF_FreeTemplate(
 
 
 t_cm_error cm_ELF_relocateSharedSegments(
+        t_memory_handle *memories,
         t_elfdescription *elfhandle,
         void                        *cbContext);
 t_cm_error cm_ELF_relocatePrivateSegments(
+        t_memory_handle *memories,
         t_elfdescription *elfhandle,
         void                        *cbContext);
 void cm_ELF_performRelocation(

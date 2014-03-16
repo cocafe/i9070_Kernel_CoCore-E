@@ -294,6 +294,7 @@ t_cm_error cm_loadComponent(
         if(template->classe != FIRMWARE)
         {
             if((error = cm_ELF_relocateSharedSegments(
+                    template->memories,
                     elfhandle,
                     template)) != CM_OK)
                 goto out;
