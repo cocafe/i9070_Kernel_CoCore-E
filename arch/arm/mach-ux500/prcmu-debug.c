@@ -1133,7 +1133,7 @@ static ssize_t prcmu_wreg_show(struct kobject *kobj, struct kobj_attribute *attr
 	prcmu_base = __io_address(U8500_PRCMU_BASE);
 	reg_val = readl(prcmu_base + reg_last);
 
-	sprintf(buf, "%#06x: %#010x\n", reg_last, reg_val);
+	sprintf(buf, "%#06x %#010x\n", reg_last, reg_val);
 
 	return strlen(buf);
 }
