@@ -14,7 +14,7 @@
 #include "mali_osk.h"
 
 /* Mali OS kernel memory allocation order */
-int mali_oskmem_allocorder = 9;
+int mali_oskmem_allocorder = 8;
 
 typedef struct os_allocation
 {
