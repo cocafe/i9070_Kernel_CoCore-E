@@ -1008,7 +1008,7 @@ static int gyro_resume(struct mldl_cfg *mldl_cfg, void *gyro_handle)
 	reg = ((mldl_cfg->int_config |
 		mldl_cfg->pdata->int_config) & (~BIT_DMP_INT_EN)) |
 		BIT_RAW_RDY_EN;
-	pr_info("%s: intcfg=%x", __func__, reg);
+	pr_info("%s: intcfg=%x\n", __func__, reg);
 	result = MLSLSerialWriteSingle(gyro_handle, mldl_cfg->addr,
 				MPUREG_INT_CFG, reg);
 #if 0
