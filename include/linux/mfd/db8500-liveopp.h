@@ -53,7 +53,7 @@ struct liveopp_arm_table
 	u32 	set_pllarm;
 	u32 	pllarm_raw;
 	u32 	set_volt;
-	u32 	varm_sel;
+	u8 	varm_sel;
 	u8 	varm_raw;
 	u8  	vbbx_raw;
 };
