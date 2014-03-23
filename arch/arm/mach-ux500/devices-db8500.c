@@ -646,6 +646,40 @@ static struct cpufreq_frequency_table db8500_freq_table[] = {
 		.index = 4,
 		.frequency = CPUFREQ_TABLE_END,
 	},
+#ifdef CONFIG_DB8500_LIVEOPP
+	[5] = {
+		.index = 5,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+	[6] = {
+		.index = 6,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+	[7] = {
+		.index = 7,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+	[8] = {
+		.index = 8,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+	[9] = {
+		.index = 9,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+	[10] = {
+		.index = 10,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+	[11] = {
+		.index = 11,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+	[12] = {
+		.index = 12,
+		.frequency = CPUFREQ_TABLE_END,
+	},
+#endif
 };
 struct platform_device db8500_prcmu_device = {
 	.name			= "db8500-prcmu",

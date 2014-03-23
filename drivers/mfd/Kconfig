@@ -694,6 +694,13 @@ config MFD_DB5500_PRCMU
 	  system controller running an XP70 microprocessor, which is accessed
 	  through a register map.
 
+config DB8500_LIVEOPP
+	bool "LiveOPP driver for DB8500 PRCMU Firmware"
+	depends on MFD_DB8500_PRCMU
+	help
+	  Select this option to enable support for LiveOPP driver which
+	  supports OC/UC/UV/OV in userspace.
+
 config MFD_CS5535
 	tristate "Support for CS5535 and CS5536 southbridge core functions"
 	select MFD_CORE
