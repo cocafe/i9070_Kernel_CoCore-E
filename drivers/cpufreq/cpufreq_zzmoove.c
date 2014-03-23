@@ -447,7 +447,7 @@ static char custom_profile[20] = "custom";			// ZZ: name to show in sysfs if any
 #define ZZMOOVE_VERSION "0.8"
 
 // ZZ: support for 2,4 or 8 cores (this will enable/disable hotplug threshold tuneables)
-#define MAX_CORES					(4)
+#define MAX_CORES					(2)
 
 // Yank: enable/disable debugging code
 //#define ZZMOOVE_DEBUG
