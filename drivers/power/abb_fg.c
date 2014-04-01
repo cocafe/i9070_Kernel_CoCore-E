@@ -143,7 +143,7 @@ static bool use_lowbat_wakelock = 0;
  * It will be shuted down by HW below 2900mV
  * while SW shutdown at about 3200mV
  */
-static unsigned int pwroff_threshold = 3000;
+static unsigned int pwroff_threshold = 3100;
 
 /*
  * cocafe: Cycle Charging Control - Similar to Battery Life Extender by Ezekeel
