@@ -30,27 +30,27 @@
 
 /* idle rate coarse adjust for cpu frequency down */
 #define FANTASY_CPUFREQ_IDLE_MAX_RATE(freq)         \
-    (freq<100000? 65 : (freq<200000? 60 : (freq<600000? 55 : (freq<900000? 35 : 20))))
+    (freq<100000? 65 : (freq<200000? 60 : (freq<600000? 55 : (freq<1000000? 35 : 20))))
 
 /*
  * minimum rate for idle task, if idle rate is less than this
  * value, cpu frequency should be adjusted to the mauximum value
 */
 #define FANTASY_CPUFREQ_IDLE_MIN_RATE(freq)         \
-    (freq<100000? 35 : (freq<200000? 30 : (freq<600000? 20 : (freq<900000? 15 : 5))))
+    (freq<100000? 35 : (freq<200000? 30 : (freq<600000? 20 : (freq<1000000? 15 : 5))))
 
 #define LATENCY_MULTIPLIER          (1000)                      /* latency multiplier */
 #define TRANSITION_LATENCY_LIMIT    (1 * 1000 * 1000 * 1000)    /* latency limitation, should be larger than 1 second */
 #define IOWAIT_IS_BUSY              (1)                         /* io wait time should be counted in idle time */
 
-#define DECRASE_FREQ_STEP_LIMIT1    (300000)   /* decrase frequency limited to 300Mhz when frequency is [900Mhz, 1008Mhz] */
+#define DECRASE_FREQ_STEP_LIMIT1    (200000)   /* decrase frequency limited to 300Mhz when frequency is [900Mhz, 1008Mhz] */
 #define DECRASE_FREQ_STEP_LIMIT2    (200000)   /* decrase frequency limited to 200Mhz when frequency is [600Mhz,  900Mhz) */
-#define DECRASE_FREQ_STEP_LIMIT3    (100000)   /* decrase frequency limited to 100Mhz when frequency is [200Mhz,  600Mhz) */
-#define DECRASE_FREQ_STEP_LIMIT4    (20000)    /* decrase frequency limited to  20Mhz when frequency is [60Mhz,   200Mhz) */
-#define IOWAIT_FREQ_STEP_LIMIT1     (300000)   /* frequency limited to  300Mhz when iowait is [10, 20)  */
+#define DECRASE_FREQ_STEP_LIMIT3    (200000)   /* decrase frequency limited to 100Mhz when frequency is [200Mhz,  600Mhz) */
+#define DECRASE_FREQ_STEP_LIMIT4    (200000)   /* decrase frequency limited to  20Mhz when frequency is [60Mhz,   200Mhz) */
+#define IOWAIT_FREQ_STEP_LIMIT1     (400000)   /* frequency limited to  300Mhz when iowait is [10, 20)  */
 #define IOWAIT_FREQ_STEP_LIMIT2     (600000)   /* frequency limited to  600Mhz when iowait is [20, 30)  */
-#define IOWAIT_FREQ_STEP_LIMIT3     (816000)   /* frequency limited to  816Mhz when iowait is [30, 40)  */
-#define IOWAIT_FREQ_STEP_LIMIT4     (1008000)  /* frequency limited to 1008Mhz when iowait is [40, 100) */
+#define IOWAIT_FREQ_STEP_LIMIT3     (800000)   /* frequency limited to  816Mhz when iowait is [30, 40)  */
+#define IOWAIT_FREQ_STEP_LIMIT4     (1000000)  /* frequency limited to 1008Mhz when iowait is [40, 100) */
 
 
 enum cpufreq_fantasy_step {
@@ -385,7 +385,7 @@ static void do_dbs_timer(struct work_struct *work)
 
 			   	FANTASY_DBG("current max idle rate is:%d\n", FANTASY_CPUFREQ_IDLE_MAX_RATE(freq_cur));
 
-                if(freq_cur >= 900000){
+                if(freq_cur >= 1000000){
                     if(freq_cur - freq_target > DECRASE_FREQ_STEP_LIMIT1){
                         freq_target = freq_cur - DECRASE_FREQ_STEP_LIMIT1;
                     }
