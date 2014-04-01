@@ -15,7 +15,7 @@
  *
  */
 
-/* #define TOUCH_BOOSTER */
+#define TOUCH_BOOSTER
 /* #define TOUCH_DEBUGGER */
 
 #include <linux/kernel.h>
