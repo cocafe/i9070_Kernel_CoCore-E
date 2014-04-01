@@ -1184,7 +1184,7 @@ void cm_destroyRequireInterface(t_component_instance* component, t_nmf_client_id
                     break;
                 case BF_HOST2DSP:
                     /* These bindings are from CM Core to DSP, they are not listed
-                           here and must be handles/freed by host at OS Integration level
+		       here and must be handled/freed by host at OS Integration level
                      */
                     break;
                 case BF_DSP2DSP:

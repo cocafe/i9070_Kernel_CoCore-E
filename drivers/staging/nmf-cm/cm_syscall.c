@@ -252,7 +252,7 @@ inline int cmld_UnbindComponentToCMCore(struct cm_process_priv* procPriv,
 	data.out.error = CM_ENGINE_UnbindComponentToCMCore(
 			data.in.client, requiredItfClientName,
 			(t_nmf_mpc2host_handle*)&skelwrapper,
-								procPriv->pid);
+			procPriv->pid);
 
 	if (data.out.error != CM_OK && data.out.error != CM_MPC_NOT_RESPONDING)
 		goto out;

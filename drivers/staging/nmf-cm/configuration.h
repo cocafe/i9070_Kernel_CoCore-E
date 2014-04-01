@@ -19,17 +19,6 @@
 #include <linux/autoconf.h>
 #endif
 
-/* Embedded Static RAM base address */
-/* config: 0-64k: secure */
-#define ESRAM_BASE (U8500_ESRAM_BASE + U8500_ESRAM_DMA_LCPA_OFFSET)
-
-/*
- * Embedded ram size for CM (in Kb)
- * 5 banks of 128k: skip the first half bank (secure) and the last
- * one (used for MCDE/B2R2), but include DMA part (4k after the secure part)
- * to give access from DSP side
- */
-#define ESRAM_SIZE 448
 enum {
 	ESRAM_12,
 	ESRAM_34,
@@ -60,7 +49,7 @@ int init_config(void);
 	module_param(cfgMpcYBanks_##mpc, uint, S_IRUGO);		\
 	MODULE_PARM_DESC(cfgMpcYBanks_##mpc, "Nb of Y-Ram banks used on " #mpc); \
 									\
-	static bool         cfgSchedulerTypeHybrid_##mpc = 1;		\
+	static int          cfgSchedulerTypeHybrid_##mpc = 1;		\
 	module_param(cfgSchedulerTypeHybrid_##mpc, bool, S_IRUGO);	\
 	MODULE_PARM_DESC(cfgSchedulerTypeHybrid_##mpc, "Scheduler used on " #mpc " (Hybrid or Synchronous)"); \
 									\

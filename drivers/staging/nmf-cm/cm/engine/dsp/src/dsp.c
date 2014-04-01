@@ -11,6 +11,7 @@
 #include <cm/engine/power_mgt/inc/power.h>
 #include <cm/engine/memory/inc/migration.h>
 #include <cm/engine/trace/inc/trace.h>
+#include <cm/engine/trace/inc/xtitrace.h>
 
 #include <share/inc/nomadik_mapping.h>
 
@@ -135,6 +136,8 @@ PUBLIC void cm_DSP_Destroy(void)
                 }
             }
         }
+	if ((coreId >= FIRST_MPC_ID) && (coreId <= LAST_MPC_ID))
+		cm_SRV_freeTraceBufferMemory(coreId);
     }
 
     cm_MM_DeleteAllocator(esramDesc.allocDesc);
@@ -149,6 +152,7 @@ PUBLIC t_cm_error cm_DSP_Add(t_nmf_core_id coreId,
         t_dsp_allocator_desc *sdramDataAllocDesc)
 {
     t_cm_error error;
+    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
 
     /* checking nbYramBanks is valid */
     if (nbYramBanks >= SxA_NB_BLOCK_RAM)
@@ -161,7 +165,7 @@ PUBLIC t_cm_error cm_DSP_Add(t_nmf_core_id coreId,
     mpcDesc[coreId].nbYramBank = nbYramBanks;
     mpcDesc[coreId].state = MPC_STATE_BOOTABLE;
 
-    return mmdsp_Init(
+    error = mmdsp_Init(
             pDspMapDesc,
             SxA_NB_BLOCK_RAM, /* nb of data tcm bank minus one (reserved for cache) */
             nbYramBanks,
@@ -171,6 +175,12 @@ PUBLIC t_cm_error cm_DSP_Add(t_nmf_core_id coreId,
             &mpcDesc[coreId],
             &pMmdspRegs[coreId]
     );
+
+    if(error != CM_OK)
+        return error;
+
+    state->traceBufferSize = TRACE_BUFFER_SIZE;
+    return cm_SRV_allocateTraceBufferMemory(coreId, eeDomain);
 }
 
 PUBLIC t_cm_error cm_DSP_Boot(t_nmf_core_id coreId)
@@ -447,10 +457,10 @@ PUBLIC t_cm_error cm_DSP_GetAllocatorStatus(t_nmf_core_id coreId, t_dsp_memory_t
     {
         t_uint8 i;
         for (i = 0; i < NB_CORE_IDS; i++) {
-            //*(pStatus->stack[i].sizes) = *(eeState[i].currentStackSize);
-            pStatus->stack[i].sizes[0] = eeState[i].currentStackSize[0];
-            pStatus->stack[i].sizes[1] = eeState[i].currentStackSize[1];
-            pStatus->stack[i].sizes[2] = eeState[i].currentStackSize[2];
+            t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
+            pStatus->stack[i].sizes[0] = state->currentStackSize[0];
+            pStatus->stack[i].sizes[1] = state->currentStackSize[1];
+            pStatus->stack[i].sizes[2] = state->currentStackSize[2];
         }
     }
 

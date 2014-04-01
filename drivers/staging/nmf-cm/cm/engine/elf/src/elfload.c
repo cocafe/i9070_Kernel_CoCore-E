@@ -670,7 +670,7 @@ t_cm_error cm_ELF_LoadTemplate(
         return error;
 
     // Load each readonly segment
-    if((error = ELF64_loadSegment(elfhandle, sharedMemories, MEM_SHARABLE)) != CM_OK)
+    if((error = ELF64_loadSegment(elfhandle, MEM_SHARABLE)) != CM_OK)
         return error;
 
     return CM_OK;
@@ -696,7 +696,7 @@ t_cm_error cm_ELF_LoadInstance(
         return error;
 
     // Load each writable memory
-    if((error = ELF64_loadSegment(elfhandle, privateMemories, MEM_PRIVATE)) != CM_OK)
+    if((error = ELF64_loadSegment(elfhandle, MEM_PRIVATE)) != CM_OK)
         return error;
 
     return CM_OK;

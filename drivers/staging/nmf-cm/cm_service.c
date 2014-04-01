@@ -102,6 +102,12 @@ static void service_tasklet_func(unsigned long unused)
 				 */
 				if (osalEnv.mpc[i].coreId == SIA_CORE_ID)
 					cmdma_stop_dma();
+
+				/*
+				 * wake up all trace readers to let them
+				 * retrieve last traces
+				 */
+				wake_up_all(&osalEnv.mpc[i].trace_waitq);
 				break;
 			}
 			case CM_MPC_SERVICE_PRINT: {
@@ -114,10 +120,7 @@ static void service_tasklet_func(unsigned long unused)
 				break;
 			}
 			case CM_MPC_SERVICE_TRACE:
-				spin_lock_bh(&osalEnv.mpc[i].trace_reader_lock);
-				if (osalEnv.mpc[i].trace_reader)
-					wake_up_process(osalEnv.mpc[i].trace_reader);
-				spin_unlock_bh(&osalEnv.mpc[i].trace_reader_lock);
+				wake_up_all(&osalEnv.mpc[i].trace_waitq);
 				break;
 			default:
 				pr_err("[CM] %s: MPC Service Type %d not supported\n", __func__, type);

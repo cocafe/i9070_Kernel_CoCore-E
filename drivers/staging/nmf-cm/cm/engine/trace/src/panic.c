@@ -8,79 +8,145 @@
 #include <cm/engine/component/inc/bind.h>
 #include <cm/engine/executive_engine_mgt/inc/executive_engine_mgt.h>
 #include <cm/engine/trace/inc/trace.h>
+#include <cm/engine/trace/inc/xtitrace.h>
 #include <cm/engine/api/control/irq_engine.h>
 
 #include <cm/engine/utils/inc/convert.h>
 #include <share/communication/inc/nmf_service.h>
 
-PUBLIC t_cm_error cm_SRV_allocateTraceBufferMemory(t_nmf_core_id coreId, t_cm_domain_id domainId)
-{
-    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
-
-    state->traceDataHandle = cm_DM_Alloc(domainId, SDRAM_EXT16,
-            TRACE_BUFFER_SIZE * sizeof(struct t_nmf_trace) / 2, CM_MM_ALIGN_WORD, TRUE);
-    if (state->traceDataHandle == INVALID_MEMORY_HANDLE)
-        return CM_NO_MORE_MEMORY;
-    else
-    {
-        t_uint32 mmdspAddr;
-        int i;
-
-        state->traceDataAddr = (struct t_nmf_trace*)cm_DSP_GetHostLogicalAddress(state->traceDataHandle);
-        cm_DSP_GetDspAddress(state->traceDataHandle, &mmdspAddr);
-        cm_writeAttribute(state->instance, "rtos/commonpart/traceDataAddr", mmdspAddr);
-
-        eeState[coreId].readTracePointer = 0;
-        eeState[coreId].lastReadedTraceRevision = 0;
-
-        for(i = 0; i < TRACE_BUFFER_SIZE; i++)
-            state->traceDataAddr[i].revision = 0;
-
-        return CM_OK;
-    }
-}
-
-PUBLIC void cm_SRV_deallocateTraceBufferMemory(t_nmf_core_id coreId)
-{
-    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
-
-    state->traceDataAddr = 0;
-    cm_DM_Free(state->traceDataHandle, TRUE);
-}
+#define MAX_REVISION 65536
 
 static t_uint32 swapHalfWord(t_uint32 word)
 {
     return (word >> 16) | (word << 16);
 }
 
+PUBLIC t_cm_error cm_SRV_allocateTraceBufferMemory(t_nmf_core_id coreId, t_cm_domain_id domainId)
+{
+    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
+
+    state->traceDataHandle = cm_DM_Alloc(domainId, SDRAM_EXT16,
+					 state->traceBufferSize * sizeof(struct t_nmf_trace) / 2,
+					 CM_MM_ALIGN_WORD, TRUE);
+    if (state->traceDataHandle == INVALID_MEMORY_HANDLE)
+        return CM_NO_MORE_MEMORY;
+    else
+    {
+        int i;
+
+        state->traceDataAddr = (struct t_nmf_trace*)cm_DSP_GetHostLogicalAddress(state->traceDataHandle);
+
+        state->writeTracePointer = 0;
+        state->lastWrittenTraceRevision = 0;
+
+	/*
+	 * Initialize trace revision as if we wrapped around the
+	 * MAX trace revision value
+	 */
+        for(i = 0; i < state->traceBufferSize; i++)
+            state->traceDataAddr[i].revision = swapHalfWord(MAX_REVISION + 1 - state->traceBufferSize + i);
+
+        return CM_OK;
+    }
+}
+
+PUBLIC t_cm_error cm_SRV_configureTraceBufferMemory(t_nmf_core_id coreId)
+{
+    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
+
+    if (state->traceDataHandle == INVALID_MEMORY_HANDLE)
+        return CM_NO_MORE_MEMORY;
+    else
+    {
+        t_uint32 mmdspAddr;
+
+        cm_DSP_GetDspAddress(state->traceDataHandle, &mmdspAddr);
+        cm_writeAttribute(state->instance, "rtos/commonpart/traceDataAddr", mmdspAddr);
+        cm_writeAttribute(state->instance, "rtos/commonpart/writePointer", state->writeTracePointer);
+        cm_writeAttribute(state->instance, "rtos/commonpart/lastWrittenTraceRevision", state->lastWrittenTraceRevision);
+        cm_writeAttribute(state->instance, "rtos/commonpart/traceBufferSize", state->traceBufferSize);
+        return CM_OK;
+    }
+}
+
+PUBLIC void cm_SRV_saveTraceBufferMemory(t_nmf_core_id coreId)
+{
+    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
+    state->lastWrittenTraceRevision = cm_readAttributeNoError(state->instance, "rtos/commonpart/lastWrittenTraceRevision");
+    state->writeTracePointer = cm_readAttributeNoError(state->instance, "rtos/commonpart/writePointer");
+}
+
+PUBLIC void cm_SRV_freeTraceBufferMemory(t_nmf_core_id coreId)
+{
+    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
+
+    state->traceDataAddr = NULL;
+    if (state->traceDataHandle != INVALID_MEMORY_HANDLE) {
+    cm_DM_Free(state->traceDataHandle, TRUE);
+	    state->traceDataHandle = INVALID_MEMORY_HANDLE;
+    }
+}
+PUBLIC EXPORT_SHARED t_cm_error CM_ENGINE_resizeTraceBuffer(t_nmf_core_id coreId, t_uint32 oldSize)
+{
+    t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
+    t_cm_error error = CM_OK;
+
+    OSAL_LOCK_API();
+    if (cm_DSP_GetState(coreId)->state == MPC_STATE_BOOTED) {
+	    LOG_INTERNAL(0, "CM: Can't change trace buffer size when DSP is booted !!\n",
+			 0, 0, 0, 0, 0, 0);
+	    error = CM_INVALID_PARAMETER;
+	    goto out;
+}
+
+    cm_SRV_freeTraceBufferMemory(coreId);
+    error = cm_SRV_allocateTraceBufferMemory(coreId, cm_DSP_GetState(coreId)->domainEE);
+    if (error != CM_OK) {
+	    LOG_INTERNAL(0, "CM: Failed to allocate memory for trace buffer during buffer resizing !!\n",
+			 0, 0, 0, 0, 0, 0);
+	    state->traceBufferSize = oldSize;
+	    cm_SRV_allocateTraceBufferMemory(coreId, cm_DSP_GetState(coreId)->domainEE);
+    }
+
+out:
+    OSAL_UNLOCK_API();
+    return error;
+}
+
 PUBLIC EXPORT_SHARED t_cm_trace_type CM_ENGINE_GetNextTrace(
         t_nmf_core_id               coreId,
-        struct t_nmf_trace          *trace)
+        struct t_nmf_trace          *trace,
+        int *readIdx,
+        int *lastRev)
 {
     t_ee_state *state = cm_EEM_getExecutiveEngine(coreId);
     t_uint32 foundRevision;
     t_cm_trace_type type;
+    struct t_nmf_trace *traceRaw;
 
     OSAL_LOCK_API();
     if (state->traceDataAddr == NULL) {
         type = CM_MPC_TRACE_NONE;
 	goto out;
+
     }
 
-    foundRevision = swapHalfWord(state->traceDataAddr[state->readTracePointer].revision);
+    foundRevision = swapHalfWord(state->traceDataAddr[*readIdx].revision);
 
-    if(foundRevision <= state->lastReadedTraceRevision)
+    if(foundRevision == ((*lastRev)+1)
+       || (((*lastRev) == MAX_REVISION-1) && (foundRevision == 0)) /* wrap around */ )
     {
-        // It's an old trace forgot it
+        type = CM_MPC_TRACE_READ;
+    }
+    else if(foundRevision == ((*lastRev)+1-state->traceBufferSize) /* normal case*/
+	    ||  (foundRevision == MAX_REVISION+(*lastRev)+1-state->traceBufferSize) /* wrap around of foundRev */)
+    {
+        /*
+         * we cathched up the writer
+         * It's an old trace forgot it
+         */
         type = CM_MPC_TRACE_NONE;
-    }
-    else
-    {
-        struct t_nmf_trace          *traceRaw;
-
-        if(foundRevision == state->lastReadedTraceRevision + 1)
-        {
-            type = CM_MPC_TRACE_READ;
+        goto out; // not trace to read
         }
         else
         {
@@ -90,12 +156,16 @@ PUBLIC EXPORT_SHARED t_cm_trace_type CM_ENGINE_GetNextTrace(
              * correspond to the older one.
              * => Here there is a window where the MMDSP could update writePointer just after
              */
-            state->readTracePointer = (cm_readAttributeNoError(state->instance, "rtos/commonpart/writePointer") + 1) % TRACE_BUFFER_SIZE;
+        if (cm_DSP_GetState(coreId)->state == MPC_STATE_BOOTED)
+            *readIdx = (cm_readAttributeNoError(state->instance, "rtos/commonpart/writePointer") + 1) % state->traceBufferSize;
+        else
+            *readIdx = (state->writeTracePointer + 1) % state->traceBufferSize;
         }
 
-        traceRaw = &state->traceDataAddr[state->readTracePointer];
+    // a trace will be read
+    traceRaw = &state->traceDataAddr[*readIdx];
 
-        trace->timeStamp = swapHalfWord(traceRaw->timeStamp);
+    trace->timeStamp = traceRaw->timeStamp;
         trace->componentId = swapHalfWord(traceRaw->componentId);
         trace->traceId = swapHalfWord(traceRaw->traceId);
         trace->paramOpt = swapHalfWord(traceRaw->paramOpt);
@@ -107,10 +177,9 @@ PUBLIC EXPORT_SHARED t_cm_trace_type CM_ENGINE_GetNextTrace(
         trace->params[2] = swapHalfWord(traceRaw->params[2]);
         trace->params[3] = swapHalfWord(traceRaw->params[3]);
 
-        state->readTracePointer = (state->readTracePointer + 1) % TRACE_BUFFER_SIZE;
-        state->lastReadedTraceRevision = swapHalfWord(traceRaw->revision);
-        trace->revision = state->lastReadedTraceRevision;
-    }
+    *readIdx = ((*readIdx) + 1) % state->traceBufferSize;
+    *lastRev = swapHalfWord(traceRaw->revision);
+    trace->revision = *lastRev;
 
 out:
     OSAL_UNLOCK_API();

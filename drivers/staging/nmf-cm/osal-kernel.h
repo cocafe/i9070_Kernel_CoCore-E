@@ -57,9 +57,7 @@ struct mpcConfig {
 #endif
 	struct task_struct *monitor_tsk; /**< task to monitor the dsp load; */
 	t_cm_mpc_load_counter oldLoadCounter; /**< previous load counter of the DSP */
-	atomic_t trace_read_count;       /**< number of trace reader */
-	spinlock_t trace_reader_lock;
-	struct task_struct *trace_reader;/**< current reader task */
+	wait_queue_head_t trace_waitq;   /**< wait queue used to block trace_read() call */
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dir;              /**< debugfs dir entry */
 	struct dentry *comp_dir;         /**< debugfs component dir entry */
@@ -87,6 +85,7 @@ struct OsalEnvironment
 {
 	struct mpcConfig mpc[NB_MPC];
 	void* hwsem_base;  /** < Remapped base address of the hardware semaphores */
+	unsigned long esram_base_phys; /**< Physical base address of embedded RAM used within the CM */
 	void* esram_base;  /**< Remapped base address embedded RAM used within the CM */
 	struct regulator *esram_regulator[NB_ESRAM]; /**< regulator for ESRAM bank 1+2 and 3+4 */
 	struct prcmu_auto_pm_config dsp_sleep;

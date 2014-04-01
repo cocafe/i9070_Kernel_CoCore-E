@@ -1,7 +1,7 @@
 
 config U8500_CM
-	tristate "U8500 Component Manager driver"
-	depends on UX500_SOC_DB8500
+	tristate "Ux500 Component Manager driver"
+	depends on UX500_SOC_DB8500 && HWMEM
 	help
 	  This is the Component Manager driver. It is part of the
 	  Nomadik Multiprocessing Framework.

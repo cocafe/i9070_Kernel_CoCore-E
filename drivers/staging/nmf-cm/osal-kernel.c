@@ -9,7 +9,6 @@
  * Implements NMF OSAL for Linux kernel-space environment
  */
 
-#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/kthread.h>
@@ -20,9 +19,7 @@
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
 
-#ifdef CONFIG_STM_TRACE
 #include <trace/stm.h>
-#endif
 
 #include <cm/engine/configuration/inc/configuration_status.h>
 
@@ -46,7 +43,7 @@ MODULE_PARM_DESC(dspLoadMonitorPeriod, "Period of the DSP-Load monitoring in ms"
 static unsigned int dspLoadHighThreshold = 85;
 module_param(dspLoadHighThreshold, uint, S_IWUSR|S_IRUGO);
 MODULE_PARM_DESC(dspLoadHighThreshold, "Threshold above which 100 APE OPP is requested");
-static unsigned int dspLoadLowThreshold = 35;
+static unsigned int dspLoadLowThreshold = 38;
 module_param(dspLoadLowThreshold, uint, S_IWUSR|S_IRUGO);
 MODULE_PARM_DESC(dspLoadLowThreshold, "Threshold below which 100 APE OPP request is removed");
 static bool cm_use_ftrace;
@@ -90,7 +87,7 @@ int remapRegions(void)
 	}
 
 	/* Remap _all_ ESRAM banks */
-	osalEnv.esram_base = ioremap_nocache(ESRAM_BASE, cfgESRAMSize*ONE_KB);
+	osalEnv.esram_base = ioremap_nocache(osalEnv.esram_base_phys, cfgESRAMSize*ONE_KB);
 	if(osalEnv.esram_base == NULL){
 		pr_err("%s: could not remap ESRAM Base\n", __func__);
 		return -ENOMEM;
@@ -217,7 +214,7 @@ int getNmfHwMappingDesc(t_nmf_hw_mapping_desc* nmfHwMappingDesc)
 	if (nmfHwMappingDesc == NULL)
 		return -ENXIO;
 
-	nmfHwMappingDesc->esramDesc.systemAddr.physical = ESRAM_BASE;
+	nmfHwMappingDesc->esramDesc.systemAddr.physical = (t_cm_physical_address)osalEnv.esram_base_phys;
 	nmfHwMappingDesc->esramDesc.systemAddr.logical = (t_cm_logical_address)osalEnv.esram_base;
 	nmfHwMappingDesc->esramDesc.size = cfgESRAMSize*ONE_KB;
 
@@ -836,7 +833,7 @@ static int dspload_monitor(void *idx)
  	return 0;
 }
 
-static bool enable_auto_pm = 1;
+static int enable_auto_pm = 1;
 module_param(enable_auto_pm, bool, S_IWUSR|S_IRUGO);
 
 /** \ingroup OSAL_IMPLEMENTATION
@@ -881,6 +878,9 @@ void OSAL_DisablePwrRessource(t_nmf_power_resource resource, t_uint32 firstParam
 		msg.d.srv.srvType = NMF_SERVICE_SHUTDOWN;
 		msg.d.srv.srvData.shutdown.coreid = firstParam;
 		dispatch_service_msg(&msg);
+
+		/* wake up all trace readers to let them retrieve last traces */
+		wake_up_all(&osalEnv.mpc[idx].trace_waitq);
 		break;
 	}
 	case CM_OSAL_POWER_SxA_AUTOIDLE:
@@ -1086,7 +1086,7 @@ void OSAL_GeneratePanic(t_nmf_core_id coreId, t_uint32 reason)
 {
 	struct osal_msg msg;
 
-	/* Create and dispatch a shutdown service message */
+	/* Create and dispatch a panic service message */
 	msg.msg_type = MSG_SERVICE;
 	msg.d.srv.srvType = NMF_SERVICE_PANIC;
 	msg.d.srv.srvData.panic.panicReason = MPC_NOT_RESPONDING_PANIC;
@@ -1096,6 +1096,9 @@ void OSAL_GeneratePanic(t_nmf_core_id coreId, t_uint32 reason)
 	msg.d.srv.srvData.panic.info.mpc.panicInfo1 = reason;
 	msg.d.srv.srvData.panic.info.mpc.panicInfo2 = 0;
 	dispatch_service_msg(&msg);
+
+	/* wake up all trace readers to let them retrieve last traces */
+	wake_up_all(&osalEnv.mpc[COREIDX(coreId)].trace_waitq);
 }
 
 /*!

@@ -21,8 +21,10 @@ enum channel_state {
 	CHANNEL_OPEN,		/**< Channel still open */
 };
 
-/** Component Manager per-process private structure
- *  It is created the first time a process opens /dev/cm0 or /dev/cm1
+/*
+ * Component Manager per-process private structure
+ * It is created the first time a process opens /dev/cm_channel
+ * or /dev/cm_control
  */
 struct cm_process_priv
 {
@@ -39,8 +41,9 @@ struct cm_process_priv
 #endif
 };
 
-/** Component Manager per-channel private structure
- * It is created when a user opens /dev/cm1
+/*
+ * Component Manager per-channel private structure
+ * It is created when a user opens /dev/cm_channel
  */
 struct cm_channel_priv
 {
@@ -55,6 +58,16 @@ struct cm_channel_priv
 	spinlock_t bh_lock;               /**< lock used to synchronize add/removal of element in/from
 					      the message queue in both user context and tasklet */
 	wait_queue_head_t waitq;          /**< wait queue used to block read() call */
+};
+
+/*
+ * Component Manager per trace-reader private structure
+ * It is created when a user opens /dev/cm_sxa_trace
+ */
+struct cm_trace_priv {
+	int read_idx;          /* current read index */
+	int last_read_rev;     /* revision of last trace read */
+	struct mpcConfig *mpc; /* pointer to mpc struct being read */
 };
 
 /** Memory area descriptor.

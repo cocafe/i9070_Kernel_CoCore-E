@@ -266,6 +266,7 @@ PUBLIC EXPORT_SHARED t_cm_error CM_ENGINE_PushComponent(const char *name, const 
             data,
             FALSE,
             &comp->elfhandle)) != CM_OK) {
+        ERROR("Failed to load component %s\n", name, 0, 0, 0, 0, 0);
         cm_StringRelease(comp->name);
         OSAL_Free(comp);
         OSAL_UNLOCK_API();

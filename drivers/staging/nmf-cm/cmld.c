@@ -10,8 +10,6 @@
  *
  */
 
-#include <linux/module.h>
-#include <linux/device.h>
 #include <linux/cdev.h>
 #include <linux/io.h>
 #include <linux/mm.h>
@@ -54,7 +52,7 @@ static DEFINE_MUTEX(channel_lock); /* lock used to protect previous list */
 /* Debugfs support */
 bool cmld_user_has_debugfs = false;
 pid_t cmld_dump_ongoing = 0;
-module_param(cmld_dump_ongoing, uint, S_IWUSR|S_IRUGO);
+module_param(cmld_dump_ongoing, uint, S_IRUGO);
 static DECLARE_WAIT_QUEUE_HEAD(dump_waitq);
 #endif
 
@@ -188,8 +186,8 @@ static inline void freeChannels(struct cm_process_priv* processPriv)
 
 			/* Free the per-channel descriptor */
 			OSAL_Free(channelPriv);
+			warn = 1;
 		}
-		warn = 1;
 	}
 	mutex_unlock(&channel_lock);
 
@@ -359,8 +357,14 @@ out:
 static int cmld_channel_flush(struct file *file, fl_owner_t id)
 {
 	struct cm_channel_priv* channelPriv = file->private_data;
-	file->f_flags |= O_FLUSH;
-	wake_up(&channelPriv->waitq);
+	/*
+	 * Protect against flush called at fork(): we don't want to generate
+	 * flush messages when called from child processes
+	 */
+	if (current->tgid == channelPriv->proc->pid) {
+		file->f_flags |= O_FLUSH;
+		wake_up_all(&channelPriv->waitq);
+	}
 	return 0;
 }
 
@@ -840,12 +844,29 @@ static int cmld_channel_open(struct file *file)
 	return 0;
 }
 
+static u64 computeDspTime(const s64 refTime, const s64 prcmuRefTime, const u64 prcmuDspTime)
+{
+	s64 dspTimeus;
+
+	/*
+	 * To convert DSP time to local ARM time, we use a common PRCMU timer
+	 * on both side.
+	 * PRCMU time is based on PRCMU Timer 4, clocked at 32KHz
+	 */
+	dspTimeus = div_s64( (((s64)prcmuDspTime - prcmuRefTime) * USEC_PER_SEC),
+			     32*1024);
+
+	return (refTime + dspTimeus);
+}
+
 static ssize_t cmld_sxa_trace_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	struct mpcConfig *mpc = file->private_data;
+	struct cm_trace_priv *tracePriv = file->private_data;
+	struct mpcConfig *mpc = tracePriv->mpc;
 	size_t written = 0;
 	struct t_nmf_trace trace;
 	t_cm_trace_type traceType;
+	s64 refTime, prcmuRefTime;
 	struct mmdsp_trace mmdsp_tr = {
 		.media = TB_MEDIA_FILE,
 		.receiver_dev = TB_DEV_PC,
@@ -864,11 +885,35 @@ static ssize_t cmld_sxa_trace_read(struct file *file, char *buf, size_t count, l
 		.btrace_hdr_subcategory = 0,
 	};
 
-	while ((count - written) >= sizeof(mmdsp_tr)) {
-		traceType = CM_ENGINE_GetNextTrace(mpc->coreId, &trace);
+	/*
+	 * Use CLOCK_MONOTIC clock to synchronize with user logs
+	 * based on the same clock
+	 */
+	refTime = ktime_to_us(ktime_get());
+	prcmuRefTime = OSAL_GetPrcmuTimer();
 
-		switch (traceType) {
-		case CM_MPC_TRACE_READ_OVERRUN:
+	while ((count - written) >= sizeof(mmdsp_tr)) {
+		u16 param_nr, handle_valid;
+		u32 to_write;
+		u64 dspTime;
+
+		if (wait_event_interruptible(mpc->trace_waitq,
+					     ((traceType =
+					       CM_ENGINE_GetNextTrace(mpc->coreId, &trace,
+								      &tracePriv->read_idx,
+								      &tracePriv->last_read_rev))
+					      != CM_MPC_TRACE_NONE)
+					     || (file->f_flags & O_NONBLOCK)
+					     || written))
+			return -ERESTARTSYS;
+
+		if (traceType == CM_MPC_TRACE_NONE)
+			return written;
+
+		dspTime = computeDspTime(refTime, prcmuRefTime, trace.timeStamp);
+
+		if (traceType == CM_MPC_TRACE_READ_OVERRUN) {
+			/* Add an overflow trace */
 			mmdsp_tr.size =
 				cpu_to_be16(offsetof(struct mmdsp_trace,
 						     ost_version)
@@ -876,23 +921,27 @@ static ssize_t cmld_sxa_trace_read(struct file *file, char *buf, size_t count, l
 						      receiver_obj));
 			mmdsp_tr.message_id = TB_TRACE_EXCEPTION_MSG;
 			mmdsp_tr.ost_master_id = TB_EXCEPTION_LONG_OVRF_PACKET;
+			mmdsp_tr.timestamp = cpu_to_be64(dspTime);
 			if (copy_to_user(&buf[written], &mmdsp_tr,
 					 offsetof(struct mmdsp_trace,
 						  ost_version)))
 				return -EFAULT;
 			written += offsetof(struct mmdsp_trace, ost_version);
+		}
+
+		/* return if not enough remaining space to put the trace */
 			if ((count - written) < sizeof(mmdsp_tr))
-				break;
-		case CM_MPC_TRACE_READ: {
-			u16 param_nr = (u16)trace.paramOpt;
-			u16 handle_valid = (u16)(trace.paramOpt >> 16);
-			u32 to_write = offsetof(struct mmdsp_trace,
-						parent_handle);
+			return written;
+
+		param_nr = (u16)trace.paramOpt;
+		handle_valid = (u16)(trace.paramOpt >> 16);
+		to_write = offsetof(struct mmdsp_trace, parent_handle);
+
 			mmdsp_tr.transaction_id = trace.revision%256;
 			mmdsp_tr.message_id = TB_TRACE_MSG;
 			mmdsp_tr.ost_master_id = OST_MASTERID;
-			mmdsp_tr.timestamp = cpu_to_be64(trace.timeStamp);
-			mmdsp_tr.timestamp2 = cpu_to_be64(trace.timeStamp);
+		mmdsp_tr.timestamp2 = mmdsp_tr.timestamp
+			= cpu_to_be64(dspTime);
 			mmdsp_tr.component_id = cpu_to_be32(trace.componentId);
 			mmdsp_tr.trace_id = cpu_to_be32(trace.traceId);
 			mmdsp_tr.btrace_hdr_category = (trace.traceId>>16)&0xFF;
@@ -900,8 +949,7 @@ static ssize_t cmld_sxa_trace_read(struct file *file, char *buf, size_t count, l
 				+ sizeof(trace.params[0]) * param_nr;
 			if (handle_valid) {
 				mmdsp_tr.parent_handle = trace.parentHandle;
-				mmdsp_tr.component_handle =
-					trace.componentHandle;
+			mmdsp_tr.component_handle = trace.componentHandle;
 				to_write += sizeof(trace.parentHandle)
 					+ sizeof(trace.componentHandle);
 				mmdsp_tr.btrace_hdr_size +=
@@ -925,22 +973,6 @@ static ssize_t cmld_sxa_trace_read(struct file *file, char *buf, size_t count, l
 			if (copy_to_user(&buf[written], trace.params, to_write))
 				return -EFAULT;
 			written += to_write;
-			break;
-		}
-		case CM_MPC_TRACE_NONE:
-		default:
-			if ((file->f_flags & O_NONBLOCK) || written)
-				return written;
-			spin_lock_bh(&mpc->trace_reader_lock);
-			mpc->trace_reader = current;
-			spin_unlock_bh(&mpc->trace_reader_lock);
-			schedule_timeout_killable(msecs_to_jiffies(200));
-			spin_lock_bh(&mpc->trace_reader_lock);
-			mpc->trace_reader = NULL;
-			spin_unlock_bh(&mpc->trace_reader_lock);
-			if (signal_pending(current))
-				return -ERESTARTSYS;
-		}
 	}
 	return written;
 }
@@ -948,8 +980,7 @@ static ssize_t cmld_sxa_trace_read(struct file *file, char *buf, size_t count, l
 /* Driver's release method for /dev/cm_sxa_trace */
 static int cmld_sxa_trace_release(struct inode *inode, struct file *file)
 {
-	struct mpcConfig *mpc = file->private_data;
-	atomic_dec(&mpc->trace_read_count);
+	OSAL_Free(file->private_data);
 	return 0;
 }
 
@@ -961,11 +992,19 @@ static struct file_operations cmld_sxa_trace_fops = {
 
 static int cmld_sxa_trace_open(struct file *file, struct mpcConfig *mpc)
 {
-	if (atomic_add_unless(&mpc->trace_read_count, 1, 1) == 0)
-		return -EBUSY;
+	struct cm_trace_priv *tracePriv;
 
-	file->private_data = mpc;
+	tracePriv = (struct cm_trace_priv*)OSAL_Alloc(sizeof(*tracePriv));
+	if (tracePriv == NULL)
+		return -ENOMEM;
+
+	tracePriv->read_idx = 0;
+	tracePriv->last_read_rev = 0;
+	tracePriv->mpc = mpc;
+
+	file->private_data = tracePriv;
 	file->f_op = &cmld_sxa_trace_fops;
+
 	return 0;
 }
 
@@ -1226,14 +1265,6 @@ static int __init cmld_init_module(void)
 	iowrite32((1<<26) | ioread32(htim_base), htim_base);
 	iounmap(htim_base);
 
-	/*i = ioread32(PRCM_SVAMMDSPCLK_MGT) & 0xFF;
-	if (i != 0x22)
-		pr_alert("CM: Looks like SVA is not clocked at 200MHz (PRCM_SVAMMDSPCLK_MGT=%x)\n", i);
-	i = ioread32(PRCM_SIAMMDSPCLK_MGT) & 0xFF;
-	if (i != 0x22)
-		pr_alert("CM: Looks like SIA is not clocked at 200MHz (PRCM_SIAMMDSPCLK_MGT=%x)\n", i);
-
-	i = 0;*/
 	err = init_config();
 	if (err)
 		goto out;

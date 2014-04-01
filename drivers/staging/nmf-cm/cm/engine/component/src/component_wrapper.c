@@ -220,6 +220,34 @@ PUBLIC EXPORT_SHARED t_cm_error CM_ENGINE_FlushComponents(t_nmf_client_id client
         error = cm_stopComponent(instance, clientId);
         if (error != CM_OK && error != CM_COMPONENT_NOT_STARTED)
             LOG_INTERNAL(0, "Error stopping component %s/%x (%s, error=%d, client=%u)\n", instance->pathname, instance, instance->Template->name, error, clientId, 0);
+    }
+
+    /* Then, unbind all these components */
+    for (i=0; i<ComponentTable.idxMax; i++)
+    {
+	if ((instance = componentEntry(i)) == NULL)
+		continue;
+        if (/* skip EE */
+                (instance->Template->classe == FIRMWARE) ||
+                /* Skip all binding components */
+                (cm_StringCompare(instance->Template->name, "_ev.", 4) == 0) ||
+                (cm_StringCompare(instance->Template->name, "_st.", 4) == 0) ||
+                (cm_StringCompare(instance->Template->name, "_sk.", 4) == 0) ||
+                (cm_StringCompare(instance->Template->name, "_tr.", 4) == 0))
+            continue;
+
+        /*
+         * Special code for SINGLETON handling
+         */
+        if(instance->Template->classe == SINGLETON)
+        {
+            struct t_client_of_singleton* cl = cm_getClientOfSingleton(instance, FALSE, clientId);
+            if(cl == NULL)
+                continue;
+        }
+        else if(domainDesc[instance->domainId].client != clientId)
+            /* Skip all components not belonging to our client */
+            continue;
 
         // Destroy dependencies
         cm_destroyRequireInterface(instance, clientId);
@@ -769,9 +797,18 @@ PUBLIC EXPORT_SHARED t_cm_error CM_ENGINE_BindComponentToCMCore(
                 (t_mpc2host_bf_info**)mpc2hostId);
 
         cm_EEM_AllowSleep(itfRequire.client->Template->dspId);
-    }
 
-    cm_registerSingletonBinding(client, &itfRequire, NULL, clientId);
+        if (error == CM_OK)
+		cm_registerSingletonBinding(client, &itfRequire, NULL, clientId);
+    }
+    else
+    {
+        /*
+	 * bindable = FALSE means client is SINGLETON
+	 * We don't allow multiple binding of singleton in this case.
+	 */
+        error = CM_INTERFACE_ALREADY_BINDED;
+    }
 
 out:
     cm_ELF_CloseFile(TRUE, elfhandleStub);
@@ -798,6 +835,12 @@ PUBLIC EXPORT_SHARED t_cm_error CM_ENGINE_UnbindComponentToCMCore(
 				       &itfRequire, &itfProvide)) != CM_OK)
         goto out;
 
+    if (itfRequire.client->interfaceReferences[itfRequire.requireIndex][itfRequire.collectionIndex].instance == NULL)
+    {
+        error = CM_INTERFACE_NOT_BINDED;
+        goto out;
+    }
+
     // Check if this is a DSP to Host binding
     if(itfRequire.client->interfaceReferences[itfRequire.requireIndex][itfRequire.collectionIndex].bfInfoID != BF_DSP2HOST)
     {
@@ -816,7 +859,6 @@ PUBLIC EXPORT_SHARED t_cm_error CM_ENGINE_UnbindComponentToCMCore(
         (void)cm_EEM_ForceWakeup(itfRequire.client->Template->dspId);
 
         cm_unbindComponentToCMCore(&itfRequire, bfInfo);
-
         cm_EEM_AllowSleep(itfRequire.client->Template->dspId);
 
         error = CM_OK;

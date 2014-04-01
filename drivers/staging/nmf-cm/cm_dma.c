@@ -7,7 +7,6 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/dmaengine.h>
-#include <linux/dma-mapping.h>
 #include <asm/io.h>
 #include <mach/db8500-regs.h>
 

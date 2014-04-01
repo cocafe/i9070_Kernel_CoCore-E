@@ -26,13 +26,13 @@ typedef struct {
     } panicArea;
 
     // Trace Management
-    t_uint32                    readTracePointer;
-    t_uint32                    lastReadedTraceRevision;
+    t_uint32                    traceBufferSize;
+    t_uint32                    writeTracePointer;
+    t_uint32                    lastWrittenTraceRevision;
     t_memory_handle             traceDataHandle;
     struct t_nmf_trace          *traceDataAddr;
 } t_ee_state;
 
-//TODO, juraj, this should be done more properly, like accessor method, instead making this global variable..
 extern t_ee_state eeState[NB_CORE_IDS];
 
 /******************************************************************************/

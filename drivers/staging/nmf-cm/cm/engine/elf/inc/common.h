@@ -89,10 +89,8 @@ void ELF64_UnloadComponent(
 
 t_cm_error ELF64_loadSegment(
         t_elfdescription            *elfhandle,
-        t_memory_handle             *memory,
         t_memory_property           property);
 t_cm_error ELF64_relocateSegments(
-        t_memory_handle             *memories,
         t_elfdescription            *elf,
         t_memory_property           property,
         void                        *cbContext);

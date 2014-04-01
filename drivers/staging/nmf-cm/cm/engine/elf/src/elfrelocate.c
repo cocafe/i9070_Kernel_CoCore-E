@@ -12,24 +12,20 @@
 #include <cm/engine/utils/inc/string.h>
 
 t_cm_error cm_ELF_relocateSharedSegments(
-        t_memory_handle *memories,
         t_elfdescription *elfhandle,
         void                        *cbContext)
 {
     return ELF64_relocateSegments(
-        memories,
         elfhandle,
         MEM_SHARABLE,
         cbContext);
 }
 
 t_cm_error cm_ELF_relocatePrivateSegments(
-        t_memory_handle *memories,
         t_elfdescription *elfhandle,
         void                        *cbContext)
 {
     return ELF64_relocateSegments(
-        memories,
         elfhandle,
         MEM_PRIVATE,
         cbContext);

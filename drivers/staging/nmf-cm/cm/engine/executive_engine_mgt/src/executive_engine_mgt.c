@@ -132,7 +132,7 @@ PUBLIC t_cm_error cm_EEM_Init(
         return error;
     }
 
-    if((error = cm_SRV_allocateTraceBufferMemory(coreId, cm_DSP_GetState(coreId)->domainEE)) != CM_OK)
+    if((error = cm_SRV_configureTraceBufferMemory(coreId)) != CM_OK)
     {
         cm_PFM_deallocatePerfmeterDataMemory(coreId);
         cm_EEM_freePanicArea(coreId);
@@ -188,10 +188,10 @@ PUBLIC t_cm_error cm_EEM_Init(
 /****************************************************************************/
 PUBLIC void cm_EEM_Close(t_nmf_core_id coreId)
 {
+    cm_SRV_saveTraceBufferMemory(coreId);
     cm_DSP_setStackSize(coreId, 0);
     cm_delayedDestroyComponent(eeState[coreId].instance);
     eeState[coreId].instance = (t_component_instance *)0;
-    cm_SRV_deallocateTraceBufferMemory(coreId);
     cm_PFM_deallocatePerfmeterDataMemory(coreId);
     cm_EEM_freePanicArea(coreId);
     cm_DSP_Shutdown(coreId);
