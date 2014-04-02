@@ -145,6 +145,9 @@ static bool use_lowbat_wakelock = 0;
  */
 static unsigned int pwroff_threshold = 3100;
 
+/* Allow battery capacity goes up */
+static unsigned int battlvl_real = 1;
+
 /*
  * cocafe: Cycle Charging Control - Similar to Battery Life Extender by Ezekeel
  */
@@ -1655,7 +1658,7 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
 		 * unless we're charging or if we're in init
 		 */
 		if (!(!di->flags.charging && di->bat_cap.level >
-			di->bat_cap.prev_level) || init) {
+			di->bat_cap.prev_level) || init || battlvl_real) {
 			dev_dbg(di->dev, "level changed from %d to %d\n",
 				di->bat_cap.prev_level,
 				di->bat_cap.level);
@@ -3422,13 +3425,36 @@ static ssize_t abb_fg_pwroff_threshold_store(struct kobject *kobj, struct kobj_a
 
 static struct kobj_attribute abb_fg_pwroff_threshold_interface = __ATTR(pwroff_threshold, 0644, abb_fg_pwroff_threshold_show, abb_fg_pwroff_threshold_store);
 
+static ssize_t abb_fg_capacity_real_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "%d\n", battlvl_real);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_fg_capacity_real_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, val;
+
+	ret = sscanf(buf, "%d", &val);
+
+	if (!ret)
+		return -EINVAL;
+
+	battlvl_real = val;
+
+	return count;
+}
+
+static struct kobj_attribute abb_fg_capacity_real_interface = __ATTR(capacity_real, 0644, abb_fg_capacity_real_show, abb_fg_capacity_real_store);
+
 static struct attribute *abb_fg_attrs[] = {
 	&abb_fg_lowbat_zero_interface.attr, 
 	&abb_fg_lowbat_tolerance_interface.attr, 
 	&abb_fg_refresh_interface.attr, 
 	&abb_fg_cycle_charging_interface.attr, 
 	&abb_fg_use_wakelock_interface.attr, 
-	&abb_fg_pwroff_threshold_interface.attr, 
+	&abb_fg_capacity_real_interface.attr, 
 	NULL,
 };
 
