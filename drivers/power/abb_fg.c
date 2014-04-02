@@ -2896,6 +2896,19 @@ static int ab8500_fg_init_hw_registers(struct ab8500_fg *di)
 		goto out;
 	}
 
+	/* 
+	 * BATTOK: 
+	 * Disable it now, in order not to let AB8500 shut down by itself
+	 */
+	ret = abx500_set_register_interruptible(di->dev,
+		AB8500_SYS_CTRL2_BLOCK,
+		AB8500_BATT_OK_REG,
+		0x00);
+	if (ret) {
+		dev_err(di->dev, "%s write failed\n", __func__);
+		goto out;
+	}
+
 out:
 	return ret;
 }
