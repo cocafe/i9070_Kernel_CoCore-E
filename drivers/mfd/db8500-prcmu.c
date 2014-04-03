@@ -1353,6 +1353,7 @@ static int db8500_prcmu_set_arm_opp(u8 opp)
 	return r;
 }
 
+#ifdef CONFIG_DB8500_LIVEOPP
 static int db8500_prcmu_set_arm_lopp(u8 opp, int idx)
 {
 	int r;
@@ -1390,6 +1391,7 @@ static int db8500_prcmu_set_arm_lopp(u8 opp, int idx)
 
 	return r;
 }
+#endif /* CONFIG_DB8500_LIVEOPP */
 
 /**
  * db8500_prcmu_get_arm_opp - get the current ARM OPP
