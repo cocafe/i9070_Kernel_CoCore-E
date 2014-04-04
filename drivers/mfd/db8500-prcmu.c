@@ -715,6 +715,16 @@ void db8500_prcmu_writel_relaxed(u32 reg, u32 value)
 	spin_unlock_irqrestore(&prcmu_lock, flags);
 }
 
+u32 db8500_prcmu_tcdm_readb(u32 reg)
+{
+	return readb(tcdm_base + reg);
+}
+
+void db8500_prcmu_tcdm_writeb(u32 reg, u32 value)
+{
+	writeb(value, tcdm_base + reg);
+}
+
 u32 db8500_prcmu_tcdm_readl(u32 reg)
 {
 	return readl(tcdm_base + reg);
