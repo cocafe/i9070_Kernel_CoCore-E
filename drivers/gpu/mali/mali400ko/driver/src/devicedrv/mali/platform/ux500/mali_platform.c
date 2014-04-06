@@ -387,6 +387,32 @@ static ssize_t mali_gpu_clock_store(struct kobject *kobj, struct kobj_attribute 
 
 ATTR_RW(mali_gpu_clock);
 
+static ssize_t mali_gpu_fullspeed_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	/*
+	 * Check APE OPP status, on OPP50, clock is half.
+	 */
+	return sprintf(buf, "%s\n", (prcmu_get_ape_opp() == APE_100_OPP) ? "1" : "0");
+}
+
+static ssize_t mali_gpu_fullspeed_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int val;
+
+	if (sscanf(buf, "%d", &val)) {
+		if (val)
+			prcmu_set_ape_opp(APE_100_OPP);
+		else
+			prcmu_set_ape_opp(APE_50_OPP);
+
+		return count;
+	}
+
+	return -EINVAL;
+}
+
+ATTR_RW(mali_gpu_fullspeed);
+
 static ssize_t mali_gpu_load_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%d (%d%%)\n", mali_last_utilization, mali_last_utilization * 100 / 256);
@@ -601,6 +627,7 @@ ATTR_RO(mali_available_frequencies);
 static struct attribute *mali_attrs[] = {
 	&version_interface.attr, 
 	&mali_gpu_clock_interface.attr, 
+	&mali_gpu_fullspeed_interface.attr, 
 	&mali_gpu_load_interface.attr, 
 	&mali_gpu_vape_interface.attr, 
 	&mali_auto_boost_interface.attr, 
