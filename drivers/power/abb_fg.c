@@ -139,11 +139,9 @@ static unsigned int lowbat_tolerance_volt = LOWBAT_TOLERANCE;
 static bool use_lowbat_wakelock = 0;
 
 /* 
- * Hacky param to prevent SW shutdown at 3200mV
- * It will be shuted down by HW below 2900mV
- * while SW shutdown at about 3200mV
+ * Voltage Threshold that decides when to power off.
  */
-static unsigned int pwroff_threshold = 3100;
+static unsigned int pwroff_threshold = 3200;
 
 /* Allow battery capacity goes up */
 static unsigned int battlvl_real = 1;
