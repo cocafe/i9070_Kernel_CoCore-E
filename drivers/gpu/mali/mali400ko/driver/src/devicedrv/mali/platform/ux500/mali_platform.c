@@ -49,7 +49,7 @@
 #define ATTR_RW(_name)	\
 	static struct kobj_attribute _name##_interface = __ATTR(_name, 0644, _name##_show, _name##_store);
 
-#define MALI_UX500_VERSION		"beta"
+#define MALI_UX500_VERSION		"1.0.0"
 
 #define MALI_MAX_UTILIZATION		256
 
@@ -178,7 +178,7 @@ static void mali_boost_update(void)
 			vape = mali_dvfs[boost_high].vape_raw;
 			pll = mali_dvfs[boost_high].clkpll;
 
-			pr_err("[Mali]   Boost @%u kHz\n", pllsoc0_freq(pll));
+			pr_err("[Mali] @%u kHz - Boost\n", mali_dvfs[boost_high].freq);
 
 			prcmu_abb_write(AB8500_REGU_CTRL2, 
 				AB8500_VAPE_SEL1, 
@@ -193,7 +193,7 @@ static void mali_boost_update(void)
 			vape = mali_dvfs[boost_low].vape_raw;
 			pll = mali_dvfs[boost_low].clkpll;
 
-			pr_err("[Mali] Unboost @%u kHz\n", pllsoc0_freq(pll));
+			pr_err("[Mali] @%u kHz - Deboost\n", mali_dvfs[boost_low].freq);
 
 			prcmu_write(PRCMU_PLLSOC0, pll);
 			prcmu_abb_write(AB8500_REGU_CTRL2, 
@@ -448,8 +448,12 @@ static ssize_t mali_auto_boost_store(struct kobject *kobj, struct kobj_attribute
 	if(sysfs_streq(buf, "0")) {
 		boost_enable = 0;
 
-		if (boost_working)
+		if (boost_working) {
 			cancel_delayed_work(&mali_boost_delayedwork);
+			mali_clock_apply(boost_low);
+			boost_required = 0;
+			boost_working = 0;
+		}
 	} else {
 		boost_enable = 1;
 		mali_clock_apply(boost_low);
