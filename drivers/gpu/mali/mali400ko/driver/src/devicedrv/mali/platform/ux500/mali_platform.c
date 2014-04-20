@@ -163,29 +163,6 @@ static int sgaclk_freq(void)
 	return (pllsoc0_freq(soc0pll) / (sgaclk & 0xf));
 }
 
-static void mali_boost_init(void)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(mali_dvfs); i++) {
-		if (mali_dvfs[i].freq == MALI_CLOCK_DEFLO) {
-			boost_low = i;
-			break;
-		}
-	}
-
-	for (i = 0; i < ARRAY_SIZE(mali_dvfs); i++) {
-		if (mali_dvfs[i].freq == MALI_CLOCK_DEFHI) {
-			boost_high = i;
-			break;
-		}
-	}
-
-	pr_info("[Mali] Booster: %u kHz - %u kHz\n", 
-			mali_dvfs[boost_low].freq, 
-			mali_dvfs[boost_high].freq);
-}
-
 static void mali_boost_update(void)
 {
 	u8 vape;
@@ -243,6 +220,33 @@ static void mali_boost_work(struct work_struct *work)
 {
 	mali_boost_update();
 	boost_working = false;
+}
+
+static void mali_boost_init(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(mali_dvfs); i++) {
+		if (mali_dvfs[i].freq == MALI_CLOCK_DEFLO) {
+			boost_low = i;
+			break;
+		}
+	}
+
+	for (i = 0; i < ARRAY_SIZE(mali_dvfs); i++) {
+		if (mali_dvfs[i].freq == MALI_CLOCK_DEFHI) {
+			boost_high = i;
+			break;
+		}
+	}
+
+	if (sgaclk_freq() != mali_dvfs[boost_low].freq) {
+		mali_clock_apply(boost_low);
+	}
+
+	pr_info("[Mali] Booster: %u kHz - %u kHz\n", 
+			mali_dvfs[boost_low].freq, 
+			mali_dvfs[boost_high].freq);
 }
 
 static _mali_osk_errcode_t mali_platform_powerdown(void)
