@@ -1955,12 +1955,41 @@ static ssize_t auto_brightness_store(struct device *dev,
 
 static DEVICE_ATTR(auto_brightness, 0644, auto_brightness_show, auto_brightness_store);
 
+unsigned short SEQ_CUSTOM_ELVSS[] = {
+	0xB2, 0x0,
+	DATA_ONLY, 0x0,
+	DATA_ONLY, 0x0,
+	DATA_ONLY, 0x0,
+
+	0xB1, 0x0B,
+
+	ENDDEF, 0x00
+};
+
+int custom_elvss_cal(struct s6e63m0 *lcd, int val)
+{
+	int data, cnt;
+
+	data = val;
+
+	for (cnt = 1; cnt <= 7; cnt += 2)
+		SEQ_CUSTOM_ELVSS[cnt] = data;
+
+	return s6e63m0_panel_send_sequence(lcd, SEQ_CUSTOM_ELVSS);
+}
+
 static ssize_t s6e63m0_sysfs_show_elvss_table(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
 	int i;
 
-	sprintf(buf, "ELVSS table:\n\n");
+	sprintf(buf, "Custom ELVSS table:\n\n");
+
+	for (i = 1; i <= 7; i += 2) {
+		sprintf(buf, "%s[%02d]\t%#04X\n", buf, i, SEQ_CUSTOM_ELVSS[i]);
+	}
+
+	sprintf(buf, "%s\nDynamic ELVSS table:\n\n", buf);
 
 	for (i = 1; i <= 7; i += 2) {
 		sprintf(buf, "%s[%02d]\t%#04X\n", buf, i, SEQ_DYNAMIC_ELVSS[i]);
@@ -1968,8 +1997,22 @@ static ssize_t s6e63m0_sysfs_show_elvss_table(struct device *dev,
 	
 	return strlen(buf);
 }
-static DEVICE_ATTR(elvss_table, 0400,
-		s6e63m0_sysfs_show_elvss_table, NULL);
+
+static ssize_t s6e63m0_sysfs_store_elvss_table(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t len)
+{
+	struct s6e63m0 *lcd = dev_get_drvdata(dev);
+	u32 val;
+
+	if (sscanf(buf, "%x", &val))
+		custom_elvss_cal(lcd, val);
+
+	return len;
+}
+
+static DEVICE_ATTR(elvss_table, 0644,
+		s6e63m0_sysfs_show_elvss_table, s6e63m0_sysfs_store_elvss_table);
 
 static ssize_t s6e63m0_sysfs_show_gamma_mode(struct device *dev,
 				      struct device_attribute *attr, char *buf)
