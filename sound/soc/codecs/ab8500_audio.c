@@ -258,7 +258,7 @@ struct ab8500_codec_drvdata {
 };
 
 /* cocafe: ABBamp module */
-#define ABBAMP_VERSION_TAG			"2.4.8"
+#define ABBAMP_VERSION_TAG			"2.5.0"
 #define ABBAMP_DEBUG_LEVEL			0
 
 #define REG_FULLBITS				0xFF		/* 1111 1111 */
@@ -4814,44 +4814,6 @@ static ssize_t abb_codec_write_store(struct kobject *kobj,
 static struct kobj_attribute abb_codec_write_interface = __ATTR(codec_write, 0200, 
 				NULL, abb_codec_write_store);
 
-static ssize_t abb_codec_bits_write_show(struct kobject *kobj, 
-		struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "<Usage[hex]>: reg shift width value\n");
-}
-
-static ssize_t abb_codec_bits_write_store(struct kobject *kobj, 
-		struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	int reg;
-	int shift;
-	int width;
-	int value;
-	int old;
-	int ret;
-
-	ret = sscanf(buf, "%x %x %x %x", &reg, &shift, &width, &value);
-
-	if (ret < 0) {
-		pr_err("[ABB-Codec] invalid inputs!\n");
-		return -EINVAL;
-	}
-
-	old = snd_soc_read(ab850x_codec, reg);
-
-	/* Allow any input */
-	abbamp_write(reg, shift, width, value);
-
-	ret = snd_soc_read(ab850x_codec, reg);
-
-	pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", reg, old, ret);
-
-	return count;
-}
-
-static struct kobj_attribute abb_codec_bits_write_interface = __ATTR(bits_write, 0600, 
-				abb_codec_bits_write_show, abb_codec_bits_write_store);
-
 static ssize_t abb_codec_anagain3_show(struct kobject *kobj, 
 		struct kobj_attribute *attr, char *buf)
 {
@@ -4915,9 +4877,9 @@ static ssize_t abb_codec_anagain3_store(struct kobject *kobj,
 			anagain3_hsr = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSR, 4);
 		}
 
-		anagain3_con = true;
 		anagain3_hsl = val;
-		abbamp_control_anagain3();
+		if (anagain3_con)
+			abbamp_control_anagain3();
 
 		new = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANAGAIN3, old, new);
@@ -4938,9 +4900,9 @@ static ssize_t abb_codec_anagain3_store(struct kobject *kobj,
 			anagain3_hsl = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSL, 4);
 		}
 
-		anagain3_con = true;
 		anagain3_hsr = val;
-		abbamp_control_anagain3();
+		if (anagain3_con)
+			abbamp_control_anagain3();
 
 		new = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANAGAIN3, old, new);
@@ -4957,10 +4919,10 @@ static ssize_t abb_codec_anagain3_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		anagain3_con = true;
 		anagain3_hsl = val;
 		anagain3_hsr = val;
-		abbamp_control_anagain3();
+		if (anagain3_con)
+			abbamp_control_anagain3();
 
 		new = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANAGAIN3, old, new);
@@ -5034,9 +4996,9 @@ static ssize_t abb_codec_hsldiggain_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		hsldiggain_con = true;
 		hsldiggain_v = val;
-		abbamp_control_hsleardiggain(hsldiggain_v);
+		if (hsldiggain_con)
+			abbamp_control_hsleardiggain(hsldiggain_v);
 
 		new = snd_soc_read(ab850x_codec, REG_HSLEARDIGGAIN);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_HSLEARDIGGAIN, old, new);
@@ -5110,9 +5072,9 @@ static ssize_t abb_codec_hsrdiggain_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		hsrdiggain_con = true;
 		hsrdiggain_v = val;
-		abbamp_control_hsrdiggain();
+		if (hsrdiggain_con)
+			abbamp_control_hsrdiggain();
 
 		new = snd_soc_read(ab850x_codec, REG_HSRDIGGAIN);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_HSRDIGGAIN, old, new);
@@ -5188,9 +5150,8 @@ static ssize_t abb_codec_eardiggain_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		eardiggain_con = true;
 		eardiggain_v = val;
-		if (ear_ponup) {
+		if (ear_ponup && eardiggain_con) {
 			abbamp_control_hsleardiggain(eardiggain_v);
 		}
 
@@ -5263,9 +5224,9 @@ static ssize_t abb_codec_hslowpow_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		hslowpow_con = true;
 		hslowpow_v = val;
-		abbamp_control_hslowpow();
+		if (hslowpow_con)
+			abbamp_control_hslowpow();
 
 		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANACONF1, old, new);
@@ -5336,9 +5297,9 @@ static ssize_t abb_codec_hsdaclowpow_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		hsdaclowpow_con = true;
 		hsdaclowpow_v = val;
-		abbamp_control_hsdaclowpow();
+		if (hsdaclowpow_con)
+			abbamp_control_hsdaclowpow();
 
 		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANACONF1, old, new);
@@ -5409,9 +5370,9 @@ static ssize_t abb_codec_hshpen_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		hshpen_con = true;
 		hshpen_v = val;
-		abbamp_control_hshpen();
+		if (hshpen_con)
+			abbamp_control_hshpen();
 
 		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANACONF1, old, new);
@@ -5644,9 +5605,9 @@ static ssize_t abb_codec_classdhpg_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		classdhpg_con = true;
 		classdhpg_v = val;
-		abbamp_control_classdhpg();
+		if (classdhpg_con)
+			abbamp_control_classdhpg();
 
 		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_CLASSDCONF3, old, new);
@@ -5722,9 +5683,9 @@ static ssize_t abb_codec_classdwg_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		classdwg_con = true;
 		classdwg_v = val;
-		abbamp_control_classdwg();
+		if (classdwg_con)
+			abbamp_control_classdwg();
 
 		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
 		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_CLASSDCONF3, old, new);
@@ -5763,7 +5724,6 @@ static ssize_t abb_codec_addiggain2_store(struct kobject *kobj,
 		pr_err("[ABB-Codec] enable AD2DigGain con\n");
 		
 		addiggain2_con = true;
-		/* Set directly */
 		if (ad2_ponup) {
 			abbamp_control_ad2();
 		}
@@ -5792,10 +5752,8 @@ static ssize_t abb_codec_addiggain2_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		addiggain2_con = true;
 		addiggain2_v = val;
-		/* Set directly */
-		if (ad2_ponup) {
+		if (ad2_ponup && addiggain2_con) {
 			abbamp_control_ad2();
 		}
 
@@ -5889,7 +5847,6 @@ static struct attribute *abb_codec_attrs[] = {
 	&abb_codec_dbg_interface.attr, 
 	&abb_codec_vertag_interface.attr, 
 	&abb_codec_write_interface.attr, 
-	&abb_codec_bits_write_interface.attr, 
 	&abb_codec_anagain3_interface.attr, 
 	&abb_codec_hsldiggain_interface.attr, 
 	&abb_codec_hsrdiggain_interface.attr, 
