@@ -2105,6 +2105,8 @@ static unsigned long db8500_prcmu_clock_rate(u8 clock)
 		return armss_rate();
 	else if (clock == PRCMU_ARMCLK)
 		return arm_get_rate();
+	else if (clock == PRCMU_PLLARM)
+		return pll_rate(PRCM_PLLARM_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
 	else if (clock == PRCMU_PLLDDR)
 		return pll_rate(PRCM_PLLDDR_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
 	else if (clock == PRCMU_PLLDSI)
