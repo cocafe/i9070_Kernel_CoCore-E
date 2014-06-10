@@ -1060,7 +1060,7 @@ static void db8500_prcmu_get_abb_event_buffer(void __iomem **buf)
 #include <linux/kobject.h>
 #include <linux/mfd/db8500-liveopp.h>
 
-#define LiveOPP_VER		"1.0.0"
+#define LiveOPP_VER		"1.0.1"
 
 #define NOCHG			0
 #define SET_PLL			1
@@ -1079,9 +1079,9 @@ static struct liveopp_arm_table liveopp_arm[] = {
 	{400000,   399360, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x01050168, SET_VOLT, 0x0C, 0x1A, 0xDB},
 	{500000,   499200, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0001010D, SET_VOLT, 0x0C, 0x1E, 0xDB},
 	{600000,   599040, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0005014E, SET_VOLT, 0x0C, 0x20, 0xDB},
-	{700000,   700800, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00040149, NOCHG,    0x0B, 0x22, 0xDB},
+	{700000,   698880, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0005015B, SET_VOLT, 0x0C, 0x22, 0xDB},
 	{800000,   798720, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00050168, NOCHG,    0x0B, 0x24, 0xDB},
-	{900000,   898560, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00050175, NOCHG,    0x0B, 0x26, 0xDB},
+	{900000,   898560, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00050175, SET_VOLT, 0x0B, 0x26, 0xDB},
 	{1000000,  998400, ARM_MAX_OPP, NOCHG,   0x741, NOCHG,   0x0001011A, NOCHG,    0x0B, 0x2F, 0xDB},
 	{1050000, 1049600, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00030152, SET_VOLT, 0x0B, 0x32, 0xDB},
 	{1100000, 1100800, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00030156, SET_VOLT, 0x0B, 0x3F, 0xDB},
@@ -1549,6 +1549,10 @@ static int arm_set_rate(unsigned long rate)
 	/*  catch early access */
 	BUG_ON(!freq_table);
 
+#ifdef LIVEOPP_DEBUG
+	pr_info("kHz: %lu\n", frequency);
+#endif
+
 	for (i = 0; i < ARRAY_SIZE(liveopp_arm); i++) {
 		if (frequency == freq_table[i].frequency) {
 			if (db8500_prcmu_get_arm_opp() == ARM_MAX_OPP) {
@@ -1556,6 +1560,7 @@ static int arm_set_rate(unsigned long rate)
 			} else if (db8500_prcmu_get_arm_opp() == ARM_100_OPP) {
 				db8500_prcmu_writel(PRCMU_PLLARM_REG, PLLARM_FREQ100OPP);
 			}
+
 			db8500_prcmu_set_arm_lopp(liveopp_arm[i].arm_opp, i);
 			last_arm_idx = i;
 
