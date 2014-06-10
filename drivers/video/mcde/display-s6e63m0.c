@@ -2100,7 +2100,7 @@ static ssize_t s6e63m0_sysfs_store_gamma_mode(struct device *dev,
 static DEVICE_ATTR(gamma_mode, 0644,
 		s6e63m0_sysfs_show_gamma_mode, s6e63m0_sysfs_store_gamma_mode);
 
-static ssize_t s6e63m0_sysfs_show_update_brihtness(struct device *dev,
+static ssize_t s6e63m0_sysfs_show_update_brightness(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
 	struct s6e63m0 *lcd = dev_get_drvdata(dev);
@@ -2110,7 +2110,7 @@ static ssize_t s6e63m0_sysfs_show_update_brihtness(struct device *dev,
 	return sprintf(buf, "Updating brightness...\n");
 }
 
-static ssize_t s6e63m0_sysfs_store_update_brihtness(struct device *dev,
+static ssize_t s6e63m0_sysfs_store_update_brightness(struct device *dev,
 				       struct device_attribute *attr,
 				       const char *buf, size_t len)
 {
@@ -2121,7 +2121,7 @@ static ssize_t s6e63m0_sysfs_store_update_brihtness(struct device *dev,
 	return len;
 }
 static DEVICE_ATTR(brightness_update, 0644,
-		s6e63m0_sysfs_show_update_brihtness, s6e63m0_sysfs_store_update_brihtness);
+		s6e63m0_sysfs_show_update_brightness, s6e63m0_sysfs_store_update_brightness);
 
 static int s6e63m0_set_power_mode(struct mcde_display_device *ddev,
 	enum mcde_display_power_mode power_mode)
