@@ -189,6 +189,10 @@ static bool gamma_table_req = false;
 static bool illumination_req = false;
 static unsigned int illumination_val = ILLUMINATION_MIN;
 
+/* cocafe: Night Mode and Sunlight Mode */
+static bool night_mode = false;
+static bool sunlight_mode = false;
+
 /* cocafe: S6E63M0 PRCMU LCDCLK */
 /* 60+++ 	79872000	unsafe
  * 60++		66560000	unsafe
@@ -1148,34 +1152,34 @@ unsigned short s6e63m0_22_gamma_table[] = {
 unsigned short s6e63m0_22_gamma_table_custom[] = {
 	0xFA, 0x02,
 
-	DATA_ONLY, 0x18,
-	DATA_ONLY, 0x08,
-	DATA_ONLY, 0x24,
-	DATA_ONLY, 0xDC,
-	DATA_ONLY, 0xDD,
-	DATA_ONLY, 0xD0,
-	DATA_ONLY, 0xB5,
-	DATA_ONLY, 0xB5,
-	DATA_ONLY, 0xB6,
-	DATA_ONLY, 0x7F,
-	DATA_ONLY, 0x8D,
-	DATA_ONLY, 0x63,
-	DATA_ONLY, 0xC5,
-	DATA_ONLY, 0xC8,
-	DATA_ONLY, 0xBA,
 	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x04,
 	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x01,
 	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x0E,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
+	DATA_ONLY, 0x00,
 
 	0xFA, 0x03,
 
 	ENDDEF, 0x0000
 };
 
-unsigned short s6e63m0_gamma_table_night[] = {
+static unsigned short s6e63m0_gamma_table_night[] = {
 	0xFA, 0x02,
 
 	DATA_ONLY, 0x18,
@@ -1199,6 +1203,36 @@ unsigned short s6e63m0_gamma_table_night[] = {
 	DATA_ONLY, 0x00,	// Reduced brightness
 	DATA_ONLY, 0x00,
 	DATA_ONLY, 0x00,	// Reduced brightness
+
+	0xFA, 0x03,
+
+	ENDDEF, 0x0000
+};
+
+static unsigned short s6e63m0_gamma_table_sunlight[] = {
+	0xFA, 0x02,
+
+	DATA_ONLY, 0x18,
+	DATA_ONLY, 0x08,
+	DATA_ONLY, 0x24,
+	DATA_ONLY, 0x44,
+	DATA_ONLY, 0x4D,
+	DATA_ONLY, 0x27,
+	DATA_ONLY, 0x9B,
+	DATA_ONLY, 0xA2,
+	DATA_ONLY, 0x8D,
+	DATA_ONLY, 0xC2,
+	DATA_ONLY, 0xC9,
+	DATA_ONLY, 0xB7,
+	DATA_ONLY, 0xD0,
+	DATA_ONLY, 0xD4,
+	DATA_ONLY, 0xC8,
+	DATA_ONLY, 0x01,
+	DATA_ONLY, 0x40,
+	DATA_ONLY, 0x01,
+	DATA_ONLY, 0x3E,
+	DATA_ONLY, 0x01,
+	DATA_ONLY, 0x59,
 
 	0xFA, 0x03,
 
@@ -2889,6 +2923,88 @@ static ssize_t main_B_store(struct kobject *kobj, struct kobj_attribute *attr, c
 }
 ATTR_RW(main_B);
 
+static ssize_t night_mode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", night_mode ? "on" : "off");
+}
+
+static ssize_t night_mode_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	struct s6e63m0 *lcd = plcd;
+	int i;
+
+	if (sysfs_streq(buf, "on")) {
+		if (sunlight_mode)
+			sunlight_mode = false;
+
+		for(i = 3; i < ((gen_table_max * 2) + 3); i += 2) {
+			s6e63m0_22_gamma_table_custom[i] = s6e63m0_gamma_table_night[i];
+		}
+
+		night_mode = true;
+		gamma_table_req = true;
+		s6e63m0_gamma_ctl(lcd);
+
+		return count;
+	}
+
+	if (sysfs_streq(buf, "off")) {
+		if (!night_mode)
+			return count;
+
+		night_mode = false;
+		gamma_table_req = false;
+		s6e63m0_gamma_ctl(lcd);
+
+		return count;
+	}
+
+	return count;
+}
+
+ATTR_RW(night_mode);
+
+static ssize_t sunlight_mode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", sunlight_mode ? "on" : "off");
+}
+
+static ssize_t sunlight_mode_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	struct s6e63m0 *lcd = plcd;
+	int i;
+
+	if (sysfs_streq(buf, "on")) {
+		if (night_mode)
+			night_mode = false;
+
+		for(i = 3; i < ((gen_table_max * 2) + 3); i += 2) {
+			s6e63m0_22_gamma_table_custom[i] = s6e63m0_gamma_table_sunlight[i];
+		}
+
+		sunlight_mode = true;
+		gamma_table_req = true;
+		s6e63m0_gamma_ctl(lcd);
+
+		return count;
+	}
+
+	if (sysfs_streq(buf, "off")) {
+		if (!sunlight_mode)
+			return count;
+
+		sunlight_mode = false;
+		gamma_table_req = false;
+		s6e63m0_gamma_ctl(lcd);
+
+		return count;
+	}
+
+	return count;
+}
+
+ATTR_RW(sunlight_mode);
+
 static struct attribute *s6e63m0_panel_attrs[] = {
 	&lcd_id_interface.attr, 
 	&lcd_clk_interface.attr, 
@@ -2916,6 +3032,8 @@ static struct attribute *s6e63m0_color_attrs[] = {
 
 
 static struct attribute *s6e63m0_attrs[] = {
+	&night_mode_interface.attr, 
+	&sunlight_mode_interface.attr, 
 	NULL, 
 };
 
