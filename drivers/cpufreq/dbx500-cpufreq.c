@@ -118,7 +118,7 @@ static int __cpuinit dbx500_cpufreq_init(struct cpufreq_policy *policy)
 	 *	   list.
 	 */
 	#ifdef CONFIG_DB8500_LIVEOPP
-	policy->cpuinfo.transition_latency = 40 * 1000; /* in ns */
+	policy->cpuinfo.transition_latency = 30 * 1000; /* in ns */
 	#else
 	policy->cpuinfo.transition_latency = 20 * 1000; /* in ns */
 	#endif
