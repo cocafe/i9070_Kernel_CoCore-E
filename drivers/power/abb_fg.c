@@ -3474,6 +3474,7 @@ static struct attribute *abb_fg_attrs[] = {
 	&abb_fg_cycle_charging_interface.attr, 
 	&abb_fg_use_wakelock_interface.attr, 
 	&abb_fg_capacity_real_interface.attr, 
+	&abb_fg_pwroff_threshold_interface.attr, 
 	NULL,
 };
 
