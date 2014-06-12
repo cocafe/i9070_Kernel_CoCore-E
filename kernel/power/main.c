@@ -706,7 +706,7 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 	 * Don't use this sysfs interface to tweak
 	 * maximum cpufreq limitation.
 	 */
-	if (freq == 800000) {
+	if (freq > 0) {
 		/* Save the last max cpufreq */
 		cpufreq_max_last_val = new_policy.max;
 		cpufreq_max_limit_val = cpufreq_dvfs_powersave;
