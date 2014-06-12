@@ -620,7 +620,6 @@ power_attr(cpufreq_min_limit);
 static int cpufreq_max_last_val = 0;
 static int cpufreq_max_limit_val = -1;
 static int cpufreq_min_limit_val = -1;
-static int cpufreq_dvfs_api = 900000;
 static int cpufreq_dvfs_powersave = 800000;
 
 static ssize_t cpufreq_table_show(struct kobject *kobj,
@@ -696,10 +695,9 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 	if (ret)
 		return -EINVAL;
 
-	if (!sscanf(buf, "%d", &freq))
+	ret = sscanf(buf, "%d", &freq);
+	if (!ret)
 		return -EINVAL;
-
-	pr_info("[DVFS] Required cpufreq %dkHz\n", freq);
 
 	/* 
 	 * To cheat Samsung DVFS App below.
@@ -707,11 +705,8 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 	 * Adapted to Samsung DVFS App only.
 	 * Don't use this sysfs interface to tweak
 	 * maximum cpufreq limitation.
-	 * 
-	 * Samsung DVFS App chooses 900MHz as powersaving
-	 * cpufreq with extended frequency table
 	 */
-	if (freq == cpufreq_dvfs_api) {
+	if (freq == 800000) {
 		/* Save the last max cpufreq */
 		cpufreq_max_last_val = new_policy.max;
 		cpufreq_max_limit_val = cpufreq_dvfs_powersave;
@@ -729,29 +724,6 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 
 	for_each_online_cpu(cpu)
 		cpufreq_update_policy(cpu);
-
-	return n;
-}
-
-static ssize_t cpufreq_dvfs_api_show(struct kobject *kobj,
-					struct kobj_attribute *attr,
-					char *buf)
-{
-	return sprintf(buf, "%d\n", cpufreq_dvfs_api);
-}
-
-static ssize_t cpufreq_dvfs_api_store(struct kobject *kobj,
-					struct kobj_attribute *attr,
-					const char *buf, size_t n)
-{
-	int ret, val;
-
-	ret = sscanf(buf, "%d\n", &val);
-
-	if (!ret || (val < 0))
-		return -EINVAL;
-
-	cpufreq_dvfs_api = val;
 
 	return n;
 }
@@ -797,7 +769,6 @@ static ssize_t cpufreq_min_limit_store(struct kobject *kobj,
 power_attr(cpufreq_table);
 power_attr(cpufreq_max_limit);
 power_attr(cpufreq_min_limit);
-power_attr(cpufreq_dvfs_api);
 power_attr(cpufreq_dvfs_powersave);
 #endif /* DVFS_LIMIT_FAKE */
 
@@ -827,7 +798,6 @@ static struct attribute * g[] = {
 	&cpufreq_table_attr.attr,
 	&cpufreq_max_limit_attr.attr,
 	&cpufreq_min_limit_attr.attr,
-	&cpufreq_dvfs_api_attr.attr,
 	&cpufreq_dvfs_powersave_attr.attr,
 #endif /* DVFS_LIMIT_FAKE */
 	NULL,
