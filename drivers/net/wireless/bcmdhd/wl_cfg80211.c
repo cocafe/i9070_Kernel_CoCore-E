@@ -52,6 +52,7 @@
 #include <linux/wireless.h>
 #include <linux/ieee80211.h>
 #include <linux/wait.h>
+#include <linux/moduleparam.h>
 #include <net/cfg80211.h>
 #include <net/rtnetlink.h>
 #include <wlioctl.h>
@@ -59,6 +60,10 @@
 #include <wl_cfg80211.h>
 #include <wl_cfgp2p.h>
 #include <wl_android.h>
+
+/* PM mode in userspace */
+static bool dhdpm_fast = true;
+module_param(dhdpm_fast, bool, 0644);
 
 #ifdef PROP_TXSTATUS
 #include <dhd_wlfc.h>
@@ -3814,7 +3819,13 @@ wl_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 	}
 	WL_DBG(("%s: Enter power save enabled %d\n", dev->name, enabled));
 	/* android has special hooks to change pm when kernel suspended */
-	pm = enabled ? ((dhd->in_suspend) ? PM_MAX : PM_FAST) : PM_OFF;
+	/* pm = enabled ? ((dhd->in_suspend) ? PM_MAX : PM_FAST) : PM_OFF; */
+	if (dhdpm_fast) {
+		pm = enabled ? PM_FAST : PM_OFF;
+	} else {
+		pm = enabled ? ((dhd->in_suspend) ? PM_MAX : PM_FAST) : PM_OFF;
+	}
+
 	if (_net_info->pm_block || wl->vsdb_mode) {
 		/* Do not enable the power save if it is p2p interface or vsdb mode is set */
 		WL_DBG(("%s:Do not enable the power save for pm_block %d or vsdb_mode %d\n",
