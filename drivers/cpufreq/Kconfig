@@ -226,6 +226,9 @@ config CPU_FREQ_GOV_ONDEMANDQ
 	help
 	   Based on ondemand, hotplug in suspend.
 
+config CPU_FREQ_GOV_PEGASUSQ
+	tristate "'pegasusq' cpufreq policy governor"
+
 menu "x86 CPU frequency scaling drivers"
 depends on X86
 source "drivers/cpufreq/Kconfig.x86"
