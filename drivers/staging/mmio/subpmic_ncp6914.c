@@ -181,11 +181,11 @@ static int NCP6914_i2c_suspend(struct device *dev)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "-> %s()", __func__);
+//	printk(KERN_INFO "-> %s()", __func__);
 
 	/*ret = NCP6914_dev_poweroff();*/
 
-	printk(KERN_INFO "<- %s() = %d", __func__, ret);
+//	printk(KERN_INFO "<- %s() = %d", __func__, ret);
 	return ret;
 }
 
@@ -193,11 +193,11 @@ static int NCP6914_i2c_resume(struct device *dev)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "-> %s()", __func__);
+//	printk(KERN_INFO "-> %s()", __func__);
 
 	/*ret = NCP6914_dev_poweron();*/
 
-	printk(KERN_INFO "<- %s() = %d", __func__, ret);
+//	printk(KERN_INFO "<- %s() = %d", __func__, ret);
 	return ret;
 }
 

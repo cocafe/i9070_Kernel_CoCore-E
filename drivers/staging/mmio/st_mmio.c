@@ -91,6 +91,7 @@
 #define OFF 0 /* GPIO Power Off*/
 int vt_id;   /* Global variable  (VT_CAM_ID) value*/
 int assistive_mode;
+int burning_mode = 0;
 
 /* Function Pointer Declaration */
 int  (*subPMIC_module_init)(void);
@@ -2240,13 +2241,33 @@ rear_camera_type_show(struct device *dev,
 }
 
 	static ssize_t
+rear_flash_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", assistive_mode);
+}
+
+	static ssize_t
 rear_flash_enable_store(struct device *dev,
-		struct device_attribute *attr, char *buf, size_t size)
+		struct device_attribute *attr, const char *buf, size_t size)
 {
 	if (buf[0] == '0') {
+		if (burning_mode) {
+			burning_mode = 0;
+			gpio_set_value(140, 0);
+		}
+	
 		assistive_mode = 0;
 		mmio_cam_flash_on_off(info, 3, 0);
 	} else {
+		if (burning_mode) {
+			burning_mode = 0;
+			gpio_set_value(140, 0);
+
+			/* For safety */
+			msleep(1000);
+		}
+
 		assistive_mode = 1;
 #if defined CONFIG_MACH_GAVINI
 		mmio_cam_flash_on_off(info, 2, (100+5));
@@ -2254,14 +2275,53 @@ rear_flash_enable_store(struct device *dev,
 		mmio_cam_flash_on_off(info, 3, (100+3));
 #endif
 	}
+
+	return size;
+}
+
+	static ssize_t
+rear_flash_burning_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", burning_mode);
+}
+
+	static ssize_t
+rear_flash_burning_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	/* Enable/Disable camera rear flash gpio directly */
+
+	if (buf[0] == '0') {
+		if (assistive_mode) {
+			assistive_mode = 0;
+			mmio_cam_flash_on_off(info, 3, 0);
+		}
+
+		burning_mode = 0;
+		gpio_set_value(140, 0);
+	} else {
+		if (assistive_mode) {
+			assistive_mode = 0;
+			mmio_cam_flash_on_off(info, 3, 0);
+			
+			/* For safety */
+			msleep(1000);
+		}
+
+		burning_mode = 1;
+		gpio_set_value(140, 1);
+	}
+
 	return size;
 }
 
 static DEVICE_ATTR(camtype, 0440, rear_camera_type_show, NULL);
-static DEVICE_ATTR(enable, 0220, NULL, rear_flash_enable_store);
+static DEVICE_ATTR(enable, 0644, rear_flash_enable_show, rear_flash_enable_store);
 static DEVICE_ATTR(front_camtype, 0440, front_camera_type_show, NULL);
 static DEVICE_ATTR(rear_camtype, 0440, rear_camera_type_show, NULL);
-static DEVICE_ATTR(rear_flash, 0220, NULL, rear_flash_enable_store);
+static DEVICE_ATTR(rear_flash, 0644, rear_flash_enable_show, rear_flash_enable_store);
+static DEVICE_ATTR(burning_led, 0644, rear_flash_burning_show, rear_flash_burning_store);
 
 void sec_cam_init(void)
 {
@@ -2305,11 +2365,22 @@ void sec_cam_init(void)
 				__func__, dev_attr_rear_flash.attr.name);
 	}
 
+	if (device_create_file(cam_dev_rear, &dev_attr_burning_led) < 0) {
+		printk(KERN_DEBUG "%s: failed to create device file, %s\n",
+				__func__, dev_attr_burning_led.attr.name);
+	}
+
 
 	cam_dev_flash = device_create(camera_class, NULL, 0, NULL, "flash");
+
 	if (device_create_file(cam_dev_flash, &dev_attr_rear_flash) < 0) {
 		printk(KERN_DEBUG "%s: failed to create device file, %s\n",
 				__func__, dev_attr_rear_flash.attr.name);
+	}
+
+	if (device_create_file(cam_dev_flash, &dev_attr_burning_led) < 0) {
+		printk(KERN_DEBUG "%s: failed to create device file, %s\n",
+				__func__, dev_attr_burning_led.attr.name);
 	}
 }
 
