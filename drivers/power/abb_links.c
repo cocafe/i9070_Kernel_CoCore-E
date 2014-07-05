@@ -630,7 +630,7 @@ static int battery_get_property(struct power_supply *psy,
 
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW :
 		psy_do_property("ab8500_fg", get,
-				POWER_SUPPLY_PROP_VOLTAGE_MIN, value);
+				POWER_SUPPLY_PROP_VOLTAGE_NOW, value);
 		val->intval = value.intval;
 		break;
 
@@ -747,7 +747,10 @@ static int charging_readproc(char *page, char **start, off_t off,
 				ab8500_power_registers[i].region, 
 				ab8500_power_registers[i].address, &c);
 		if (ret>=0) {
-			len+=sprintf(page+len,"%s = 0x%02x\n",ab8500_power_registers[i].name,c);
+			len+=sprintf(page+len,"(%#04x %#04x)%s = 0x%02x\n", 
+					ab8500_power_registers[i].region, 
+					ab8500_power_registers[i].address, 
+					ab8500_power_registers[i].name, c);
 		msleep(10);
 		}
 	}
