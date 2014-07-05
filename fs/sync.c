@@ -2,11 +2,18 @@
  * High-level sync()-related operations
  */
 
+/*
+ * cocafe: add fsync control in sysfs kobjects
+ * version: 0.4
+ *
+ */
+
 #include <linux/kernel.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/namei.h>
 #include <linux/sched.h>
 #include <linux/writeback.h>
@@ -20,6 +27,20 @@
 
 #define VALID_FLAGS (SYNC_FILE_RANGE_WAIT_BEFORE|SYNC_FILE_RANGE_WRITE| \
 			SYNC_FILE_RANGE_WAIT_AFTER)
+
+#include <linux/earlysuspend.h>
+#include <linux/notifier.h>
+#include <linux/reboot.h>
+
+/*
+ * fsync mode:
+ *  0: fsync operates normally
+ *  1: fsync turns off
+ *  2: dynamic fsync
+ */
+static int fsync_mode = 0;
+static bool is_suspend = false;
+
 
 /*
  * Do the filesystem syncing work. For simple filesystems
@@ -139,6 +160,14 @@ SYSCALL_DEFINE1(syncfs, int, fd)
 	int ret;
 	int fput_needed;
 
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
+
 	file = fget_light(fd, &fput_needed);
 	if (!file)
 		return -EBADF;
@@ -167,6 +196,14 @@ int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
 {
 	struct address_space *mapping = file->f_mapping;
 	int err, ret;
+
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
 
 	if (!file->f_op || !file->f_op->fsync) {
 		ret = -EINVAL;
@@ -200,6 +237,14 @@ EXPORT_SYMBOL(vfs_fsync_range);
  */
 int vfs_fsync(struct file *file, int datasync)
 {
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
+
 	return vfs_fsync_range(file, 0, LLONG_MAX, datasync);
 }
 EXPORT_SYMBOL(vfs_fsync);
@@ -208,6 +253,14 @@ static int do_fsync(unsigned int fd, int datasync)
 {
 	struct file *file;
 	int ret = -EBADF;
+
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
 
 	file = fget(fd);
 	if (file) {
@@ -219,11 +272,27 @@ static int do_fsync(unsigned int fd, int datasync)
 
 SYSCALL_DEFINE1(fsync, unsigned int, fd)
 {
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
+
 	return do_fsync(fd, 0);
 }
 
 SYSCALL_DEFINE1(fdatasync, unsigned int, fd)
 {
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
+
 	return do_fsync(fd, 1);
 }
 
@@ -237,6 +306,14 @@ SYSCALL_DEFINE1(fdatasync, unsigned int, fd)
  */
 int generic_write_sync(struct file *file, loff_t pos, loff_t count)
 {
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
+
 	if (!(file->f_flags & O_DSYNC) && !IS_SYNC(file->f_mapping->host))
 		return 0;
 	return vfs_fsync_range(file, pos, pos + count - 1,
@@ -300,6 +377,14 @@ SYSCALL_DEFINE(sync_file_range)(int fd, loff_t offset, loff_t nbytes,
 	loff_t endbyte;			/* inclusive */
 	int fput_needed;
 	umode_t i_mode;
+
+	if (fsync_mode > 0) {
+		if (fsync_mode == 1) {
+			return 0;
+		} else if ((fsync_mode == 2) && !is_suspend) {
+			return 0;
+		}
+	}
 
 	ret = -EINVAL;
 	if (flags & ~VALID_FLAGS)
@@ -400,3 +485,118 @@ asmlinkage long SyS_sync_file_range2(long fd, long flags,
 }
 SYSCALL_ALIAS(sys_sync_file_range2, SyS_sync_file_range2);
 #endif
+
+static struct early_suspend early_suspend;
+
+static void fsync_early_suspend(struct early_suspend *h)
+{
+	is_suspend = true;
+
+	/* Do fsync */
+	if (fsync_mode == 2) {
+		pr_info("[FSYNC] Dynamic fsync syncing\n");
+		wakeup_flusher_threads(0);
+		sync_filesystems(0);
+		sync_filesystems(1);
+	}
+}
+
+static void fsync_late_resume(struct early_suspend *h)
+{
+	is_suspend = false;
+}
+
+static ssize_t fsync_mode_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+
+	sprintf(buf,   "[%s][0] FSYNC On\n", (fsync_mode == 0) ? "*" : " ");
+	sprintf(buf, "%s[%s][1] FSYNC Off\n", buf, (fsync_mode == 1) ? "*" : " ");
+	sprintf(buf, "%s[%s][2] FSYNC Dynamic\n", buf, (fsync_mode == 2) ? "*" : " ");
+
+	return strlen(buf);
+}
+
+static ssize_t fsync_mode_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	unsigned int mode_wanted;
+
+	ret = sscanf(buf, "%d", &mode_wanted);
+
+	if ((ret < 0) || (mode_wanted < 0) || (mode_wanted > 2)) {
+		pr_info("[FSYNC] invalid inputs\n");
+		return -EINVAL;
+	}
+
+	pr_info("[FSYNC] fsync mode %d ==> %d\n", fsync_mode, mode_wanted);
+
+	fsync_mode = mode_wanted;
+
+	return count;
+}
+
+static struct kobj_attribute fsync_mode_interface = __ATTR(mode, 0644, fsync_mode_show, fsync_mode_store);
+
+static struct attribute *fsync_attrs[] = {
+	&fsync_mode_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group fsync_interface_group = {
+	.attrs = fsync_attrs,
+};
+
+static struct kobject *fsync_kobject;
+
+static int fsync_reboot_handler(struct notifier_block *this, unsigned long code, void *unused)
+{
+	if (code == SYS_DOWN || code == SYS_HALT) {
+		if (fsync_mode >= 1) {
+			fsync_mode = 0;
+
+			wakeup_flusher_threads(0);
+			sync_filesystems(0);
+			sync_filesystems(1);
+
+			pr_warn("[FSYNC] Reboot handler flushing data\n");
+		}
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block fsync_control_notifier = {
+	.notifier_call = fsync_reboot_handler,
+};
+
+static int __init fsync_module_init(void)
+{
+	int ret;
+
+	fsync_kobject = kobject_create_and_add("fsync", kernel_kobj);
+
+	if (!fsync_kobject) {
+		pr_info("[FSYNC] Failed to create kobjects\n");
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(fsync_kobject, &fsync_interface_group);
+
+	if (ret) {
+		pr_info("[FSYNC] Failed to create sysfs group\n");
+		kobject_put(fsync_kobject);
+	}
+
+	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	early_suspend.suspend = fsync_early_suspend;
+	early_suspend.resume = fsync_late_resume;
+
+	register_early_suspend(&early_suspend);
+	register_reboot_notifier(&fsync_control_notifier);
+
+	pr_info("[FSYNC] FSync control registered.");
+
+	return 0;
+}
+
+module_init(fsync_module_init);
