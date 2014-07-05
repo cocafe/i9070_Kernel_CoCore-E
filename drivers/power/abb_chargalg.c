@@ -6,9 +6,13 @@
  * License Terms: GNU General Public License v2
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: Karl Komierowski <karl.komierowski@stericsson.com>
+ *
+ * Modified: Huang Ji (cocafe@xda-developers.com)
+ *
  */
 
 #include <linux/init.h>
+#include <linux/sysfs.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
@@ -39,6 +43,45 @@
 
 #define to_ab8500_chargalg_device_info(x) container_of((x), \
 	struct ab8500_chargalg, chargalg_psy);
+
+/* cocafe: Real end of charged */
+#include <linux/ab8500-ponkey.h>
+#include <linux/earlysuspend.h>
+
+#define CHARGING_PAUSED			-1
+#define CHARGING_STOPPED		0
+#define CHARGING_WORKING		1
+
+static struct early_suspend ab8500_chargalg_earlysuspend;
+
+static int charging_stats = CHARGING_STOPPED;
+
+static bool eoc_noticed = 0;
+static bool eoc_first = 0;
+static bool eoc_real = 0;
+static bool is_suspend = 0;
+
+static void ab8500_chargalg_early_suspend(struct early_suspend *h)
+{
+	is_suspend = 1;
+}
+
+static void ab8500_chargalg_late_resume(struct early_suspend *h)
+{
+	is_suspend = 0;
+}
+
+static void eoc_wakeup_thread(struct work_struct *eoc_wakeup_work)
+{
+	pr_err("[abb-chargalg] [fn] EOC wakeup\n");
+
+	ab8500_ponkey_emulator(1);
+	msleep(100);
+	ab8500_ponkey_emulator(0);
+
+	eoc_noticed = 1;
+}
+static DECLARE_WORK(eoc_wakeup_work, eoc_wakeup_thread);
 
 enum ab8500_chargers {
 	NO_CHG,
@@ -283,7 +326,7 @@ struct ab8500_chargalg {
 	struct kobject chargalg_kobject;
 };
 
-
+static struct ab8500_chargalg *p_di;
 
 
 static unsigned long get_charge_timeout_duration( struct ab8500_chargalg * di)
@@ -470,7 +513,7 @@ static int ab8500_chargalg_check_charger_connection(struct ab8500_chargalg *di)
 		 */
 		if ((di->chg_info.conn_chg & AC_CHG) &&
 			!di->susp_status.ac_suspended) {
-			dev_samsung_dbg(di->dev, "Charging source is AC\n");
+			dev_dbg(di->dev, "Charging source is AC\n");
 			if (di->chg_info.charger_type != AC_CHG) {
 				di->chg_info.charger_type = AC_CHG;
 				di->charge_timeout_jiffies=jiffies + get_charge_timeout_duration(di);
@@ -480,7 +523,7 @@ static int ab8500_chargalg_check_charger_connection(struct ab8500_chargalg *di)
 			}
 		} else if ((di->chg_info.conn_chg & USB_CHG) &&
 			!di->susp_status.usb_suspended) {
-			dev_samsung_dbg(di->dev, "Charging source is USB\n");
+			dev_dbg(di->dev, "Charging source is USB\n");
 			di->chg_info.charger_type = USB_CHG;
 			di->initial_timeout_expire=0 ;
 			di->initial_timeout_expire_under_threshold = 0;
@@ -489,11 +532,11 @@ static int ab8500_chargalg_check_charger_connection(struct ab8500_chargalg *di)
 		} else if (di->chg_info.conn_chg &&
 			(di->susp_status.ac_suspended ||
 			di->susp_status.usb_suspended)) {
-			dev_samsung_dbg(di->dev, "Charging is suspended\n");
+			dev_dbg(di->dev, "Charging is suspended\n");
 			di->chg_info.charger_type = NO_CHG;
 			ab8500_chargalg_state_to(di, STATE_SUSPENDED_INIT);
 		} else {
-			dev_samsung_dbg(di->dev, "Charging source is OFF\n");
+			dev_dbg(di->dev, "Charging source is OFF\n");
 			di->chg_info.charger_type = NO_CHG;
 			ab8500_chargalg_state_to(di, STATE_HANDHELD_INIT);
 		}
@@ -730,7 +773,7 @@ static void ab8500_chargalg_stop_charging(struct ab8500_chargalg *di)
 	cancel_delayed_work(&di->chargalg_wd_work);
 	power_supply_changed(&di->chargalg_psy);
 	printk(KERN_INFO "Charging is Stop\n"); 
-	
+	charging_stats = CHARGING_STOPPED;
 }
 
  /**
@@ -755,7 +798,7 @@ static void ab8500_chargalg_hold_charging(struct ab8500_chargalg *di)
 	cancel_delayed_work(&di->chargalg_wd_work);
 	power_supply_changed(&di->chargalg_psy);
 	printk(KERN_INFO "Charging is Pause\n"); 
-	
+	charging_stats = CHARGING_PAUSED;
 }
 
 /**
@@ -795,6 +838,8 @@ static void ab8500_chargalg_start_charging(struct ab8500_chargalg *di,
 		dev_err(di->dev, "Unknown charger to charge from\n");
 		return;
 	}
+
+	charging_stats = CHARGING_WORKING;
 
 	cancel_delayed_work(&di->chargalg_wd_work);
 	queue_delayed_work(di->chargalg_wq, &di->chargalg_wd_work, 0);
@@ -942,17 +987,17 @@ static void ab8500_chargalg_end_of_charge(struct ab8500_chargalg *di)
 
 			if (!di->full_charging_status_1st) {
 				if (++di->eoc_cnt_1st >= EOC_COND_CNT_1ST) {
-					dev_samsung_dbg(di->dev,
+					dev_dbg(di->dev,
 					"1st Full Charging EOC reached!\n");
 					di->eoc_cnt_1st = 0;
 					di->full_charging_status_1st = true;
-					dev_samsung_dbg(di->dev,
+					dev_dbg(di->dev,
 					 "Full charging status will be shown \
 in the UI, BUT NOT Real Full charging\n");
 					power_supply_changed(&di->chargalg_psy);
-
+					eoc_first = 1;
 				} else {
-					dev_samsung_dbg(di->dev,
+					dev_dbg(di->dev,
 					"1st Full Charging EOC limit reached \
 for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, EOC_COND_CNT_1ST);
 				}
@@ -969,11 +1014,15 @@ for the %d time, out of %d before EOC\n",  di->eoc_cnt_1st, EOC_COND_CNT_1ST);
 				di->charge_status = POWER_SUPPLY_STATUS_FULL;
 				di->maintenance_chg = true;
 				di->full_charging_status_1st = false;
-				dev_samsung_dbg(di->dev, "real EOC reached!\n");
+				dev_dbg(di->dev, "real EOC reached!\n");
 				power_supply_changed(&di->chargalg_psy);
-				dev_samsung_dbg(di->dev, "Charging is end\n");
+				dev_dbg(di->dev, "Charging is end\n");
+				eoc_real = 1;
+				/* Wakeup device to notice user */
+				if (!eoc_noticed && is_suspend)
+					schedule_work_on(0, &eoc_wakeup_work);
 			} else {
-				dev_samsung_dbg(di->dev,
+				dev_dbg(di->dev,
 				" real EOC limit reached for the %d"
 				" time, out of %d before EOC\n",
 						di->eoc_cnt_2nd,
@@ -1020,7 +1069,7 @@ static enum maxim_ret ab8500_chargalg_chg_curr_maxim(struct ab8500_chargalg *di)
 	delta_i = di->ccm.original_iset - di->batt_data.inst_curr;
 
 	if (di->events.vbus_collapsed) {
-		dev_samsung_dbg(di->dev, "Charger voltage has collapsed %d\n",
+		dev_dbg(di->dev, "Charger voltage has collapsed %d\n",
 				di->ccm.wait_cnt);
 		if (di->ccm.wait_cnt == 0) {
 			dev_dbg(di->dev, "lowering current\n");
@@ -1042,7 +1091,7 @@ static enum maxim_ret ab8500_chargalg_chg_curr_maxim(struct ab8500_chargalg *di)
 	di->ccm.wait_cnt = 0;
 
 	if ((di->batt_data.inst_curr > di->ccm.original_iset)) {
-		dev_samsung_dbg(di->dev, " Maximization Ibat (%dmA) too high"
+		dev_dbg(di->dev, " Maximization Ibat (%dmA) too high"
 			" (limit %dmA) (current iset: %dmA)!\n",
 			di->batt_data.inst_curr, di->ccm.original_iset,
 			di->ccm.current_iset);
@@ -2382,6 +2431,73 @@ static int ab8500_chargalg_sysfs_init(struct ab8500_chargalg *di)
 /* Exposure to the sysfs interface <<END>> */
 #endif //SYSFS_CHARGER_CONTROL
 
+static ssize_t abb_chargalg_charging_stats_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	char *txt;
+
+	if (charging_stats == CHARGING_PAUSED)
+		txt = "Charging paused\n";
+
+	if (charging_stats == CHARGING_STOPPED)
+		txt = "Charging stopped\n";
+
+	if (charging_stats == CHARGING_WORKING)
+		txt = "Charging now\n";
+
+	return sprintf(buf, "%s", txt);
+}
+
+static struct kobj_attribute abb_chargalg_charging_stats_interface = __ATTR(charging_status, 0444, abb_chargalg_charging_stats_show, NULL);
+
+static ssize_t abb_chargalg_eoc_stats_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	char *txt;
+
+	if (eoc_first == 0) {
+		txt = "Not reported yet\n";
+	}
+
+	if (eoc_first == 1) {
+		txt = "First EOC reached\n";
+	}
+
+	if (eoc_real == 1) {
+		txt = "Real EOC reached\n";
+	}
+
+	return sprintf(buf, "%s", txt);
+}
+
+static struct kobj_attribute abb_chargalg_eoc_stats_interface = __ATTR(eoc_status, 0444, abb_chargalg_eoc_stats_show, NULL);
+
+static ssize_t abb_chargalg_eoc_first_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", eoc_first);
+}
+
+static struct kobj_attribute abb_chargalg_eoc_first_interface = __ATTR(eoc_first, 0444, abb_chargalg_eoc_first_show, NULL);
+
+static ssize_t abb_chargalg_eoc_real_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", eoc_real);
+}
+
+static struct kobj_attribute abb_chargalg_eoc_real_interface = __ATTR(eoc_real, 0444, abb_chargalg_eoc_real_show, NULL);
+
+static struct attribute *abb_chargalg_attrs[] = {
+	&abb_chargalg_charging_stats_interface.attr, 
+	&abb_chargalg_eoc_stats_interface.attr, 
+	&abb_chargalg_eoc_first_interface.attr, 
+	&abb_chargalg_eoc_real_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group abb_chargalg_interface_group = {
+	.attrs = abb_chargalg_attrs,
+};
+
+static struct kobject *abb_chargalg_kobject;
+
 #if defined(CONFIG_PM)
 static int ab8500_chargalg_resume(struct platform_device *pdev)
 {
@@ -2425,6 +2541,8 @@ static int __devexit ab8500_chargalg_remove(struct platform_device *pdev)
 	/* sysfs interface to enable/disbale charging from user space */
 	ab8500_chargalg_sysfs_exit(di);
 #endif
+
+	kobject_put(abb_chargalg_kobject);
 
 	/* Delete the work queue */
 	destroy_workqueue(di->chargalg_wq);
@@ -2532,6 +2650,28 @@ static int __devinit ab8500_chargalg_probe(struct platform_device *pdev)
 		goto free_psy;
 	}
 #endif //SYSFS_CHARGER_CONTROL
+
+	p_di = di;
+
+	abb_chargalg_kobject = kobject_create_and_add("abb-chargalg", kernel_kobj);
+
+	if (!abb_chargalg_kobject) {
+		pr_info("abb-chargalg: Failed to register sysfs kobj\n");
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(abb_chargalg_kobject, &abb_chargalg_interface_group);
+
+	if (ret) {
+		pr_info("abb-chargalg: Failed to register sysfs group\n");
+		kobject_put(abb_chargalg_kobject);
+	}
+
+	ab8500_chargalg_earlysuspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	ab8500_chargalg_earlysuspend.suspend = ab8500_chargalg_early_suspend;
+	ab8500_chargalg_earlysuspend.resume = ab8500_chargalg_late_resume;
+
+	register_early_suspend(&ab8500_chargalg_earlysuspend);
 
 	/* Run the charging algorithm */
 	queue_delayed_work(di->chargalg_wq, &di->chargalg_periodic_work, 0);
