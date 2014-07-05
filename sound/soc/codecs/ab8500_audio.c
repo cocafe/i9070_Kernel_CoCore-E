@@ -16,6 +16,17 @@
  * by the Free Software Foundation.
  */
 
+/* 
+ * ABBamp
+ * 
+ * Audio control module for ST-Ericsson AB850x codec
+ * 
+ * Author: Huang Ji (cocafe) <cocafehj@gmail.com>
+ * 
+ * Thanks: Aditya Patange (Adi_Pat) <adithemagnificent@gmail.com>
+ * 
+ */
+
 #include <linux/bitops.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -89,7 +100,7 @@ static const u8 ab850x_reg_cache[] = {
 	0x00, /* REG_ANACONF4		(0x08) */
 	0x00, /* REG_DAPATHCONF		(0x09) */
 	0x40, /* REG_MUTECONF		(0x0A) */
-	0x01, /* REG_SHORTCIRCONF	(0x0B) */
+	0x37, /* REG_SHORTCIRCONF	(0x0B) */
 	0x01, /* REG_ANACONF5		(0x0C) */
 	0x00, /* REG_ENVCPCONF		(0x0D) */
 	0x00, /* REG_SIGENVCONF		(0x0E) */
@@ -245,6 +256,621 @@ static long anc_iir_cache[REG_ANC_IIR_COEFFS];
 struct ab8500_codec_drvdata {
 	enum ab850x_audio_chipid chipid;
 };
+
+/* cocafe: ABBamp module */
+#define ABBAMP_VERSION_TAG			"2.5.0"
+#define ABBAMP_DEBUG_LEVEL			0
+
+#define REG_FULLBITS				0xFF		/* 1111 1111 */
+#define REG_FULLWIDTH				0x08		/* 8 bits */
+
+static int abbamp_read(unsigned int reg, unsigned int shift, unsigned int width);
+static int abbamp_write(unsigned int reg, unsigned int shift, unsigned int width, unsigned int value);
+
+static void abbamp_control_anagain3(void);
+static void abbamp_control_hslowpow(void);
+static void abbamp_control_hsdaclowpow(void);
+static void abbamp_control_hshpen(void);
+static void abbamp_control_hsleardiggain(int input);
+static void abbamp_control_hsrdiggain(void);
+static void abbamp_control_classdhpg(void);
+static void abbamp_control_classdwg(void);
+
+/* static void abbamp_control_ponup(void); */
+static void abbamp_control_hs(void);
+static void abbamp_control_hf(void);
+static void abbamp_control_earpiece(void);
+static void abbamp_control_addiggain(void);
+
+
+/* Core functions for ABBamp */
+/* 
+ * Read bits from ab850x codec registers
+ * 
+ * @reg:	codec register
+ * @shift:	offset of bit(s)
+ * @width:	width of bit(s)
+ * 
+ * Return bits in dec
+ */
+static int abbamp_read(unsigned int reg, unsigned int shift, unsigned int width)
+{
+	int shift_mov;
+	int mask;
+	int ret;
+
+	ret = snd_soc_read(ab850x_codec, reg);
+	shift_mov = shift + 1;
+	mask = ((REG_FULLBITS >> (REG_FULLWIDTH - width)) << (shift_mov - width));
+	ret = (ret & mask) >> (shift_mov - width);
+
+	return ret;
+}
+
+/*
+ * abbamp_write
+ * 
+ * Writes masked bits to ab850x code registers 
+ * 
+ * @reg:	codec register
+ * @shift:	offset of bit(s)
+ * @width:	width of bit(s)
+ * @value:	bit(s) value in dec
+ * 
+ * Return 1 on success,return 0 on no changed or failure
+ */
+static int abbamp_write(unsigned int reg, unsigned int shift, unsigned int width, unsigned int value)
+{
+	int shift_mov;
+	int offset;
+	int m_head;
+	int m_end;
+	int m_ret;
+	int val_mov;
+	int obj;
+	int ret;
+
+	obj = snd_soc_read(ab850x_codec, reg);
+
+	shift_mov = shift + 1;
+	offset = shift_mov - width;
+	val_mov = value << offset;
+
+	m_head = (REG_FULLBITS >> shift_mov) << shift_mov;
+	m_end = REG_FULLBITS >> (REG_FULLWIDTH - offset);
+	m_ret = m_head | m_end;
+
+	obj = (obj & m_ret) | val_mov;
+
+	ret = snd_soc_write(ab850x_codec, reg, obj);
+
+	return ret;
+}
+
+/* Codec ID */
+static char *ab850x_codec_id;
+
+/* Debug Level */
+static int abbamp_dbg = ABBAMP_DEBUG_LEVEL;
+
+/* HS widget status */
+static bool hs_ponup = false;
+
+/* HF widget status */
+static bool hf_ponup = false;
+
+/* Earpiece widget status */
+static bool ear_ponup = false;
+
+/* AD2 path status */
+static bool ad2_ponup = false;
+
+/* AnaConf1
+ * Lowpower/Headset/Earpiece amp configuration.
+ * 
+ * HsLowPow:
+ * 0: Normal Operation
+ * 1: Hs drivers in Low Power
+ * 
+ * HsDACLowPow:
+ * 00: Normal Operation
+ * 01: Hs DAC drivers in Low Power
+ * 10: Hs DAC in Low Power
+ * 11: Hs DAC and Hs DAC drivers in Low Power
+ * 
+ * HsHpEn:
+ * (Headset noise cancellation)
+ * 0: Headset high pass filter disabled
+ * 1: Headset high pass filter enabled (offset cancellation enabled)
+ */
+#define SHIFT_ANACONF1_HSDACLOWPOW		6
+
+static bool hslowpow_con = false;
+static bool hsdaclowpow_con = false;
+static bool hshpen_con = false;
+
+static int hslowpow_v = 0;
+static int hsdaclowpow_v = 0;
+static int hshpen_v = 1;
+
+static void abbamp_control_hslowpow(void)
+{
+	abbamp_write(REG_ANACONF1, REG_ANACONF1_HSLOWPOW, 1, hslowpow_v);
+}
+static void abbamp_control_hsdaclowpow(void)
+{
+	abbamp_write(REG_ANACONF1, SHIFT_ANACONF1_HSDACLOWPOW, 2, hsdaclowpow_v);
+}
+static void abbamp_control_hshpen(void)
+{
+	abbamp_write(REG_ANACONF1, REG_ANACONF1_HSHPEN, 1, hshpen_v);
+}
+
+/* AnaConf4
+ * Analog Output Enable.
+ * 
+ * [7] DisPdVss
+ * 0: Internal pull down on VssVcphs is enabled.
+ * 1: Internal pull down on VssVcphs is disabled.
+ * 
+ * [6] EnEar
+ * 0: The Ear Class-AB driver is powered down
+ * 1: The Ear Class-AB driver is powered up
+ * 
+ * [5] EnHsL
+ * 0: The HsL Driver is powered down
+ * 1: The HsL Driver is powered up
+ * 
+ * [4] EnHsR
+ * 0: The HsR Driver is powered down
+ * 1: The HsR Driver is powered up
+ * 
+ * [3] EnHfL
+ * 0: The HfL Class-D driver is powered down
+ * 1: The HfL Class-D driver is powered up
+ * 
+ * [2] EnHfR
+ * 0: The HfR Class-D driver is powered down
+ */
+
+/* When these bools are ture, the path will be disable */
+static bool hslanaena_con = false;
+static bool hsranaena_con = false;
+static bool hflanaena_con = false;
+static bool hfranaena_con = false;
+
+static void abbamp_control_hslanaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSL, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHsL widget\n");
+}
+
+static void abbamp_control_hsranaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSR, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHsR widget\n");
+}
+
+static void abbamp_control_hflanaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFL, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHfL widget\n");
+}
+
+static void abbamp_control_hfranaena(void)
+{
+	abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFR, 1, 0);
+	pr_info("[ABB-Codec] AnaConf4 EnHfR widget\n");
+}
+
+
+static void abbamp_control_anaconf4_hs(void)
+{
+	/* When it's TRUE, disable path */
+	if (hslanaena_con)
+		abbamp_control_hslanaena();
+
+	if (hsranaena_con)
+		abbamp_control_hsranaena();
+}
+
+static void abbamp_control_anaconf4_hf(void)
+{
+	if (hflanaena_con)
+		abbamp_control_hflanaena();
+
+	if (hfranaena_con)
+		abbamp_control_hfranaena();
+}
+
+/* ShortCirConf 
+ * Short circuit configuration
+ *
+ * [7] EnShortPWD
+ * 	0: Automatic switch off on short circuit detection is disabled
+ * 	1: Automatic switch off on short circuit detection is enabled
+ * [6] EarShortDis
+ * 	0: Short circuit detection on Ear driver enabled
+ * 	1: Short circuit detection on Ear driver disabled
+ * [5] HsShortDis
+ * 	0: Short circuit detection on HsL and HsR drivers enabled
+ * 	1: Short circuit detection on HsL and HsR drivers disabled
+ * [4] HsPullDEn
+ * 	0: HsL and HsR outputs are in high impedance
+ * 	1: HsL and HsR outputs are pulled down to ground
+ * [2] HsOscEn
+ * 	0: The HS drivers use the system clock
+ * 	1: The HS drivers use a local oscillator (system clock absent: analog path only)
+ * [1] HsFadDis
+ * 	0: All intermediate steps are applied between two programmed gains (fading)
+ * 	1: Gain on HS is applied immediately
+ * [0] HsZcdDis
+ * 	0: HS gain changes on signal zero cross (unless time-out occurs)
+ * 	1: HS gain is changed without zero cross control
+ * 
+ * Codec won't change ShortCir(0x0b) register.
+ */
+
+/* AnaGain3
+ * Headset Analog Gain
+ * 
+ * 0000: +4  dB gain
+ * 0001: +2  dB gain
+ * ....: -2  dB step
+ * 1110: -24 dB gain
+ * 1111: -26 dB gain
+ */
+#define SHIFT_ANAGAIN3_HSL			7
+#define SHIFT_ANAGAIN3_HSR			3
+#define WIDTH_ANAGAIN3_HSX			4
+#define GAIN_ANAGAIN3_MAX			0xF
+
+static bool anagain3_con = false;
+static int anagain3_hsl = 0;
+static int anagain3_hsr = 0;
+
+/* Volume map */
+static char *anagain3_volmap[] = {
+	 "+4dB", 
+	 "+2dB", 
+	 "+0dB", 
+	 "-2dB", 
+	 "-4dB", 
+	 "-6dB", 
+	 "-8dB", 
+	"-10dB", 
+	"-12dB", 
+	"-14dB", 
+	"-16dB", 
+	"-18dB", 
+	"-20dB", 
+	"-24dB", 
+	"-28dB", 
+	"-32dB", 
+};
+
+static void abbamp_control_anagain3(void)
+{
+	abbamp_write(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSL, 4, anagain3_hsl);
+	abbamp_write(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSR, 4, anagain3_hsr);
+}
+
+/* ClassDConf3
+ * Class-D dithering control(gain)
+ *
+ * ClassDDithHPGain
+ * 	ClassD High Pass Gain Playback Volume
+ * 	0000: Minimum gain
+ * 	0100: Medium gain
+ * 	1010: Maximum gain
+ * 
+ * ClassDDithWGain
+ * 	ClassD White Gain Playback Volume
+ * 	0000: Minimum gain
+ * 	0100: Medium gain
+ * 	1010: Maximum gain
+ */
+#define SHIFT_CLASSDDIR_HPG			7
+#define SHIFT_CLASSDDIR_WG			3
+#define GAIN_CLASSDDIR_MAX			0xA
+
+static bool classdhpg_con = false;
+static bool classdwg_con = false;
+
+static int classdhpg_v = GAIN_CLASSDDIR_MAX;
+static int classdwg_v = GAIN_CLASSDDIR_MAX;
+
+static void abbamp_control_classdhpg(void)
+{
+	abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_HPG, 4, classdhpg_v);
+}
+
+static void abbamp_control_classdwg(void)
+{
+	abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_WG, 4, classdwg_v);
+}
+
+/* ADDigGain2
+ * AD2 path digital gain
+ * 000000:  31 dB gain
+ * 000001:  30 dB gain
+ * ......:   1 dB step
+ * 011111:   0 dB gain
+ * ......:   1 dB step
+ * 111101: -30 dB gain
+ * 111110: -31 dB gain
+ * 111111:        mute
+ */
+#define GAIN_AD2_MAX				0x0
+#define MUTE_AD2_MAX				0x3F
+
+static bool addiggain2_con = false;
+static unsigned int addiggain2_v = 25;
+static unsigned int addiggain2_ms = 1000;
+
+static char *addiggain2_volmap[] = 
+{
+	"+31dB", 
+	"+30dB", 
+	"+29dB", 
+	"+28dB", 
+	"+27dB", 
+	"+26dB", 
+	"+25dB", 
+	"+24dB", 
+	"+23dB", 
+	"+22dB", 
+	"+21dB", 
+	"+20dB", 
+	"+19dB", 
+	"+18dB", 
+	"+17dB", 
+	"+16dB", 
+	"+15dB", 
+	"+14dB", 
+	"+13dB", 
+	"+12dB", 
+	"+11dB", 
+	"+10dB", 
+	"+9dB", 
+	"+8dB", 
+	"+7dB", 
+	"+6dB", 
+	"+5dB", 
+	"+4dB", 
+	"+3dB", 
+	"+2dB", 
+	"+1dB", 
+	"+0dB", 
+	"-1dB", 
+	"-2dB", 
+	"-3dB", 
+	"-4dB", 
+	"-5dB", 
+	"-6dB", 
+	"-7dB", 
+	"-8dB", 
+	"-9dB", 
+	"-10dB", 
+	"-11dB", 
+	"-12dB", 
+	"-13dB", 
+	"-14dB", 
+	"-15dB", 
+	"-16dB", 
+	"-17dB", 
+	"-18dB", 
+	"-19dB", 
+	"-20dB", 
+	"-21dB", 
+	"-22dB", 
+	"-23dB", 
+	"-24dB", 
+	"-25dB", 
+	"-26dB", 
+	"-27dB", 
+	"-28dB", 
+	"-29dB", 
+	"-30dB", 
+	"-31dB", 
+	"mute", 
+};
+
+static void abbamp_control_ad2(void)
+{
+	abbamp_write(REG_ADDIGGAIN2, REG_ADDIGGAINX_GAIN, 6, addiggain2_v);
+}
+
+static void abbamp_ad2_delay(struct work_struct *abbamp_ad2_work)
+{
+	/* FIXME: Codec will hold this path for a while */
+	msleep(addiggain2_ms);
+	abbamp_control_ad2();
+}
+static DECLARE_WORK(abbamp_ad2_work, abbamp_ad2_delay);
+
+/* HsLEarDigGain
+ * HsL/Earpiece Digital Gain
+ * 
+ * 0000: +8 dB gain
+ * 0001: +7 dB gain
+ * ....: -1 dB step
+ * 0111: +1 dB gain
+ * 1000:  0 dB gain
+ * 1001 ~ 1111: -inf dB gain (mute)
+ */
+#define MUTE_HSLEARDIG_MAX			0xF
+
+static bool hsldiggain_con = false;
+static bool eardiggain_con = false;
+
+static int hsldiggain_v = 0x04;
+static int eardiggain_v = 0x04;
+
+/* Volume map */
+static char *hsleardiggain_volmap[] = 
+{
+	"+8dB", 
+	"+7dB", 
+	"+6dB", 
+	"+5dB", 
+	"+4dB", 
+	"+3dB", 
+	"+2dB", 
+	"+1dB", 
+	"+0dB", 
+};
+
+/* Need to switch hsl/earpiece */
+static void abbamp_control_hsleardiggain(int input)
+{
+	abbamp_write(REG_HSLEARDIGGAIN, REG_HSLEARDIGGAIN_HSLDGAIN, 4, input);
+}
+
+/* HsRDigGain
+ * HsR Digital Gain
+ * 
+ * 0000: +8 dB gain
+ * 0001: +7 dB gain
+ * ....: -1 dB step
+ * 0111: +1 dB gain
+ * 1000:  0 dB gain
+ * 1001 ~ 1111: -inf dB gain (mute)
+ */
+#define MUTE_HSRDIG_MAX			0xF
+
+static bool hsrdiggain_con = false;
+
+static int hsrdiggain_v = 0x04;
+
+/* Volume map */
+static char *hsrdiggain_volmap[] = 
+{
+	"+8dB", 
+	"+7dB", 
+	"+6dB", 
+	"+5dB", 
+	"+4dB", 
+	"+3dB", 
+	"+2dB", 
+	"+1dB", 
+	"+0dB", 
+};
+
+static void abbamp_control_hsrdiggain(void)
+{
+	abbamp_write(REG_HSRDIGGAIN, REG_HSRDIGGAIN_HSRDGAIN, 4, hsrdiggain_v);
+}
+
+/* ABBamp headset controls */
+static void abbamp_control_hs(void)
+{
+	if (anagain3_con) {
+		abbamp_control_anagain3();
+		pr_err("[ABB-Codec] AnaGain3 widget\n");
+	}
+	if (hslowpow_con) {
+		abbamp_control_hslowpow();
+		pr_err("[ABB-Codec] HsLowPow widget\n");
+	}
+	if (hsdaclowpow_con) {
+		abbamp_control_hsdaclowpow();
+		pr_err("[ABB-Codec] HsDacLowPow widget\n");
+	}
+	if (hshpen_con) {
+		abbamp_control_hshpen();
+		pr_err("[ABB-Codec] HsHpEn widget\n");
+	}
+	if (hsldiggain_con) {
+		abbamp_control_hsleardiggain(hsldiggain_v);
+		pr_err("[ABB-Codec] HsLDigGain widget\n");
+	}
+	if (hsrdiggain_con) {
+		abbamp_control_hsrdiggain();
+		pr_err("[ABB-Codec] HsRDigGain widget\n");
+	}
+}
+
+/* ABBamp earpiece controls */
+static void abbamp_control_earpiece(void)
+{
+	if (eardiggain_con) {
+		abbamp_control_hsleardiggain(eardiggain_v);
+		pr_err("[ABB-Codec] EarDigGain widget\n");
+	}
+}
+
+/* ABBamp handsfree controls */
+static void abbamp_control_hf(void)
+{
+	if (classdhpg_con) {
+		abbamp_control_classdhpg();
+		pr_err("[ABB-Codec] ClassD-HPG widget\n");
+	}
+	if (classdwg_con) {
+		abbamp_control_classdwg();
+		pr_err("[ABB-Codec] ClassD-WG widget\n");
+	}
+}
+
+/* ABBamp Analog to Digital path2 controls */
+static void abbamp_control_addiggain(void)
+{
+	if (addiggain2_con) {
+		schedule_work(&abbamp_ad2_work);
+		pr_err("[ABB-Codec] AD2-DigGain widget\n");
+	}
+}
+
+/* Low-power-audio playback in suspend */
+#define AB8500_VAPESEL1			0x0E
+#define AB8500_VAPESEL2			0x0F
+#define AB8500_VAPE_STEP_UV		12500
+#define AB8500_VAPE_MIN_UV		700000
+#define AB8500_VAPE_MAX_UV		1362500
+
+static int vape_voltage(u8 raw)
+{
+	if (raw <= 0x35) {
+		return (AB8500_VAPE_MIN_UV + (raw * AB8500_VAPE_STEP_UV));
+	} else {
+		return AB8500_VAPE_MAX_UV;
+	}
+}
+
+#define VAPE_SEL2_DEFAULT 	0x16
+
+static bool lpa_mode_enabled = 0;
+static u8 lpa_vape2 = 0x16;
+
+static int abb_codec_lpa_mode(bool suspend)
+{
+	int ret;
+	u8 regval;
+
+	/*
+	 * We use LPA mode in suspend only.
+	 * Because Vape not only supplies to audio module,
+	 * but also supplies to SXA engines in running state.
+	 */
+	if (suspend) {
+		regval = lpa_vape2;
+		ret = prcmu_abb_write(AB8500_REGU_CTRL2,
+					      AB8500_VAPESEL2,
+					      &regval, 1);
+
+		return ret;
+
+		
+	} else {
+		regval = VAPE_SEL2_DEFAULT;
+		ret = prcmu_abb_write(AB8500_REGU_CTRL2,
+					      AB8500_VAPESEL2,
+					      &regval, 1);
+
+		return ret;
+	}
+}
 
 /* Reads an arbitrary register from the ab8500 chip.
 */
@@ -564,17 +1190,6 @@ static int digital_mute_control_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int hs_disable_event(struct snd_soc_dapm_widget *w,
-		struct snd_kcontrol *kcontrol, int event)
-{
-	switch (event) {
-	case SND_SOC_DAPM_POST_PMD:
-		mdelay(10);
-		break;
-	}
-	return 0;
-}
-
 static int if1_enable = 0;
 static int digital_mute_control_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
@@ -656,13 +1271,21 @@ static int if0_fifo_enable_control_put(struct snd_kcontrol *kcontrol,
 		set_mask = BMASK(REG_DIGIFCONF3_IF0BFIFOEN);
 
 		pr_debug("%s: IF0 FIFO disable: override APE OPP\n", __func__);
-		ret = prcmu_qos_lpa_override(true);
+		if (!lpa_mode_enabled) {
+			ret = prcmu_qos_lpa_override(true);
+		} else {
+			ret = abb_codec_lpa_mode(true);
+		}
 	} else {
 		clear_mask = BMASK(REG_DIGIFCONF3_IF0BFIFOEN);
 		set_mask = 0;
 
 		pr_debug("%s: IF0 FIFO disable: restore APE OPP\n", __func__);
-		ret = prcmu_qos_lpa_override(false);
+		if (!lpa_mode_enabled) {
+			ret = prcmu_qos_lpa_override(false);
+		} else {
+			ret = abb_codec_lpa_mode(false);
+		}
 	}
 	if (ret < 0) {
 		pr_err("%s: ERROR: Failed to modify APE OPP (%ld)!\n",
@@ -1198,6 +1821,95 @@ static const struct snd_kcontrol_new dapm_pdm2_mux =
 
 /* Event-handlers - DAPM */
 
+static int hs_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		hs_ponup = true;
+		abbamp_control_hs();
+		abbamp_control_anaconf4_hs();
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		hs_ponup = false;
+		mdelay(10);
+		break;
+	}
+	return 0;
+}
+
+static int ihfr_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		hf_ponup = true;
+		abbamp_control_hf();
+		abbamp_control_anaconf4_hf();
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		hf_ponup = false;
+		if (hs_ponup) {
+			abbamp_control_hs();
+		}
+		break;
+	}
+	return 0;
+}
+
+static int earpiece_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		ear_ponup = true;
+		if (!hs_ponup) {
+			abbamp_control_earpiece();
+		}
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		ear_ponup = false;
+		if (hs_ponup) {
+			abbamp_control_hs();
+		}
+		break;
+	}
+	return 0;
+}
+
+static int ad2_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		ad2_ponup = true;
+		abbamp_control_addiggain();
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		ad2_ponup = false;
+		if (hs_ponup) {
+			abbamp_control_hs();
+		}
+		break;
+	}
+	return 0;
+}
+
+static int ad3_dapm_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		if (hs_ponup) {
+			abbamp_control_hs();
+		}
+		break;
+	}
+	return 0;
+}
+
 static int stfir_enable;
 static int stfir_enable_event(struct snd_soc_dapm_widget *w,
 		struct snd_kcontrol *kcontrol, int event)
@@ -1322,9 +2034,9 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER("HSR Mute", REG_MUTECONF, REG_MUTECONF_MUTHSR,
 			INVERT, NULL, 0),
 	SND_SOC_DAPM_PGA_E("HSL Enable", REG_ANACONF4, REG_ANACONF4_ENHSL,
-			NORMAL, NULL, 0, hs_disable_event, SND_SOC_DAPM_POST_PMD),
+			NORMAL, NULL, 0, hs_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_PGA_E("HSR Enable", REG_ANACONF4, REG_ANACONF4_ENHSR,
-			NORMAL, NULL, 0, hs_disable_event, SND_SOC_DAPM_POST_PMD),
+			NORMAL, NULL, 0, hs_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_PGA("HSL Gain", SND_SOC_NOPM, 0,
 			0, NULL, 0),
 	SND_SOC_DAPM_PGA("HSR Gain", SND_SOC_NOPM, 0,
@@ -1354,8 +2066,9 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("Earpiece or LineOut Mono Source",
 			SND_SOC_NOPM, 0, 0, dapm_ear_lineout_source),
 
-	SND_SOC_DAPM_MIXER("EAR DAC", REG_DAPATHCONF,
-			REG_DAPATHCONF_ENDACEAR, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER_E("EAR DAC", REG_DAPATHCONF,
+			REG_DAPATHCONF_ENDACEAR, 0, NULL, 0, 
+			earpiece_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MUX("Earpiece", SND_SOC_NOPM, 0, 0, &dapm_ear_mux),
 
@@ -1387,8 +2100,10 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 
 	SND_SOC_DAPM_MIXER("IHFL DAC", REG_DAPATHCONF,
 			REG_DAPATHCONF_ENDACHFL, 0, NULL, 0),
-	SND_SOC_DAPM_MIXER("IHFR DAC", REG_DAPATHCONF,
-			REG_DAPATHCONF_ENDACHFR, 0, NULL, 0),
+	/* TODO: Revet user's headset tweaks when handsfree powers off */
+	SND_SOC_DAPM_MIXER_E("IHFR DAC", REG_DAPATHCONF,
+			REG_DAPATHCONF_ENDACHFR, 0, NULL, 0, 
+			ihfr_dapm_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("DA4 or ANC path to HfR", REG_DIGMULTCONF2,
 			REG_DIGMULTCONF2_DATOHFREN, 0, NULL, 0),
@@ -1465,7 +2180,8 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 			SND_SOC_NOPM, 0, 0, dapm_ad2_select),
 
 	SND_SOC_DAPM_MIXER("AD1 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0),
-	SND_SOC_DAPM_MIXER("AD2 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER_E("AD2 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0, 
+			ad2_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("AD12 Enable", REG_ADPATHENA,
 			REG_ADPATHENA_ENAD12, 0, NULL, 0),
@@ -1492,7 +2208,8 @@ static const struct snd_soc_dapm_widget ab850x_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("AD 3 Select Capture Route",
 			SND_SOC_NOPM, 0, 0, dapm_ad3_select),
 
-	SND_SOC_DAPM_MIXER("AD3 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER_E("AD3 Channel Gain", SND_SOC_NOPM, 0, 0, NULL, 0, 
+			ad3_dapm_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("AD3 Enable", REG_ADPATHENA,
 			REG_ADPATHENA_ENAD34, 0, NULL, 0),
@@ -3099,7 +3816,7 @@ int ab850x_audio_power_control(bool power_on)
 		return -EIO;
 	}
 
-	pr_debug("%s ab850x.", (power_on) ? "Enabling" : "Disabling");
+	pr_info("[ABB-Codec] %s\n", (power_on) ? "Power On" : "Power Off");
 
 	return snd_soc_update_bits(ab850x_codec, REG_POWERUP,
 		pwr_mask, (power_on) ? pwr_mask : REG_MASK_NONE);
@@ -4028,6 +4745,1131 @@ static enum ab850x_audio_chipid detect_chipid(struct platform_device *pdev)
 	return chipid;
 }
 
+/* ABBamp sysfs interfaces */
+static ssize_t abb_codec_dbg_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", abbamp_dbg);
+}
+
+static ssize_t abb_codec_dbg_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int val;
+	int ret;
+
+	ret = sscanf(buf, "%d", &val);
+
+	if ((ret < 0) || (val < 0)) {
+		pr_err("[ABB-Codec] invalid inputs!\n");
+		return -EINVAL;
+	}
+
+	abbamp_dbg = val;
+
+	pr_err("[ABB-Codec] update debug level\n");
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_dbg_interface = __ATTR(debug_level, 0644, 
+				abb_codec_dbg_show, abb_codec_dbg_store);
+
+static ssize_t abb_codec_vertag_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "Codec: %s\nABBamp: %s\ncocafe\n", ab850x_codec_id, ABBAMP_VERSION_TAG);
+}
+
+static struct kobj_attribute abb_codec_vertag_interface = __ATTR(version, 0444, 
+				abb_codec_vertag_show, NULL);
+
+static ssize_t abb_codec_write_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reg;
+	int value;
+	int old;
+	int new;
+	int ret;
+
+	ret = sscanf(buf, "%x %x", &reg, &value);
+
+	if (ret < 0) {
+		pr_err("[ABB-Codec] invalid inputs!\n");
+		return -EINVAL;
+	}
+
+	old = snd_soc_read(ab850x_codec, reg);
+
+	snd_soc_write(ab850x_codec, reg, value);
+
+	new = snd_soc_read(ab850x_codec, reg);
+
+	pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", reg, old, new);
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_write_interface = __ATTR(codec_write, 0200, 
+				NULL, abb_codec_write_store);
+
+static ssize_t abb_codec_anagain3_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int left_mem = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSL, 4);
+	int right_mem = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSR, 4);
+
+	sprintf(buf, "Headset Analog Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, anagain3_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sLeft(mem):\t%02d (%s)\n", buf, left_mem, 
+		anagain3_volmap[left_mem]);
+	sprintf(buf, "%sLeft(user):\t%02d (%s)\n", buf, anagain3_hsl, 
+		anagain3_volmap[anagain3_hsl]);
+	sprintf(buf, "%sRight(mem):\t%02d (%s)\n", buf, right_mem, 
+		anagain3_volmap[right_mem]);
+	sprintf(buf, "%sRight(user):\t%02d (%s)\n", buf, anagain3_hsr, 
+		anagain3_volmap[anagain3_hsr]);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_anagain3_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable AnaGain3 con\n");
+		
+		anagain3_con = true;
+		abbamp_control_anagain3();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable AnaGain3 con\n");
+
+		anagain3_con = false;
+
+		/* Reset when HS widget powered up only */
+		if (hs_ponup) {
+			/* 0100 0100 */
+			snd_soc_write(ab850x_codec, REG_ANAGAIN3, 0x44);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "left=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_ANAGAIN3_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		if (!anagain3_con) {
+			anagain3_hsr = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSR, 4);
+		}
+
+		anagain3_hsl = val;
+		if (anagain3_con)
+			abbamp_control_anagain3();
+
+		new = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANAGAIN3, old, new);
+		
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "right=", 6)) {
+		old = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		ret = sscanf(&buf[6], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_ANAGAIN3_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		if (!anagain3_con) {
+			anagain3_hsl = abbamp_read(REG_ANAGAIN3, SHIFT_ANAGAIN3_HSL, 4);
+		}
+
+		anagain3_hsr = val;
+		if (anagain3_con)
+			abbamp_control_anagain3();
+
+		new = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANAGAIN3, old, new);
+		
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_ANAGAIN3_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		anagain3_hsl = val;
+		anagain3_hsr = val;
+		if (anagain3_con)
+			abbamp_control_anagain3();
+
+		new = snd_soc_read(ab850x_codec, REG_ANAGAIN3);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANAGAIN3, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_anagain3_interface = __ATTR(anagain3, 0644, 
+				abb_codec_anagain3_show, abb_codec_anagain3_store);
+
+static ssize_t abb_codec_hsldiggain_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int gain_mem = abbamp_read(REG_HSLEARDIGGAIN, REG_HSLEARDIGGAIN_HSLDGAIN, 4);
+
+	sprintf(buf, "HsL Digital Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, hsldiggain_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (gain_mem > 8) {
+		sprintf(buf, "%sGain(mem):\t%02d (mute)\n", buf, gain_mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (%s)\n", buf, gain_mem, 
+						hsleardiggain_volmap[gain_mem]);
+	}
+	if (hsldiggain_v > 8) {
+		sprintf(buf, "%sGain(user):\t%02d (mute)\n", buf, hsldiggain_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (%s)\n", buf, hsldiggain_v, 
+						hsleardiggain_volmap[hsldiggain_v]);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_hsldiggain_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable HsLDigGain con\n");
+		
+		hsldiggain_con = true;
+		abbamp_control_hsleardiggain(hsldiggain_v);
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable HsLDigGain con\n");
+
+		hsldiggain_con = false;
+		if (hs_ponup) {
+			/* 0000 1000 */
+			snd_soc_write(ab850x_codec, REG_HSLEARDIGGAIN, 0x08);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_HSLEARDIGGAIN);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > MUTE_HSLEARDIG_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		hsldiggain_v = val;
+		if (hsldiggain_con)
+			abbamp_control_hsleardiggain(hsldiggain_v);
+
+		new = snd_soc_read(ab850x_codec, REG_HSLEARDIGGAIN);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_HSLEARDIGGAIN, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_hsldiggain_interface = __ATTR(hsldiggain, 0644, 
+				abb_codec_hsldiggain_show, abb_codec_hsldiggain_store);
+
+static ssize_t abb_codec_hsrdiggain_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int gain_mem = abbamp_read(REG_HSRDIGGAIN, REG_HSRDIGGAIN_HSRDGAIN, 4);
+
+	sprintf(buf, "HsR Digital Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, hsrdiggain_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (gain_mem > 8) {
+		sprintf(buf, "%sGain(mem):\t%02d (mute)\n", buf, gain_mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (%s)\n", buf, gain_mem, 
+						hsrdiggain_volmap[gain_mem]);
+	}
+	if (hsrdiggain_v > 8) {
+		sprintf(buf, "%sGain(user):\t%02d (mute)\n", buf, hsrdiggain_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (%s)\n", buf, hsrdiggain_v, 
+						hsrdiggain_volmap[hsrdiggain_v]);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_hsrdiggain_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable HsRDigGain con\n");
+		
+		hsrdiggain_con = true;
+		abbamp_control_hsrdiggain();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable HsRDigGain con\n");
+
+		hsrdiggain_con = false;
+		if (hs_ponup) {
+			/* 0000 1000 */
+			snd_soc_write(ab850x_codec, REG_HSRDIGGAIN, 0x08);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_HSRDIGGAIN);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > MUTE_HSRDIG_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		hsrdiggain_v = val;
+		if (hsrdiggain_con)
+			abbamp_control_hsrdiggain();
+
+		new = snd_soc_read(ab850x_codec, REG_HSRDIGGAIN);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_HSRDIGGAIN, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_hsrdiggain_interface = __ATTR(hsrdiggain, 0644, 
+				abb_codec_hsrdiggain_show, abb_codec_hsrdiggain_store);
+
+static ssize_t abb_codec_eardiggain_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int gain_mem = abbamp_read(REG_HSLEARDIGGAIN, REG_HSLEARDIGGAIN_HSLDGAIN, 4);
+
+	sprintf(buf, "Ear Digital Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, eardiggain_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (gain_mem > 8) {
+		sprintf(buf, "%sGain(mem):\t%02d (mute)\n", buf, gain_mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (%s)\n", buf, gain_mem, 
+						hsleardiggain_volmap[gain_mem]);
+	}
+	if (eardiggain_v > 8) {
+		sprintf(buf, "%sGain(user):\t%02d (mute)\n", buf, eardiggain_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (%s)\n", buf, eardiggain_v, 
+						hsleardiggain_volmap[eardiggain_v]);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_eardiggain_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable EarDigGain con\n");
+		
+		eardiggain_con = true;
+		if (ear_ponup) {
+			abbamp_control_hsleardiggain(eardiggain_v);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable EarDigGain con\n");
+
+		eardiggain_con = false;
+		if (ear_ponup) {
+			/* 0000 1000 */
+			snd_soc_write(ab850x_codec, REG_HSLEARDIGGAIN, 0x08);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_HSLEARDIGGAIN);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > MUTE_HSLEARDIG_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		eardiggain_v = val;
+		if (ear_ponup && eardiggain_con) {
+			abbamp_control_hsleardiggain(eardiggain_v);
+		}
+
+		new = snd_soc_read(ab850x_codec, REG_HSLEARDIGGAIN);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_HSLEARDIGGAIN, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_eardiggain_interface = __ATTR(eardiggain, 0644, 
+				abb_codec_eardiggain_show, abb_codec_eardiggain_store);
+
+static ssize_t abb_codec_hslowpow_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int mem = abbamp_read(REG_ANACONF1, REG_ANACONF1_HSLOWPOW, 1);
+
+	sprintf(buf, "HS Drivers LP Mode:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, hslowpow_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (mem) {
+		sprintf(buf, "%sMode(mem):\t%d (LP)\n", buf, mem);
+	} else {
+		sprintf(buf, "%sMode(mem):\t%d (HP)\n", buf, mem);
+	}
+	if (hslowpow_v) {
+		sprintf(buf, "%sMode(user):\t%d (LP)\n", buf, hslowpow_v);
+	} else {
+		sprintf(buf, "%sMode(user):\t%d (HP)\n", buf, hslowpow_v);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_hslowpow_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable HsLowPow con\n");
+		
+		hslowpow_con = true;
+		abbamp_control_hslowpow();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable HsLowPow con\n");
+
+		hslowpow_con = false;
+		if (hs_ponup) {
+			abbamp_write(REG_ANACONF1, REG_ANACONF1_HSLOWPOW, 1, 1);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "mode=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > 1)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		hslowpow_v = val;
+		if (hslowpow_con)
+			abbamp_control_hslowpow();
+
+		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANACONF1, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_hslowpow_interface = __ATTR(hslowpow, 0644, 
+				abb_codec_hslowpow_show, abb_codec_hslowpow_store);
+
+static ssize_t abb_codec_hsdaclowpow_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int mem = abbamp_read(REG_ANACONF1, SHIFT_ANACONF1_HSDACLOWPOW, 2);
+
+	sprintf(buf, "HsDAC Drivers LP Mode:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, hsdaclowpow_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (mem) {
+		sprintf(buf, "%sMode(mem):\t%d (LP)\n", buf, mem);
+	} else {
+		sprintf(buf, "%sMode(mem):\t%d (HP)\n", buf, mem);
+	}
+	if (hsdaclowpow_v) {
+		sprintf(buf, "%sMode(user):\t%d (LP)\n", buf, hslowpow_v);
+	} else {
+		sprintf(buf, "%sMode(user):\t%d (HP)\n", buf, hslowpow_v);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_hsdaclowpow_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable HsDACLowPow con\n");
+		
+		hsdaclowpow_con = true;
+		abbamp_control_hsdaclowpow();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable HsDACLowPow con\n");
+
+		hsdaclowpow_con = false;
+		if (hs_ponup) {
+			abbamp_write(REG_ANACONF1, SHIFT_ANACONF1_HSDACLOWPOW, 2, 3);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "mode=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > 3)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		hsdaclowpow_v = val;
+		if (hsdaclowpow_con)
+			abbamp_control_hsdaclowpow();
+
+		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANACONF1, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_hsdaclowpow_interface = __ATTR(hsdaclowpow, 0644, 
+				abb_codec_hsdaclowpow_show, abb_codec_hsdaclowpow_store);
+
+static ssize_t abb_codec_hshpen_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int mem = abbamp_read(REG_ANACONF1, REG_ANACONF1_HSHPEN, 1);
+
+	sprintf(buf, "HS HighPass Filter:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, hshpen_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (mem) {
+		sprintf(buf, "%sMode(mem):\t%d [*]\n", buf, mem);
+	} else {
+		sprintf(buf, "%sMode(mem):\t%d [ ]\n", buf, mem);
+	}
+	if (hshpen_v) {
+		sprintf(buf, "%sMode(user):\t%d [*]\n", buf, hshpen_v);
+	} else {
+		sprintf(buf, "%sMode(user):\t%d [ ]\n", buf, hshpen_v);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_hshpen_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable HsHpEn con\n");
+		
+		hshpen_con = true;
+		abbamp_control_hshpen();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable HsHpEn con\n");
+
+		hshpen_con = false;
+		if (hs_ponup) {
+			abbamp_write(REG_ANACONF1, REG_ANACONF1_HSHPEN, 1, 0);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "mode=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > 1)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		hshpen_v = val;
+		if (hshpen_con)
+			abbamp_control_hshpen();
+
+		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ANACONF1, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_hshpen_interface = __ATTR(hshpen, 0644, 
+				abb_codec_hshpen_show, abb_codec_hshpen_store);
+
+static ssize_t abb_codec_anaconf1_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int hslp = abbamp_read(REG_ANACONF1, REG_ANACONF1_HSLOWPOW, 1);
+	int hsdaclp = abbamp_read(REG_ANACONF1, SHIFT_ANACONF1_HSDACLOWPOW, 2);
+	int hshp = abbamp_read(REG_ANACONF1, REG_ANACONF1_HSHPEN, 1);
+
+	sprintf(buf, "Analog Config1(mem):\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sHsLowPow\t[%s]\n", buf, hslp ? "*" : " ");
+	if (hsdaclp > 0) {
+		sprintf(buf, "%sHsDacLowPow\t[*]\n", buf);
+	} else {
+		sprintf(buf, "%sHsDacLowPow\t[ ]\n", buf);
+	}
+	sprintf(buf, "%sHsHpEn\t\t[%s]\n", buf, hshp ? "*" : " ");
+
+	return strlen(buf);
+}
+
+static struct kobj_attribute abb_codec_anaconf1_interface = __ATTR(anaconf1, 0444, 
+				abb_codec_anaconf1_show, NULL);
+
+static ssize_t abb_codec_anaconf4_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "Analog Path Enable:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%s[IDX][DIS][MEM]\n", buf);
+	sprintf(buf, "%s[2]  [%d]  [%s]  Headset Left Enable\n", buf, 
+			hslanaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHSL, 1) ? "*" : " ");
+	sprintf(buf, "%s[3]  [%d]  [%s]  Headset Right Enable\n", buf, 
+			hsranaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHSR, 1) ? "*" : " ");
+	sprintf(buf, "%s[4]  [%d]  [%s]  Speaker Left Enable\n", buf, 
+			hflanaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHFL, 1) ? "*" : " ");
+	sprintf(buf, "%s[5]  [%d]  [%s]  Speaker Right Enable\n", buf, 
+			hfranaena_con, abbamp_read(REG_ANACONF4, REG_ANACONF4_ENHFR, 1) ? "*" : " ");
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_anaconf4_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int sft, dis, ret;
+	
+	/* CMD: Index Disable? */
+	ret = sscanf(buf, "%d %d", &sft, &dis);
+	
+	if ((ret < 0) || (sft < 2) || (sft > 5) || ((dis != 0) && (dis != 1)))
+	{
+		pr_err("[ABB-Codec] invalid inputs\n");
+		return -EINVAL;
+	}
+
+	switch (sft)
+	{
+		case 2:
+			if (dis) {
+				/* Disable */
+				hslanaena_con = true;
+			} else {
+				hslanaena_con = false;
+				
+				/* Restore default state */
+				if (hs_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSL, 1, 1);
+			}
+
+			break;
+
+		case 3:
+			if (dis) {
+				hsranaena_con = true;
+			} else {
+				hsranaena_con = false;
+
+				if (hs_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHSR, 1, 1);
+			}
+
+			break;
+
+		case 4:
+			if (dis) {
+				hflanaena_con = true;
+			} else {
+				hflanaena_con = false;
+
+				if (hf_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFL, 1, 1);
+			}
+
+			break;
+
+		case 5:
+			if (dis) {
+				hfranaena_con = true;
+			} else {
+				hfranaena_con = false;
+
+				if (hf_ponup)
+					abbamp_write(REG_ANACONF4, REG_ANACONF4_ENHFR, 1, 1);
+			}
+
+			break;
+	}
+
+	abbamp_control_anaconf4_hs();
+	abbamp_control_anaconf4_hf();
+
+	pr_info("[ABB-Codec] AnaConf4 [%d] : [%d]\n", sft, abbamp_read(REG_ANACONF4, sft, 1));
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_anaconf4_interface = __ATTR(anaconf4, 0644, 
+				abb_codec_anaconf4_show, abb_codec_anaconf4_store);
+
+static ssize_t abb_codec_shortcir_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "Short Circuit Conf:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%s[0][%d] HsZcdDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSZCDDIS, 1));
+	sprintf(buf, "%s[1][%d] HsFadDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSFADDIS, 1));
+	sprintf(buf, "%s[2][%d] HsOscEn\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSOSCEN, 1));
+	sprintf(buf, "%s[3][%d] \n", 		buf, abbamp_read(REG_SHORTCIRCONF, 3, 1));
+	sprintf(buf, "%s[4][%d] HsPullDEn\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSPULLDEN, 1));
+	sprintf(buf, "%s[5][%d] HsShortDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_HSSHORTDIS, 1));
+	sprintf(buf, "%s[6][%d] EarShortDis\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_EARSHORTDIS, 1));
+	sprintf(buf, "%s[7][%d] EnShortPWD\n", buf, abbamp_read(REG_SHORTCIRCONF, REG_SHORTCIRCONF_ENSHORTPWD, 1));
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_shortcir_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int sft, val, ret;
+	
+	ret = sscanf(buf, "%d %d", &sft, &val);
+	
+	if ((ret < 0) || (sft < 0) || (sft > 7) || ((val != 0) && (val != 1)))
+	{
+		pr_err("[ABB-Codec] invalid inputs\n");
+		return -EINVAL;
+	}
+
+	abbamp_write(REG_SHORTCIRCONF, sft, 1, val);
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_shortcir_interface = __ATTR(shortcir, 0644, 
+				abb_codec_shortcir_show, abb_codec_shortcir_store);
+
+static ssize_t abb_codec_classdhpg_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int mem = abbamp_read(REG_CLASSDCONF3, SHIFT_CLASSDDIR_HPG, 4);
+
+	sprintf(buf, "ClassD HighPass Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, classdhpg_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (mem == 0xA) {
+		sprintf(buf, "%sGain(mem):\t%02d (Maximum)\n", buf, mem);
+	} else if (mem == 0x0){
+		sprintf(buf, "%sGain(mem):\t%02d (Minimum)\n", buf, mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (Medium)\n", buf, mem);
+	}
+	if (classdhpg_v == 0xA) {
+		sprintf(buf, "%sGain(user):\t%02d (Maximum)\n", buf, classdhpg_v);
+	} else if (classdhpg_v == 0x0){
+		sprintf(buf, "%sGain(user):\t%02d (Minimum)\n", buf, classdhpg_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (Medium)\n", buf, classdhpg_v);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_classdhpg_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable ClassDHPG con\n");
+		
+		classdhpg_con = true;
+		abbamp_control_classdhpg();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable ClassDHPG con\n");
+
+		classdhpg_con = false;
+		/* 0100 xxxx */
+		if (hf_ponup) {
+			abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_HPG, 4, 0x4);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_CLASSDDIR_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		classdhpg_v = val;
+		if (classdhpg_con)
+			abbamp_control_classdhpg();
+
+		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_CLASSDCONF3, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_classdhpg_interface = __ATTR(classdhpg, 0644, 
+				abb_codec_classdhpg_show, abb_codec_classdhpg_store);
+
+static ssize_t abb_codec_classdwg_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int mem = abbamp_read(REG_CLASSDCONF3, SHIFT_CLASSDDIR_WG, 4);
+
+	sprintf(buf, "ClassD White Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, classdwg_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+	if (mem == 0xA) {
+		sprintf(buf, "%sGain(mem):\t%02d (Maximum)\n", buf, mem);
+	} else if (mem == 0x0){
+		sprintf(buf, "%sGain(mem):\t%02d (Minimum)\n", buf, mem);
+	} else {
+		sprintf(buf, "%sGain(mem):\t%02d (Medium)\n", buf, mem);
+	}
+	if (classdwg_v == 0xA) {
+		sprintf(buf, "%sGain(user):\t%02d (Maximum)\n", buf, classdwg_v);
+	} else if (classdwg_v == 0x0){
+		sprintf(buf, "%sGain(user):\t%02d (Minimum)\n", buf, classdwg_v);
+	} else {
+		sprintf(buf, "%sGain(user):\t%02d (Medium)\n", buf, classdwg_v);
+	}
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_classdwg_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable ClassDWG con\n");
+		
+		classdwg_con = true;
+		abbamp_control_classdwg();
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable ClassDWG con\n");
+
+		classdwg_con = false;
+		/* xxxx 0100 */
+		if (hf_ponup) {
+			abbamp_write(REG_CLASSDCONF3, SHIFT_CLASSDDIR_WG, 4, 0x4);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > GAIN_CLASSDDIR_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		classdwg_v = val;
+		if (classdwg_con)
+			abbamp_control_classdwg();
+
+		new = snd_soc_read(ab850x_codec, REG_ANACONF1);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_CLASSDCONF3, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_classdwg_interface = __ATTR(classdwg, 0644, 
+				abb_codec_classdwg_show, abb_codec_classdwg_store);
+
+static ssize_t abb_codec_addiggain2_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int gain_mem = abbamp_read(REG_ADDIGGAIN2, REG_ADDIGGAINX_GAIN, 6);
+
+	sprintf(buf, "AD2(mic2) Path Gain:\n");
+	sprintf(buf, "%s\n", buf);
+	sprintf(buf, "%sEnable [%s]\n", buf, addiggain2_con ? "*" : " ");
+	sprintf(buf, "%s\n", buf);
+
+	sprintf(buf, "%sGain(mem):\t%02d (%s)\n", buf, gain_mem, addiggain2_volmap[gain_mem]);
+	sprintf(buf, "%sGain(user):\t%02d (%s)\n", buf, addiggain2_v, addiggain2_volmap[addiggain2_v]);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_addiggain2_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int new, old, val, ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		pr_err("[ABB-Codec] enable AD2DigGain con\n");
+		
+		addiggain2_con = true;
+		if (ad2_ponup) {
+			abbamp_control_ad2();
+		}
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		pr_err("[ABB-Codec] disable AD2DigGain con\n");
+
+		addiggain2_con = false;
+		if (ad2_ponup) {
+			/* 0001 1111 */
+			snd_soc_write(ab850x_codec, REG_ADDIGGAIN2, 0x1f);
+		}
+
+		return count;
+	}
+
+	if (!strncmp(&buf[0], "gain=", 5)) {
+		old = snd_soc_read(ab850x_codec, REG_ADDIGGAIN2);
+		ret = sscanf(&buf[5], "%d", &val);
+
+		if ((ret < 0) || (val < 0) || (val > MUTE_AD2_MAX)) {
+			pr_err("[ABB-Codec] invalid inputs!\n");
+			return -EINVAL;
+		}
+
+		addiggain2_v = val;
+		if (ad2_ponup && addiggain2_con) {
+			abbamp_control_ad2();
+		}
+
+		new = snd_soc_read(ab850x_codec, REG_ADDIGGAIN2);
+		pr_err("[ABB-Codec] REG[%#04x] %#04x -> %#04x\n", REG_ADDIGGAIN2, old, new);
+		
+		return count;
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_addiggain2_interface = __ATTR(addiggain2, 0644, 
+				abb_codec_addiggain2_show, abb_codec_addiggain2_store);
+
+static ssize_t abb_codec_lpamode_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "Low-power-audio Mode\n\n");
+	sprintf(buf, "%sEnable [%s]\n\n", buf, lpa_mode_enabled ? "*" : " ");
+	sprintf(buf, "%sLPA Vape: %u uV (%#04x)\n\n", buf, vape_voltage(lpa_vape2), lpa_vape2);
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_lpamode_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int val;
+
+	if (sysfs_streq(buf, "on")) {
+		lpa_mode_enabled = true;
+
+		return count;
+	}
+
+	if (sysfs_streq(buf, "off")) {
+		lpa_mode_enabled = false;
+
+		return count;
+	}
+
+	if (sscanf(buf, "vape=%x", &val)) {
+		lpa_vape2 = val;
+
+		return count;
+	}
+
+	return -EINVAL;
+}
+
+static struct kobj_attribute abb_codec_lpamode_interface = __ATTR(lpa_mode, 0644, 
+				abb_codec_lpamode_show, abb_codec_lpamode_store);
+
+static ssize_t abb_codec_chargepump_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
+{
+	int bit = (snd_soc_read(ab850x_codec, REG_SIGENVCONF)) & BIT(REG_SIGENVCONF_CPLVEN);
+
+	sprintf(buf,   "Headset ChargePump:\n\n");
+	sprintf(buf, "%sPower Supply Mode:\n", buf);
+	sprintf(buf, "%s[%s][0] VddHs     (Fixed 1.8V)(Class AB)\n", buf, bit ? " " : "*");
+	sprintf(buf, "%s[%s][1] SmpsVcphs (Dynamic, LP)(Class G)\n", buf, bit ? "*" : " ");
+
+	return strlen(buf);
+}
+
+static ssize_t abb_codec_chargepump_store(struct kobject *kobj, 
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int regval;
+
+	/* This bit is static */
+	if (sysfs_streq(buf, "0")) {
+		regval = snd_soc_read(ab850x_codec, REG_SIGENVCONF);
+		regval = regval & 0x1f;	
+		snd_soc_write(ab850x_codec, REG_SIGENVCONF, regval);
+	} else if (sysfs_streq(buf, "1")) {
+		regval = snd_soc_read(ab850x_codec, REG_SIGENVCONF);
+		regval = regval | BIT(REG_SIGENVCONF_CPLVEN);
+		snd_soc_write(ab850x_codec, REG_SIGENVCONF, regval);
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_codec_chargepump_interface = __ATTR(chargepump, 0644, 
+				abb_codec_chargepump_show, abb_codec_chargepump_store);
+
+static struct attribute *abb_codec_attrs[] = {
+	&abb_codec_dbg_interface.attr, 
+	&abb_codec_vertag_interface.attr, 
+	&abb_codec_write_interface.attr, 
+	&abb_codec_anagain3_interface.attr, 
+	&abb_codec_hsldiggain_interface.attr, 
+	&abb_codec_hsrdiggain_interface.attr, 
+	&abb_codec_hslowpow_interface.attr, 
+	&abb_codec_hsdaclowpow_interface.attr, 
+	&abb_codec_hshpen_interface.attr, 
+	&abb_codec_anaconf1_interface.attr, 
+	&abb_codec_anaconf4_interface.attr, 
+	&abb_codec_eardiggain_interface.attr, 
+	&abb_codec_shortcir_interface.attr, 
+	&abb_codec_classdhpg_interface.attr, 
+	&abb_codec_classdwg_interface.attr, 
+	&abb_codec_addiggain2_interface.attr, 
+	&abb_codec_lpamode_interface.attr, 
+	&abb_codec_chargepump_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group abb_codec_interface_group = {
+	.attrs = abb_codec_attrs,
+};
+
+static struct kobject *abb_codec_kobject;
 
 static int ab850x_codec_remove(struct snd_soc_codec *codec)
 {
@@ -4101,6 +5943,23 @@ static int __devinit ab850x_codec_driver_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	switch (drvdata->chipid) {
+	case AB850X_AUDIO_AB8500:
+		ab850x_codec_id = "ab8500";
+		break;
+	case AB850X_AUDIO_AB8505_V1:
+		ab850x_codec_id = "ab8505-V1";
+		break;
+	case AB850X_AUDIO_AB8505_V2:
+		ab850x_codec_id = "ab8505-V2";
+		break;
+	case AB850X_AUDIO_AB8505_V3:
+		ab850x_codec_id = "ab8505-V3";
+		break;
+	default:
+		ab850x_codec_id = "unknown";
+	}
+
 	pr_info("%s: Register codec.\n", __func__);
 	err = snd_soc_register_codec(&pdev->dev,
 				&ab850x_codec_driver,
@@ -4109,6 +5968,20 @@ static int __devinit ab850x_codec_driver_probe(struct platform_device *pdev)
 	if (err < 0) {
 		pr_err("%s: Error: Failed to register codec (%d).\n",
 			__func__, err);
+	}
+
+	abb_codec_kobject = kobject_create_and_add("abb-codec", kernel_kobj);
+
+	if (!abb_codec_kobject) {
+		pr_info("[ABB-Codec] Failed to create kobjects\n");
+		return -ENOMEM;
+	}
+
+	err = sysfs_create_group(abb_codec_kobject, &abb_codec_interface_group);
+
+	if (err) {
+		pr_info("[ABB-Codec] Failed to register sysfs\n");
+		kobject_put(abb_codec_kobject);
 	}
 
 	pr_debug("%s: Exit.\n", __func__);
