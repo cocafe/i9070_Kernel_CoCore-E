@@ -10,10 +10,12 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/input.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/mfd/abx500.h>
 #include <linux/mfd/abx500/ab5500.h>
+#include <linux/ab8500-ponkey.h>
 
 /* Ponkey time control bits */
 #define AB5500_MCB		0x2F
@@ -60,6 +62,8 @@ struct ab8500_ponkey_info {
 	struct delayed_work	pcut_work;
 	u8			pcut_ctrl;
 };
+
+struct ab8500_ponkey_info *p_info;
 
 #ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
 extern bool gpio_keys_getstate(int keycode);
@@ -156,7 +160,7 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
 		info->key_state = true;
 		input_report_key(info->idev, KEY_POWER, true);
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		dev_info(info->idev->dev.parent, "Power KEY pressed %d\n", KEY_POWER);
+		pr_info("[ABB-POnKey] Power KEY pressed %d\n", KEY_POWER);
 #endif
 	} else if (irq == info->irq_dbr) {
 		if (info->pcut_wa && !cancel_delayed_work_sync(&info->pcut_work))
@@ -167,7 +171,7 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
 		info->key_state = false;
 		input_report_key(info->idev, KEY_POWER, false);
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		dev_info(info->idev->dev.parent, "Power KEY released %d\n", KEY_POWER);
+		pr_info("[ABB-POnKey] Power KEY released %d\n", KEY_POWER);
 #endif
 
 	}
@@ -176,6 +180,77 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+
+void ab8500_ponkey_emulator(bool press)
+{
+	if (press) {
+		gpio_keys_setstate(KEY_POWER, true);
+		p_info->key_state = true;
+		input_report_key(p_info->idev, KEY_POWER, true);
+		pr_err("[ABB-POnKey] Emulate Power Key PRESS\n");
+		input_sync(p_info->idev);
+	} else if (!press) {
+		gpio_keys_setstate(KEY_POWER, false);
+		p_info->key_state = false;
+		input_report_key(p_info->idev, KEY_POWER, false);
+		pr_err("[ABB-POnKey] Emulate Power Key RELEASE\n");
+		input_sync(p_info->idev);
+	}
+}
+EXPORT_SYMBOL(ab8500_ponkey_emulator);
+
+static bool emu_working = false;
+static unsigned int emu_sleep = 500;
+
+static void abb_ponkey_emulator_thread(struct work_struct *abb_ponkey_emulator_work)
+{
+	pr_err("[ABB-POnKey] Emulator thread called, timer = %d\n", emu_sleep);
+
+	emu_working = true;
+
+	ab8500_ponkey_emulator(1);
+
+	msleep(emu_sleep);
+
+	ab8500_ponkey_emulator(0);
+
+	emu_working = false;
+}
+static DECLARE_WORK(abb_ponkey_emulator_work, abb_ponkey_emulator_thread);
+
+static ssize_t abb_ponkey_emulator_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int slp, ret;
+
+	ret = sscanf(buf, "%d", &slp);
+
+	if ((ret < 0) || (slp < 0)) {
+		pr_err("[ABB-POnKey] Invalid inputs\n");
+		return -EINVAL;
+	}
+
+	if (!emu_working) {
+		emu_sleep = slp;
+		schedule_work(&abb_ponkey_emulator_work);
+	} else {
+		pr_err("[ABB-POnKey] Emulator thread is working\n");
+	}
+
+	return count;
+}
+
+static struct kobj_attribute abb_ponkey_emulator_interface = __ATTR(emulator, 0644, NULL, abb_ponkey_emulator_store);
+
+static struct attribute *abb_ponkey_attrs[] = {
+	&abb_ponkey_emulator_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group abb_ponkey_interface_group = {
+	.attrs = abb_ponkey_attrs,
+};
+
+static struct kobject *abb_ponkey_kobject;
 
 static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
 {
@@ -271,6 +346,20 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, info);
 
+	p_info = info;
+
+	abb_ponkey_kobject = kobject_create_and_add("abb-ponkey", kernel_kobj);
+
+	if (!abb_ponkey_kobject) {
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(abb_ponkey_kobject, &abb_ponkey_interface_group);
+
+	if (ret) {
+		kobject_put(abb_ponkey_kobject);
+	}
+
 	return 0;
 
 out_irq_dbf:
@@ -294,6 +383,7 @@ static int __devexit ab8500_ponkey_remove(struct platform_device *pdev)
 	free_irq(info->irq_dbr, info);
 	input_unregister_device(info->idev);
 	kfree(info);
+	kobject_put(abb_ponkey_kobject);
 	return 0;
 }
 
