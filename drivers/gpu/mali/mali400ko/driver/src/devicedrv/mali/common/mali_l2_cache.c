@@ -19,6 +19,8 @@
  */
 #define MALI400_L2_CACHE_REGISTERS_SIZE 0x30
 
+int mali_l2_registers_size = MALI400_L2_CACHE_REGISTERS_SIZE;
+
 #define MALI_MAX_NUMBER_OF_L2_CACHE_CORES  3
 
 /**
@@ -167,7 +169,7 @@ void mali_l2_cache_delete(struct mali_l2_cache_core *cache)
 	u32 i;
 
 	/* reset to defaults */
-	mali_hw_core_register_write(&cache->hw_core, MALI400_L2_CACHE_REGISTER_MAX_READS, (u32)MALI400_L2_MAX_READS_DEFAULT);
+	mali_hw_core_register_write(&cache->hw_core, MALI400_L2_CACHE_REGISTER_MAX_READS, (u32)mali_l2_max_reads);
 	mali_hw_core_register_write(&cache->hw_core, MALI400_L2_CACHE_REGISTER_ENABLE, (u32)MALI400_L2_CACHE_ENABLE_DEFAULT);
 
 	_mali_osk_lock_term(cache->counter_lock);

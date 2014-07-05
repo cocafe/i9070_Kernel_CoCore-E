@@ -135,7 +135,7 @@ $(error No configuration found for config $(CONFIG). Check that arch-$(CONFIG)/c
 else
 # Link arch to the selected arch-config directory
 $(shell [ -L $(DRIVER_DIR)/arch ] && rm $(DRIVER_DIR)/arch)
-$(shell ln -sf arch-$(CONFIG) $(DRIVER_DIR)/arch)
+$(shell ln -sf $(DRIVER_DIR)/arch-$(CONFIG) $(DRIVER_DIR)/arch)
 $(shell touch $(DRIVER_DIR)/arch/config.h)
 endif
 
@@ -160,7 +160,7 @@ DEFINES += -DMALI_TIMELINE_PROFILING_ENABLED=$(USING_PROFILING)
 DEFINES += -DMALI_POWER_MGMT_TEST_SUITE=$(USING_MALI_PMM_TESTSUITE)
 ifeq ($(shell test $(SUBLEVEL) -gt 32 -a $(PATCHLEVEL) = 6 -a $(VERSION) = 2 -o $(VERSION) -gt 2 && echo "OK"),OK)
 # MALI_STATE_TRACKING is only supported on Linux kernels from version 2.6.32.
-DEFINES += -DMALI_STATE_TRACKING=1
+DEFINES += -DMALI_STATE_TRACKING=0
 else
 DEFINES += -DMALI_STATE_TRACKING=0
 endif

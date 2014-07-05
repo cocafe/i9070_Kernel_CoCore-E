@@ -65,8 +65,36 @@ module_param(mali_max_job_runtime, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | 
 MODULE_PARM_DESC(mali_max_job_runtime, "Maximum allowed job runtime in msecs.\nJobs will be killed after this no matter what");
 
 extern int mali_l2_max_reads;
-module_param(mali_l2_max_reads, int, S_IRUSR | S_IRGRP | S_IROTH);
+module_param(mali_l2_max_reads, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_l2_max_reads, "Maximum reads for Mali L2 cache");
+
+extern int mali_l2_registers_size;
+module_param(mali_l2_registers_size, int, S_IRUGO); /* r--r--r-- */
+MODULE_PARM_DESC(mali_l2_registers_size, "Mali L2 cache registers size");
+
+extern int mali_pm_sampling_rate;
+module_param(mali_pm_sampling_rate, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_pm_sampling_rate, "Mali PM light sleep timeout");
+
+extern int mali_utilization_sampling_rate;
+module_param(mali_utilization_sampling_rate, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_utilization_sampling_rate, "Mali GPU utilization sampling rate");
+
+extern int mali_utilization_high_to_low;
+module_param(mali_utilization_high_to_low, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_utilization_high_to_low, "Mali GPU utilization high to low limit");
+
+extern int mali_utilization_low_to_high;
+module_param(mali_utilization_low_to_high, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_utilization_low_to_high, "Mali GPU utilization low to high limit");
+
+extern bool mali_pp_scheduler_balance_jobs;
+module_param(mali_pp_scheduler_balance_jobs, bool, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_pp_scheduler_balance_jobs, "Mali PP forces balance jobs at starts");
+
+extern int mali_oskmem_allocorder;
+module_param(mali_oskmem_allocorder, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_utilization_sampling_rate, "Mali OS kernel memory allocation order");
 
 #if MALI_TIMELINE_PROFILING_ENABLED
 extern int mali_boot_profiling;
