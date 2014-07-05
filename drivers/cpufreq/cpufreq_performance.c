@@ -10,17 +10,37 @@
  *
  */
 
+#include <linux/cpu.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/cpufreq.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
+static void cpufreq_replug_thread(struct work_struct *cpufreq_replug_work)
+{
+	int cpu;
+
+	/* For UX500 platform, PRCMU need to update CPU1 policy */
+	msleep(3000);
+
+	for_each_cpu_not(cpu, cpu_online_mask) {
+
+	if (cpu == 0)
+		continue;
+		cpu_up(cpu);
+	}
+}
+static DECLARE_WORK(cpufreq_replug_work, cpufreq_replug_thread);
 
 static int cpufreq_governor_performance(struct cpufreq_policy *policy,
 					unsigned int event)
 {
 	switch (event) {
 	case CPUFREQ_GOV_START:
+		schedule_work(&cpufreq_replug_work);
+		break;
+
 	case CPUFREQ_GOV_LIMITS:
 		pr_debug("setting to %u kHz because of event %u\n",
 						policy->max, event);
