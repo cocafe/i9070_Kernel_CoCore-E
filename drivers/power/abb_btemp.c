@@ -11,6 +11,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -48,6 +49,9 @@
 
 #define to_ab8500_btemp_device_info(x) container_of((x), \
 	struct ab8500_btemp, btemp_psy);
+
+static bool debug_mask = 0;
+module_param(debug_mask, bool, 0644);
 
 enum battery_monitoring_state {
 	temperature_monitoring_off = 0 ,
@@ -569,7 +573,7 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 		di->bat->bat_type[id].r_to_t_tbl,
 		di->bat->bat_type[id].n_temp_tbl_elements, adc);
 	if (temp != prev)
-		pr_info("%s: adc(%d), temp(%d)\n", __func__, adc, temp);
+		pr_info("[ABB-BTEMP] adc(%d), temp(%d)\n", adc, temp);
 	prev = temp;
 
 
@@ -591,7 +595,7 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 		temp = ab8500_btemp_res_to_temp(di,
 			di->bat->bat_type[id].r_to_t_tbl,
 			di->bat->bat_type[id].n_temp_tbl_elements, rbat);
-		pr_info("%s: rbat(%d), temp(%d)\n", __func__, rbat, temp);
+		pr_info("[ABB-BTEMP] rbat(%d), temp(%d)\n", rbat, temp);
 	} else {
 		vntc = ab8500_gpadc_convert(di->gpadc, BTEMP_BALL);
 		if (vntc < 0) {
@@ -609,7 +613,8 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 			di->bat->bat_type[id].r_to_t_tbl,
 			di->bat->bat_type[id].n_temp_tbl_elements, rntc);
 		prev = temp;
-		pr_info("%s: vntc(%d), rntc(%d), temp(%d)\n", __func__, vntc, rntc, temp);
+		if (debug_mask)
+			pr_info("[ABB-BTEMP] vntc(%d), rntc(%d), temp(%d)\n", vntc, rntc, temp);
 	}
 #endif
 	dev_dbg(di->dev, "Battery temperature is %d\n", temp);
