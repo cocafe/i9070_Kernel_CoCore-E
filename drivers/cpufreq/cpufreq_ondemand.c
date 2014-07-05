@@ -22,6 +22,7 @@
 #include <linux/tick.h>
 #include <linux/ktime.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -33,7 +34,7 @@
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
 #define MAX_SAMPLING_DOWN_FACTOR		(100000)
 #define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
-#define MICRO_FREQUENCY_UP_THRESHOLD		(95)
+#define MICRO_FREQUENCY_UP_THRESHOLD		(75)
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
@@ -704,6 +705,22 @@ static struct notifier_block __refdata ondemand_cpu_notifier = {
 	.notifier_call = cpu_callback,
 };
 
+static void cpufreq_replug_thread(struct work_struct *cpufreq_replug_work)
+{
+	int cpu;
+
+	/* For UX500 platform, PRCMU need to update CPU1 policy */
+	msleep(3000);
+
+	for_each_cpu_not(cpu, cpu_online_mask) {
+
+	if (cpu == 0)
+		continue;
+		cpu_up(cpu);
+	}
+}
+static DECLARE_WORK(cpufreq_replug_work, cpufreq_replug_thread);
+
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				   unsigned int event)
 {
@@ -788,6 +805,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 		} else
 			dbs_timer_init(this_dbs_info, cpu);
+
+		schedule_work(&cpufreq_replug_work);
+
 		break;
 
 	case CPUFREQ_GOV_STOP:
