@@ -3,6 +3,8 @@
  *
  * Copyright (C) 2011 Samsung Electronics
  *
+ * Modified: Huang Ji (cocafe@xda-developers.com)
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -11,6 +13,7 @@
 
 /* #define TOUCHKEY_UPDATE_ONBOOT */
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/input.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -32,6 +35,10 @@
 #include <linux/usb_switcher.h>
 
 #include <mach/board-sec-u8500.h>
+
+#if CONFIG_HAS_WAKELOCK
+#include <linux/wakelock.h>
+#endif
 
 #define CYPRESS_GEN		0X00
 #define CYPRESS_FW_VER		0X01
@@ -64,6 +71,10 @@
 #define TOUCHKEY_BACKLIGHT	"button-backlight"
 #endif
 
+#if CONFIG_HAS_WAKELOCK
+static struct wake_lock t2w_wakelock;
+#endif
+
 /*sec_class sysfs*/
 extern struct class *sec_class;
 struct device *sec_touchkey;
@@ -80,8 +91,8 @@ static u8 touchkey_threshold;
 #define PRESS_BIT_MASK		0X08
 #define KEYCODE_BIT_MASK	0X07
 
-#define TOUCHKEY_LOG(k, v) dev_notice(&info->client->dev, "key[%d] %d\n", k, v);
-#define FUNC_CALLED dev_notice(&info->client->dev, "%s: called.\n", __func__);
+#define TOUCHKEY_LOG(k, v) pr_info("[Touchkey] Key[%d] %d\n", k, v);
+#define FUNC_CALLED pr_info("[Touchkey] [fn] %s\n", __func__);
 
 #define NUM_OF_RETRY_UPDATE	5
 #define NUM_OF_RETRY_I2C	2
@@ -92,6 +103,13 @@ extern bool vbus_state;
 
 static struct workqueue_struct *touchkey_wq;
 static struct work_struct update_work;
+
+static bool debug_mask = false;
+module_param(debug_mask, bool, 0644);
+
+static bool bTouch2Wake = false;
+
+static bool led_disabled = false;
 
 extern int touch_is_pressed;
 struct cypress_touchkey_info {
@@ -167,7 +185,7 @@ static void cypress_touchkey_brightness_set
 	if (info->current_status && !touchkey_update_status)
 		queue_work(info->led_wq, &info->led_work);
 	else
-		dev_notice(&info->client->dev, "%s under suspend status or FW updating\n", __func__);
+		pr_err("[TouchKey] Not allowed to set LED backlight\n");
 }
 #endif
 
@@ -270,7 +288,8 @@ static void cypress_touchkey_work(struct work_struct *work)
 	}
 
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	TOUCHKEY_LOG(info->keycode[code], press);
+	if (debug_mask)
+		TOUCHKEY_LOG(info->keycode[code], press);
 #endif
 
 	if (touch_is_pressed && press) {
@@ -346,11 +365,13 @@ static void cypress_touchkey_con_hw(struct cypress_touchkey_info *info, bool fla
 		gpio_set_value(info->pdata->gpio_ldo_en, 1);
 		gpio_set_value(info->pdata->gpio_led_en, 1);
 	} else {
-		gpio_set_value(info->pdata->gpio_led_en, 0);
-		gpio_set_value(info->pdata->gpio_ldo_en, 0);
+		if (!bTouch2Wake) {
+			gpio_set_value(info->pdata->gpio_led_en, 0);
+			gpio_set_value(info->pdata->gpio_ldo_en, 0);
+		}
 	}
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	dev_notice(&info->client->dev, "%s : called with flag %d.\n", __func__, flag);
+	pr_info("[Touchkey] [fn] %s [flag %d]\n", __func__, flag);
 #endif
 }
 
@@ -460,6 +481,116 @@ static int cypress_touchkey_led_off(struct cypress_touchkey_info *info)
 	return ret;
 }
 */
+
+static ssize_t cypress_touch2wake_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "status: %s\n", bTouch2Wake ? "on" : "off");
+	#if CONFIG_HAS_WAKELOCK
+	sprintf(buf, "%swakelock_ena: %d\n", buf, wake_lock_active(&t2w_wakelock));
+	#endif
+
+	return strlen(buf);
+}
+
+static ssize_t cypress_touch2wake_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+
+	if (!strncmp(buf, "on", 2)) {
+		bTouch2Wake = true;
+
+		#if CONFIG_HAS_WAKELOCK
+		wake_lock(&t2w_wakelock);
+		#endif
+
+		pr_err("[TouchKey] Touch2Wake On\n");
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		bTouch2Wake = false;
+
+		#if CONFIG_HAS_WAKELOCK
+		wake_unlock(&t2w_wakelock);
+		#endif
+
+		pr_err("[TouchKey] Touch2Wake Off\n");
+
+		return count;
+	}
+
+	#if CONFIG_HAS_WAKELOCK
+	/* For development activity */
+	if (!strncmp(&buf[0], "wakelock=", 9)) {
+		sscanf(&buf[9], "%d", &ret);
+
+		if (!ret)
+			wake_unlock(&t2w_wakelock);
+		else
+			wake_lock(&t2w_wakelock);
+		
+		return count;
+	}
+	#endif
+		
+	return count;
+}
+
+static struct kobj_attribute cypress_touch2wake_interface = __ATTR(touch2wake, 0644, cypress_touch2wake_show, cypress_touch2wake_store);
+
+static ssize_t cypress_forceled_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf, "%s\n", led_disabled ? "on" : "off");
+
+	return strlen(buf);
+}
+
+static ssize_t cypress_forceled_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	if (!strncmp(buf, "on", 2)) {
+		if (info->brightness > 0) {
+			cypress_touchkey_brightness_set(&info->leds, LED_OFF);
+		}
+
+		info->current_status = 0;
+		led_disabled  = 1;
+
+		pr_err("[TouchKey] LED Off\n");
+
+		return count;
+	}
+
+	if (!strncmp(buf, "off", 3)) {
+		info->current_status = 1;
+		led_disabled = 0;
+
+		if (info->brightness > 0) {
+			cypress_touchkey_brightness_set(&info->leds, LED_FULL);
+		}
+
+		pr_err("[TouchKey] LED On\n");
+
+		return count;
+	}
+		
+	return count;
+}
+
+static struct kobj_attribute cypress_forceled_interface = __ATTR(led_disable, 0644, cypress_forceled_show, cypress_forceled_store);
+
+static struct attribute *cypress_attrs[] = {
+	&cypress_touch2wake_interface.attr, 
+	&cypress_forceled_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group cypress_interface_group = {
+	.attrs = cypress_attrs,
+};
+
+static struct kobject *cypress_kobject;
+
 static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 				  const struct i2c_device_id *id)
 {
@@ -555,6 +686,22 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 	cypress_thd_change(vbus_state);
 	cypress_touchkey_auto_cal(info);
 
+	cypress_kobject = kobject_create_and_add("cypress", kernel_kobj);
+
+	if (!cypress_kobject) {
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(cypress_kobject, &cypress_interface_group);
+
+	if (ret) {
+		kobject_put(cypress_kobject);
+	}
+
+#if CONFIG_HAS_WAKELOCK
+	wake_lock_init(&t2w_wakelock, WAKE_LOCK_SUSPEND, "t2w_wakelock");
+#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	info->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	info->early_suspend.suspend = cypress_touchkey_early_suspend;
@@ -614,6 +761,9 @@ static int __devexit cypress_touchkey_remove(struct i2c_client *client)
 	if (info->irq >= 0)
 		free_irq(info->irq, info);
 	input_unregister_device(info->input_dev);
+#if CONFIG_HAS_WAKELOCK
+	wake_lock_destroy(&t2w_wakelock);
+#endif
 	kfree(info);
 	return 0;
 }
@@ -655,10 +805,21 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
 {
 	struct cypress_touchkey_info *info;
 	info = container_of(h, struct cypress_touchkey_info, early_suspend);
-	cypress_touchkey_suspend(&info->client->dev);
+	if (!bTouch2Wake)
+		cypress_touchkey_suspend(&info->client->dev);
+
+	/* In some cases, led doesn't turn off */
+	if (bTouch2Wake) {
+		if (info->brightness > 0) {
+			pr_err("[TouchKey] LED is on in suspend, turning OFF...\n");
+			cypress_touchkey_brightness_set(&info->leds, LED_OFF);
+		}
+	}
 
 	#ifdef CONFIG_LEDS_CLASS
-	info->current_status = 0;
+	if(!bTouch2Wake)
+		/* Allow to enable LED with Touch2Wake */
+		info->current_status = 0;
 	#endif
 }
 
@@ -666,12 +827,15 @@ static void cypress_touchkey_late_resume(struct early_suspend *h)
 {
 	struct cypress_touchkey_info *info;
 	info = container_of(h, struct cypress_touchkey_info, early_suspend);
-	cypress_touchkey_resume(&info->client->dev);
+	if (!bTouch2Wake)
+		cypress_touchkey_resume(&info->client->dev);
 
 	#ifdef CONFIG_LEDS_CLASS
 	/*led sysfs write led value before resume process is not executed */
-	info->current_status = 1;
-	queue_work(info->led_wq, &info->led_work);
+	if (!led_disabled) {
+		info->current_status = 1;
+		queue_work(info->led_wq, &info->led_work);
+	}
 	#endif
 }
 #endif
@@ -999,6 +1163,30 @@ static ssize_t touchkey_threshold_show(struct device *dev,
 	return sprintf(buf, "%d\n", touchkey_threshold);
 }
 
+static ssize_t touchkey_threshold_store(struct device *dev,
+				 struct device_attribute *attr, const char *buf,
+				 size_t size)
+{
+	u8 buf_threshold;
+	int buftmp;
+	int ret;
+
+	ret = sscanf(buf, "%d", &buftmp);
+
+	if (!ret) {
+		printk(KERN_INFO "cypress-touchkey: invalid threshold\n");
+		return -EINVAL;
+	}
+
+	buf_threshold = buftmp;
+
+	ret = i2c_smbus_write_byte_data(info->client, CYPRESS_THRESHOLD, buf_threshold);
+
+	printk(KERN_INFO "cypress-touchkey: threshold(w) %d\n", (unsigned int)buf_threshold);
+
+	return size;
+}
+
 static ssize_t touch_autocal_testmode(struct device *dev,
 				 struct device_attribute *attr, const char *buf,
 				 size_t size)
@@ -1053,7 +1241,7 @@ static DEVICE_ATTR(touchkey_raw_data0, S_IRUGO, touchkey_raw_data0_show, NULL);
 static DEVICE_ATTR(touchkey_raw_data1, S_IRUGO, touchkey_raw_data1_show, NULL);
 static DEVICE_ATTR(touchkey_idac0, S_IRUGO, touchkey_idac0_show, NULL);
 static DEVICE_ATTR(touchkey_idac1, S_IRUGO, touchkey_idac1_show, NULL);
-static DEVICE_ATTR(touchkey_threshold, S_IRUGO, touchkey_threshold_show, NULL);
+static DEVICE_ATTR(touchkey_threshold, S_IRUGO | S_IWUSR, touchkey_threshold_show, touchkey_threshold_store);
 static DEVICE_ATTR(touch_sensitivity, S_IRUGO | S_IWUSR | S_IWGRP, NULL, touch_sensitivity_control);
 static DEVICE_ATTR(touchkey_autocal_start, S_IRUGO | S_IWUSR | S_IWGRP, NULL, touch_autocal_testmode);
 
