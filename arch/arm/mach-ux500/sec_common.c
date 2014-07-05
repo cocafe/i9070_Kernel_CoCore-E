@@ -822,10 +822,12 @@ static int sec_cpufreq_notifier(struct notifier_block *nb,
 static int sec_policy_notifier(struct notifier_block *nb,
 					unsigned long val, void *data)
 {
+/*
 	struct cpufreq_policy *policy = data;
 
 	if (val == CPUFREQ_NOTIFY)
 		printk(KERN_INFO "DVFS Governor Policy set to - %s\n", policy->governor->name);
+*/
 
 	return 0;
 }
