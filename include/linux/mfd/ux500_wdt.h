@@ -20,7 +20,7 @@ struct ux500_wdt_ops {
 	int (*config) (u8 num, bool sleep_auto_off);
 };
 #ifdef CONFIG_SAMSUNG_LOG_BUF
-void wdog_disable();
+void wdog_disable(void);
 #endif
 extern u32 sec_dbug_level;
 #endif /* __UX500_WDT_H */
