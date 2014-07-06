@@ -13,6 +13,8 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/io.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
@@ -59,13 +61,6 @@ static struct state_history vsafe_sh = {
 	.opps = {VSAFE_50_OPP, VSAFE_100_OPP},
 	.state_names = {50, 100},
 	.max_states = 2,
-};
-
-static struct state_history arm_sh = {
-	.name = "ARM KHZ",
-	.req = PRCMU_QOS_ARM_KHZ,
-	.opps = {ARM_EXTCLK, ARM_50_OPP, ARM_100_OPP, ARM_MAX_OPP},
-	.max_states = 4,
 };
 
 static const u16 u8500_prcmu_dump_regs[] = {
@@ -232,7 +227,7 @@ void prcmu_debug_vsafe_opp_log(u8 opp)
  */
 void prcmu_debug_arm_opp_log(u32 value)
 {
-	log_set(&arm_sh, value);
+	return;
 }
 
 static void log_reset(struct state_history *sh)
@@ -274,14 +269,6 @@ static ssize_t vsafe_stats_write(struct file *file,
 			   size_t count, loff_t *ppos)
 {
 	log_reset(&vsafe_sh);
-	return count;
-}
-
-static ssize_t arm_stats_write(struct file *file,
-			   const char __user *user_buf,
-			   size_t count, loff_t *ppos)
-{
-	log_reset(&arm_sh);
 	return count;
 }
 
@@ -342,12 +329,6 @@ static int vsafe_stats_print(struct seq_file *s, void *p)
 	return 0;
 }
 
-static int arm_stats_print(struct seq_file *s, void *p)
-{
-	log_print(s, &arm_sh);
-	return 0;
-}
-
 static int opp_read(struct seq_file *s, void *p)
 {
 	int opp;
@@ -377,14 +358,6 @@ static int opp_read(struct seq_file *s, void *p)
 			   "unknown", opp);
 		break;
 	case PRCMU_QOS_ARM_KHZ:
-		opp = prcmu_get_arm_opp();
-		seq_printf(s, "%d kHz (OPP %s %d)\n", cpufreq_get(0),
-			   (opp == ARM_MAX_OPP) ? "max" :
-			   (opp == ARM_MAX_FREQ100OPP) ? "max-freq100" :
-			   (opp == ARM_100_OPP) ? "100%" :
-			   (opp == ARM_50_OPP) ? "50%" :
-			   (opp == ARM_EXTCLK) ? "25% (extclk)" :
-			   "unknown", opp);
 		break;
 	default:
 		break;
@@ -844,11 +817,6 @@ static int vsafe_stats_open_file(struct inode *inode, struct file *file)
 	return single_open(file, vsafe_stats_print, inode->i_private);
 }
 
-static int arm_stats_open_file(struct inode *inode, struct file *file)
-{
-	return single_open(file, arm_stats_print, inode->i_private);
-}
-
 static int cpufreq_delay_open_file(struct inode *inode, struct file *file)
 {
 	return single_open(file, cpufreq_delay_read, inode->i_private);
@@ -948,15 +916,6 @@ static const struct file_operations vsafe_stats_fops = {
 	.owner = THIS_MODULE,
 };
 
-static const struct file_operations arm_stats_fops = {
-	.open = arm_stats_open_file,
-	.write = arm_stats_write,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-	.owner = THIS_MODULE,
-};
-
 static const struct file_operations cpufreq_delay_fops = {
 	.open = cpufreq_delay_open_file,
 	.write = cpufreq_delay_write,
@@ -1041,11 +1000,6 @@ static int setup_debugfs(void)
 			goto fail;
 	}
 
-	file = debugfs_create_file("arm_stats", (S_IRUGO | S_IWUSR | S_IWGRP),
-				   dir, NULL, &arm_stats_fops);
-	if (IS_ERR_OR_NULL(file))
-		goto fail;
-
 	file = debugfs_create_file("ape_opp", (S_IRUGO),
 				   dir, (void *)&ape_sh,
 				   &opp_fops);
@@ -1054,12 +1008,6 @@ static int setup_debugfs(void)
 
 	file = debugfs_create_file("ddr_opp", (S_IRUGO),
 				   dir, (void *)&ddr_sh,
-				   &opp_fops);
-	if (IS_ERR_OR_NULL(file))
-		goto fail;
-
-	file = debugfs_create_file("arm_khz", (S_IRUGO),
-				   dir, (void *)&arm_sh,
 				   &opp_fops);
 	if (IS_ERR_OR_NULL(file))
 		goto fail;
@@ -1121,33 +1069,207 @@ fail:
 	return -ENOMEM;
 }
 
+static u32 prcmu_rreg_last = 0;
+static u32 prcmu_wreg_last = 0;
+
+static ssize_t prcmu_wreg_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	int reg_val;
+	void __iomem *prcmu_base;
+
+	prcmu_base = __io_address(U8500_PRCMU_BASE);
+	reg_val = readl(prcmu_base + prcmu_wreg_last);
+
+	sprintf(buf, "%#06x %#010x\n", prcmu_wreg_last, reg_val);
+
+	return strlen(buf);
+}
+
+static ssize_t prcmu_wreg_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reg, val, err;
+	void __iomem *prcmu_base;
+
+	err = sscanf(buf, "%x %x", &reg, &val);
+
+	if (!err) {
+		pr_err("[prcmu-dbg] invalid inputs\n");
+		return -EINVAL;
+	}
+
+	prcmu_base = __io_address(U8500_PRCMU_BASE);
+
+	prcmu_wreg_last = reg;
+
+	pr_info("[prcmu-dbg] %#06x: %#010x\n", reg, val);
+
+	writel(val, prcmu_base + reg);
+	
+	return count;
+}
+
+static struct kobj_attribute prcmu_wreg_interface = __ATTR(prcmu_wreg, 0600, prcmu_wreg_show, prcmu_wreg_store);
+
+static ssize_t prcmu_rreg_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	int reg_val;
+	void __iomem *prcmu_base;
+
+	prcmu_base = __io_address(U8500_PRCMU_BASE);
+	reg_val = readl(prcmu_base + prcmu_rreg_last);
+
+	sprintf(buf, "%#06x %#010x\n", prcmu_rreg_last, reg_val);
+
+	return strlen(buf);
+}
+
+static ssize_t prcmu_rreg_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reg;
+
+	if (sscanf(buf, "%x", &reg))
+		prcmu_rreg_last = reg;
+	
+	return count;
+}
+
+static struct kobj_attribute prcmu_rreg_interface = __ATTR(prcmu_rreg, 0600, prcmu_rreg_show, prcmu_rreg_store);
+
+static u32 tcdm_rregb_last;
+static u32 tcdm_wregb_last;
+static u32 tcdm_rregl_last;
+static u32 tcdm_wregl_last;
+
+static ssize_t tcdm_rregb_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%#06x %#04x\n", tcdm_rregb_last, db8500_prcmu_tcdm_readb(tcdm_rregb_last));
+}
+
+static ssize_t tcdm_rregb_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reg;
+
+	if (sscanf(buf, "%x", &reg))
+		tcdm_rregb_last = reg;
+	
+	return count;
+}
+
+static struct kobj_attribute tcdm_rregb_interface = __ATTR(tcdm_rregb, 0600, tcdm_rregb_show, tcdm_rregb_store);
+
+static ssize_t tcdm_wregb_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%#06x %#04x\n", tcdm_wregb_last, db8500_prcmu_tcdm_readl(tcdm_wregb_last));
+}
+
+static ssize_t tcdm_wregb_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reg, val;
+
+	if (sscanf(buf, "%x %x", &reg, &val) == 2) {
+		tcdm_wregb_last = reg;
+		db8500_prcmu_tcdm_writeb(reg, val);
+
+		pr_err("[prcmu-dbg] %#06x: %#04x\n", reg, val);
+	}
+
+	return -EINVAL;
+}
+
+static struct kobj_attribute tcdm_wregb_interface = __ATTR(tcdm_wregb, 0600, tcdm_wregb_show, tcdm_wregb_store);
+
+static ssize_t tcdm_rregl_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%#06x %#010x\n", tcdm_rregl_last, db8500_prcmu_tcdm_readl(tcdm_rregl_last));
+}
+
+static ssize_t tcdm_rregl_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reg;
+
+	if (sscanf(buf, "%x", &reg))
+		tcdm_rregl_last = reg;
+	
+	return count;
+}
+
+static struct kobj_attribute tcdm_rregl_interface = __ATTR(tcdm_rregl, 0600, tcdm_rregl_show, tcdm_rregl_store);
+
+static ssize_t tcdm_wregl_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%#06x %#010x\n", tcdm_wregl_last, db8500_prcmu_tcdm_readl(tcdm_wregl_last));
+}
+
+static ssize_t tcdm_wregl_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reg, val;
+
+	if (sscanf(buf, "%x %x", &reg, &val) == 2) {
+		tcdm_wregl_last = reg;
+		db8500_prcmu_tcdm_writel(reg, val);
+
+		pr_err("[prcmu-dbg] %#06x: %#010x\n", reg, val);
+	}
+
+	return -EINVAL;
+}
+
+static struct kobj_attribute tcdm_wregl_interface = __ATTR(tcdm_wregl, 0600, tcdm_wregl_show, tcdm_wregl_store);
+
+static struct attribute *prcmu_sysfs_debug_attrs[] = {
+	&prcmu_rreg_interface.attr, 
+	&prcmu_wreg_interface.attr, 
+	&tcdm_rregb_interface.attr, 
+	&tcdm_wregb_interface.attr, 
+	&tcdm_rregl_interface.attr, 
+	&tcdm_wregl_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group prcmu_sysfs_debug_interface_group = {
+	.attrs = prcmu_sysfs_debug_attrs,
+};
+
+static struct kobject *prcmu_sysfs_debug_kobject;
+
+static int setup_sysfs(void)
+{
+	int ret;
+
+	prcmu_sysfs_debug_kobject = kobject_create_and_add("prcmu", kernel_kobj);
+
+	if (!prcmu_sysfs_debug_kobject) {
+		return -ENOMEM;
+	}
+
+	ret = sysfs_create_group(prcmu_sysfs_debug_kobject, &prcmu_sysfs_debug_interface_group);
+
+	if (ret) {
+		kobject_put(prcmu_sysfs_debug_kobject);
+	}
+
+	return ret;
+}
+
 static __init int prcmu_debug_init(void)
 {
 	spin_lock_init(&ape_sh.lock);
 	spin_lock_init(&ddr_sh.lock);
 	spin_lock_init(&vsafe_sh.lock);
-	spin_lock_init(&arm_sh.lock);
 	ape_sh.start = ktime_get();
 	ddr_sh.start = ktime_get();
 	vsafe_sh.start = ktime_get();
-	arm_sh.start = ktime_get();
 	return 0;
 }
 arch_initcall(prcmu_debug_init);
 
 static __init int prcmu_debug_debugfs_init(void)
 {
-	struct cpufreq_frequency_table *table;
-	int i, ret;
-
-	table = cpufreq_frequency_get_table(0);
-
-	for (i = 0; table[i].frequency != CPUFREQ_TABLE_END; i++)
-		arm_sh.state_names[i] = table[i].frequency;
-
-	arm_sh.max_states = i;
+	int ret;
 
 	ret = setup_debugfs();
+	ret = setup_sysfs();
+
 	return ret;
 }
 late_initcall(prcmu_debug_debugfs_init);
