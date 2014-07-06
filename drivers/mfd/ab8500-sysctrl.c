@@ -17,6 +17,8 @@
 #include <linux/time.h>
 #include <linux/hwmon.h>
 
+#include <linux/moduleparam.h>
+
 /* RtcCtrl bits */
 #define AB8500_ALARM_MIN_LOW  0x08
 #define AB8500_ALARM_MIN_MID 0x09
@@ -24,6 +26,9 @@
 #define RTC_ALARM_ENABLE 0x4
 
 static struct device *sysctrl_dev;
+
+static bool force_pwroff = false;
+module_param(force_pwroff, bool, 0644);
 
 void ab8500_power_off(void)
 {
@@ -73,7 +78,7 @@ void ab8500_power_off(void)
         abx500_get_register_interruptible(sysctrl_dev, AB8500_CHARGER,
                                           AB8500_CH_STATUS1_REG, &data);
 
-	if (!charger_present && !(data & 0x01))
+	if ((!charger_present && !(data & 0x01)) || force_pwroff)
 		goto shutdown;
 
 
@@ -255,6 +260,34 @@ int ab8500_sysctrl_write(u16 reg, u8 mask, u8 value)
 }
 EXPORT_SYMBOL(ab8500_sysctrl_write);
 
+static ssize_t abb_sysctrl_restart_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return 0;
+}
+
+static ssize_t abb_sysctrl_restart_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int reason;
+	if (sscanf(buf, "%x", &reason)) {
+		ab8500_restart((u16)reason);
+	}
+	
+	return count;
+}
+static struct kobj_attribute abb_sysctrl_restart_interface = 
+	__ATTR(abb_restart, 0644, abb_sysctrl_restart_show, abb_sysctrl_restart_store);
+
+static struct attribute *abb_sysctrl_attrs[] = {
+	&abb_sysctrl_restart_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group abb_sysctrl_interface_group = {
+	.attrs = abb_sysctrl_attrs,
+};
+
+static struct kobject *abb_sysctrl_kobject;
+
 static int __devinit ab8500_sysctrl_probe(struct platform_device *pdev)
 {
 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
@@ -295,6 +328,15 @@ static int __devinit ab8500_sysctrl_probe(struct platform_device *pdev)
 					"%d\n", j + 1, ret);
 			}
 		}
+	}
+
+	abb_sysctrl_kobject = kobject_create_and_add("abb-sysctrl", kernel_kobj);
+	if (!abb_sysctrl_kobject) {
+		pr_err("[ABB-SysCtrl] Failed to create kobject interface\n");
+	}
+	ret = sysfs_create_group(abb_sysctrl_kobject, &abb_sysctrl_interface_group);
+	if (ret) {
+		kobject_put(abb_sysctrl_kobject);
 	}
 
 	sysctrl_dev = &pdev->dev;
