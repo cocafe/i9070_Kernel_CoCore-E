@@ -1670,10 +1670,9 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 	data->max = policy->max;
 
 	if(prev_min != data->min || prev_max != data->max)
-		pr_info("new min and max freqs are %u - %u kHz\n",
-					data->min, data->max);
-	pr_debug("new min and max freqs are %u - %u kHz\n",
-					data->min, data->max);
+		pr_info("cpufreq: %u-%u kHz\n", data->min, data->max);
+		/* pr_debug("new min and max freqs are %u - %u kHz\n",
+					data->min, data->max); */
 
 	if (cpufreq_driver->setpolicy) {
 		data->policy = policy->policy;
