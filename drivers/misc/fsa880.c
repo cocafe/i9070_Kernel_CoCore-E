@@ -126,6 +126,8 @@ struct FSA9480_instance {
 	struct wake_lock vbus_wake_lock;
 };
 
+struct FSA9480_instance *pInstance;
+
 static struct register_bits device_1_register_bits[] = {
 	{	(1<<0), "Audio_1", EXTERNAL_AUDIO_1},
 	{	(1<<1), "Audio_2", EXTERNAL_AUDIO_2 },
@@ -368,6 +370,16 @@ static ssize_t store_jig_smd(struct device *dev, struct device_attribute *attr, 
 	return size;
 }
 
+
+static ssize_t store_swreset(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	pr_err("[FSA880] SW RESET!!!\n");
+
+	TI_SWreset(pInstance);
+
+	return size;
+}
+
 extern void uart_wakeunlock(void);
 
 static ssize_t store_smd_wakelock(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
@@ -405,6 +417,7 @@ static struct device_attribute FSA9480_device_attrs[] = {
 	__ATTR(charger, 0444, show_charger_connection, NULL),
 	__ATTR(jig_smd, 0644, show_jig_smd, store_jig_smd),
 	__ATTR(smd_wakelock, 0664, NULL, store_smd_wakelock),
+	__ATTR(swreset, 0644, NULL, store_swreset),
 };
 
 static DEVICE_ATTR(usb_state, 0444, show_usb_state, NULL);
@@ -832,7 +845,7 @@ static int init_driver_instance(struct FSA9480_instance *instance, struct i2c_cl
 	instance->prev_event = instance->last_event = current_connection_mask(instance);
 	printk(KERN_INFO "MUIC Initial Event = 0x%08lx\n", instance->last_event);
 
-	/* /sys/class/usb_switch/FSA_SWITCH/* */
+	/* /sys/class/usb_switch/FSA_SWITCH/ */
 	instance->dev = device_create(usb_switch_class, NULL, 0, instance, "%s", "FSA_SWITCH");
 	for (i = 0; i < ARRAY_SIZE(FSA9480_device_attrs); i++) {
 			ret = device_create_file(instance->dev, &FSA9480_device_attrs[i]);
@@ -871,6 +884,8 @@ static int init_driver_instance(struct FSA9480_instance *instance, struct i2c_cl
 	ret = enable_irq_wake(instance->irq_bit);
 	if (ret < 0)
 		dev_err(instance->dev, "failed to enable wakeup src %d\n", ret);
+
+	pInstance = instance;
 
 	return 0 ;
 }
