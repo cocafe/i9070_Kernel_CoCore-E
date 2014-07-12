@@ -229,6 +229,9 @@ config CPU_FREQ_GOV_ONDEMANDQ
 config CPU_FREQ_GOV_PEGASUSQ
 	tristate "'pegasusq' cpufreq policy governor"
 
+config CPU_FREQ_GOV_PEGASUSQPLUS
+	tristate "'pegasusq plus' cpufreq policy governor"
+
 config CPU_FREQ_GOV_LULZACTIVEQ
 	tristate "'lulzactiveq' cpufreq governor"
 	depends on CPU_FREQ
