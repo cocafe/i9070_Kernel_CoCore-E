@@ -718,6 +718,8 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 		 * Apply the last max cpufreq insteads of 
 		 * the maximum cpufreq in cpufreq table
 		 */
+		if (new_policy.max > cpufreq_max_last_val)
+			cpufreq_max_last_val = new_policy.max;
 		cpufreq_max_limit_val = freq;
 		cpufreq_update_freq(0, new_policy.min, cpufreq_max_last_val);
 	}
