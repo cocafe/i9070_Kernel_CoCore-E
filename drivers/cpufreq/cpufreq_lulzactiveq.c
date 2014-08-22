@@ -2041,7 +2041,7 @@ static struct notifier_block cpufreq_lulzactive_idle_nb = {
 };
 
 unsigned int stored_max_speed = 1000000;
-unsigned int sleep_max_freq = 200000;
+unsigned int sleep_max_freq   = 400000;
 
 static void lulzactive_early_suspend(struct early_suspend *handler) {
 	struct cpufreq_lulzactive_cpuinfo *dbs_info = &per_cpu(cpuinfo, 0);
