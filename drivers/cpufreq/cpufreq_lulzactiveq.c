@@ -2044,8 +2044,8 @@ unsigned int stored_max_speed = 1000000;
 unsigned int sleep_max_freq = 200000;
 
 static void lulzactive_early_suspend(struct early_suspend *handler) {
-	early_suspended = 1;
 	struct cpufreq_lulzactive_cpuinfo *dbs_info = &per_cpu(cpuinfo, 0);
+	early_suspended = 1;
 	stored_max_speed = dbs_info->policy->max;
 	cpufreq_update_freq(0, dbs_info->policy->min, sleep_max_freq);
         __cpufreq_driver_target(dbs_info->policy, sleep_max_freq, CPUFREQ_RELATION_H);
@@ -2053,8 +2053,8 @@ static void lulzactive_early_suspend(struct early_suspend *handler) {
 }
 
 static void lulzactive_late_resume(struct early_suspend *handler) {
-	early_suspended = 0;
 	struct cpufreq_lulzactive_cpuinfo *dbs_info = &per_cpu(cpuinfo, 0);
+	early_suspended = 0;
 	cpufreq_update_freq(0, dbs_info->policy->min, stored_max_speed);
         __cpufreq_driver_target(dbs_info->policy, dbs_info->policy->max,
 CPUFREQ_RELATION_L);
