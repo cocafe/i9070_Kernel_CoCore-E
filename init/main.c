@@ -70,6 +70,7 @@
 #include <linux/perf_event.h>
 #include <linux/boottime.h>
 #include <linux/pasr.h>
+#include <linux/random.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -784,6 +785,7 @@ static void __init do_basic_setup(void)
 	init_irq_proc();
 	do_ctors();
 	do_initcalls();
+	random_int_secret_init();
 }
 
 static void __init do_pre_smp_initcalls(void)
