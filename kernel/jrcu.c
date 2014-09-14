@@ -152,7 +152,7 @@ static struct rcu_stats {
        unsigned nforced;       /* #forced eobs (should be zero) */
 } rcu_stats;
 
-#define RCU_HZ                 (20)
+#define RCU_HZ                 (100)
 #define RCU_HZ_PERIOD_US       (USEC_PER_SEC / RCU_HZ)
 #define RCU_HZ_DELTA_US                (USEC_PER_SEC / HZ)
 
