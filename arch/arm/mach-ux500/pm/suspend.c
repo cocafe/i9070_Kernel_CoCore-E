@@ -259,11 +259,9 @@ static void ux500_suspend_finish(void)
 
 static int ux500_suspend_begin(suspend_state_t state)
 {
-	/*
 	(void) prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					    "suspend",
 					    PRCMU_QOS_ARM_KHZ_MAX);
-	*/
 	suspend_ongoing = true;
 
 	suspend_state = state;
@@ -272,11 +270,9 @@ static int ux500_suspend_begin(suspend_state_t state)
 
 static void ux500_suspend_end(void)
 {
-	/*
 	(void) prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					    "suspend",
 					    PRCMU_QOS_DEFAULT_VALUE);
-	*/
 	suspend_ongoing = false;
 	suspend_state = PM_SUSPEND_ON;
 
