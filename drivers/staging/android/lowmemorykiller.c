@@ -35,7 +35,7 @@
 #include <linux/oom.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
-#define ENHANCED_LMK_ROUTINE
+/* #define ENHANCED_LMK_ROUTINE */
 
 #ifdef CONFIG_ZRAM_FOR_ANDROID
 #include <linux/swap.h>
