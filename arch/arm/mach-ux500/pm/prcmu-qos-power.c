@@ -249,6 +249,9 @@ void prcmu_qos_set_cpufreq_opp_delay(unsigned long n)
 	}
 	cpufreq_opp_delay = n;
 }
+
+unsigned int orig_min_freq = 0, last_min_freq = 0;
+
 #ifdef CONFIG_CPU_FREQ
 static void update_cpu_limits(s32 min_freq)
 {
@@ -264,7 +267,18 @@ static void update_cpu_limits(s32 min_freq)
 			continue;
 		}
 
-		ret = cpufreq_update_freq(cpu, min_freq, policy.max);
+		if (policy.cpu == 0) {
+			//since all cpus have the same freq, do calculations only for cpu0
+			//FIXME I know it's ugly - feel free to make it better :)
+			if (policy.min != last_min_freq) {
+				//if it's different from what we've set last time,
+				//it has been changed by someone else, so let's assume it's the new 'default'
+				orig_min_freq = policy.min;
+			}
+			last_min_freq = max(min_freq, orig_min_freq);
+		}
+
+		ret = cpufreq_update_freq(cpu, last_min_freq, policy.max);
 		if (ret)
 			pr_err("prcmu qos: update cpufreq "
 			       "frequency limits failed\n");
