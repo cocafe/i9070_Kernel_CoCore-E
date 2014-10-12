@@ -982,6 +982,7 @@ static int __init prcmu_qos_power_init(void)
 {
 	int ret;
 	struct cpufreq_frequency_table *table;
+	struct cpufreq_policy policy;
 	unsigned int min_freq = UINT_MAX;
 	unsigned int max_freq = 0;
 	int i;
@@ -1002,6 +1003,10 @@ static int __init prcmu_qos_power_init(void)
 	arm_khz_qos.default_value = min_freq;
 	/* CPUs start at max */
 	atomic_set(&arm_khz_qos.target_value, arm_khz_qos.max_value);
+
+	ret = cpufreq_get_policy(&policy, 0);
+	last_min_freq = policy.min;
+	orig_min_freq = policy.min;
 
 	prcmu_qos_cpufreq_init_done = true;
 
