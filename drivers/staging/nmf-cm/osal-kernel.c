@@ -35,7 +35,7 @@ __iomem void *prcmu_tcdm_base = NULL;
 
 /* DSP Load Monitoring */
 #define FULL_OPP 100
-#define HALF_OPP 50
+#define HALF_OPP PRCMU_QOS_DEFAULT_VALUE
 static unsigned long running_dsp = 0;
 static unsigned int dspLoadMonitorPeriod = 1000;
 module_param(dspLoadMonitorPeriod, uint, S_IWUSR|S_IRUGO);
@@ -733,7 +733,7 @@ static void wakeup_process(unsigned long data)
 static int dspload_monitor(void *idx)
 {
 	int i = (int)idx;
-	unsigned char current_opp_request = FULL_OPP;
+	signed char current_opp_request = FULL_OPP;
 	struct mpcConfig *mpc = &osalEnv.mpc[i];
 	struct timer_list timer;
 

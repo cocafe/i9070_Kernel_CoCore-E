@@ -42,9 +42,9 @@ struct state_history {
 static struct state_history ape_sh = {
 	.name = "APE OPP",
 	.req = PRCMU_QOS_APE_OPP,
-	.opps = {APE_50_OPP, APE_100_OPP},
-	.state_names = {50, 100},
-	.max_states = 2,
+	.opps = {APE_50_PARTLY_25_OPP, APE_50_OPP, APE_100_OPP},
+	.state_names = {25, 50, 100},
+	.max_states = 3,
 };
 
 static struct state_history ddr_sh = {
@@ -204,9 +204,10 @@ static void log_set(struct state_history *sh, u8 opp)
 
 void prcmu_debug_ape_opp_log(u8 opp)
 {
+/*
 	if (opp == APE_50_PARTLY_25_OPP)
 		opp = APE_50_OPP;
-
+*/
 	log_set(&ape_sh, opp);
 }
 
@@ -507,7 +508,11 @@ static int avs_read(struct seq_file *s, void *p)
 	return 0;
 }
 
-static void prcmu_data_mem_print(struct seq_file *s)
+static int dump_long2byte(struct seq_file *s, u32 data) {
+	return seq_printf(s, " 0x%02x 0x%02x 0x%02x 0x%02x", data & 0xff, (data >> 8) & 0xff, (data >> 16) & 0xff, (data >> 24) & 0xff);
+}
+
+static void prcmu_data_mem_print(struct seq_file *s, char width)
 {
 	int i;
 	int err;
@@ -524,9 +529,16 @@ static void prcmu_data_mem_print(struct seq_file *s)
 			dmem[3] = readl(tcdm_base + i + 12);
 
 			if (s) {
-				err = seq_printf(s,
+				if (width == 1) {
+					err = seq_printf(s, "0x%x:", i);
+					dump_long2byte(s, dmem[0]);
+					dump_long2byte(s, dmem[1]);
+					dump_long2byte(s, dmem[2]);
+					dump_long2byte(s, dmem[3]);
+					err = seq_printf(s, "\n");
+				} else  err = seq_printf(s,
 					"0x%x: 0x%08x 0x%08x 0x%08x 0x%08x\n",
-					((int)tcdm_base) + i, dmem[0],
+					i, dmem[0],
 					dmem[1], dmem[2], dmem[3]);
 				if (err < 0) {
 					pr_err("%s: seq_printf overflow, addr=%x\n",
@@ -547,13 +559,21 @@ static void prcmu_data_mem_print(struct seq_file *s)
 void prcmu_debug_dump_data_mem(void)
 {
 	printk(KERN_INFO "PRCMU data memory dump:\n");
-	prcmu_data_mem_print(NULL);
+	prcmu_data_mem_print(NULL, 4);
 }
 
 static int prcmu_debugfs_data_mem_read(struct seq_file *s, void *p)
 {
 	seq_printf(s, "PRCMU data memory:\n");
-	prcmu_data_mem_print(s);
+	prcmu_data_mem_print(s, 4);
+
+	return 0;
+}
+
+static int prcmu_debugfs_data_mem_readb(struct seq_file *s, void *p)
+{
+	seq_printf(s, "PRCMU data memory:\n");
+	prcmu_data_mem_print(s, 1);
 
 	return 0;
 }
@@ -851,6 +871,25 @@ static int prcmu_data_mem_open_file(struct inode *inode, struct file *file)
 	return err;
 }
 
+static int prcmu_data_memb_open_file(struct inode *inode, struct file *file)
+{
+	int err;
+	struct seq_file *s;
+
+	err = single_open(file, prcmu_debugfs_data_mem_readb, inode->i_private);
+	if (!err) {
+		/* Default buf size in seq_read is not enough */
+		s = (struct seq_file *)file->private_data;
+		s->size = (PAGE_SIZE * 8);
+		s->buf = kmalloc(s->size, GFP_KERNEL);
+		if (!s->buf) {
+			single_release(inode, file);
+			err = -ENOMEM;
+		}
+	}
+	return err;
+}
+
 static int prcmu_regs_open_file(struct inode *inode, struct file *file)
 {
 	int err;
@@ -950,6 +989,14 @@ static const struct file_operations prcmu_data_mem_fops = {
 	.owner = THIS_MODULE,
 };
 
+static const struct file_operations prcmu_data_memb_fops = {
+	.open = prcmu_data_memb_open_file,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
 static const struct file_operations prcmu_regs_fops = {
 	.open = prcmu_regs_open_file,
 	.read = seq_read,
@@ -1039,6 +1086,12 @@ static int setup_debugfs(void)
 	file = debugfs_create_file("data_mem", (S_IRUGO),
 				   dir, NULL,
 				   &prcmu_data_mem_fops);
+	if (IS_ERR_OR_NULL(file))
+		goto fail;
+
+	file = debugfs_create_file("data_memb", (S_IRUGO),
+				   dir, NULL,
+				   &prcmu_data_memb_fops);
 	if (IS_ERR_OR_NULL(file))
 		goto fail;
 
@@ -1159,7 +1212,7 @@ static struct kobj_attribute tcdm_rregb_interface = __ATTR(tcdm_rregb, 0600, tcd
 
 static ssize_t tcdm_wregb_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%#06x %#04x\n", tcdm_wregb_last, db8500_prcmu_tcdm_readl(tcdm_wregb_last));
+	return sprintf(buf, "%#06x %#04x\n", tcdm_wregb_last, db8500_prcmu_tcdm_readb(tcdm_wregb_last));
 }
 
 static ssize_t tcdm_wregb_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)

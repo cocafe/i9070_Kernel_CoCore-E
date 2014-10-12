@@ -42,6 +42,13 @@
  * @vbbx_raw:		Raw register value of Vbbp and Vbbn regulator in AB850x
  * @set_pllarm:		Whether override the default PRCMU OPP frequency
  * @set_volt:		Whether override the default PRCMU OPP voltage
+ * @ddr_opp		minimum DDR_OPP - valid values are 25/default, 50, 100/max
+ * @ape_opp		minimum APE_OPP - valid values are 25/default, 50, 100/max
+ * 			25 is actually APE_50_PARTLY_25_OPP - its OPP_50 with some clocks
+ * 			running at 25% (ACLK and DMACLK)
+ * 			At 50_OPP gpu is running at half speed and uses different voltage
+ * 			(AB8500_REGU_CTRL2/AB8500_VAPESEL2_REG), while at 100_OPP it uses
+ * 			AB8500_REGU_CTRL2/AB8500_VAPESEL1_REG
  */
 struct liveopp_arm_table
 {
@@ -56,6 +63,8 @@ struct liveopp_arm_table
 	u8 	varm_sel;
 	u8 	varm_raw;
 	u8  	vbbx_raw;
+	s8	ddr_opp;
+	s8	ape_opp;
 };
 
 /* Varm in 12.5mV steps */

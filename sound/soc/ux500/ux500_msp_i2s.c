@@ -222,10 +222,10 @@ static int ux500_msp_i2s_configure_clock(struct msp *msp, struct msp_config *con
 	 * Only consider OPP 100% when bit-clock is used, i.e. MSP master mode
 	 */
 	if ((bit_clock > 19200000) && ((config->tx_clock_sel != 0) || (config->rx_clock_sel != 0))) {
-		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, "ux500-msp-i2s", 100);
+		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, "ux500-msp-i2s", PRCMU_QOS_MAX_VALUE);
 		msp->vape_opp_constraint = 1;
 	} else {
-		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, "ux500-msp-i2s", 50);
+		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, "ux500-msp-i2s", PRCMU_QOS_DEFAULT_VALUE);
 		msp->vape_opp_constraint = 0;
 	}
 

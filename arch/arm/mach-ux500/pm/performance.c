@@ -20,8 +20,12 @@
 
 #include <mach/irqs.h>
 
-#define WLAN_PROBE_DELAY 3000 /* 3 seconds */
-#define WLAN_LIMIT (3000/3) /* If we have more than 1000 irqs per second */
+#define WLAN_PROBE_DELAY_DEFAULT 3000 /* 3 seconds */
+#define WLAN_LIMIT_DEFAULT (3000/3) /* If we have more than 1000 irqs per second */
+
+int wlan_probe_delay = WLAN_PROBE_DELAY_DEFAULT;
+int wlan_limit = WLAN_LIMIT_DEFAULT;
+int wlan_arm_khz = 400000;
 
 /*
  * MMC TODO:
@@ -31,20 +35,83 @@
  *   it may be altered by drivers/mmc/card/block.c
  */
 
+#define ATTR_RO(_name)	\
+	static struct kobj_attribute _name##_interface = __ATTR(_name, 0444, _name##_show, NULL);
+
+#define ATTR_WO(_name)	\
+	static struct kobj_attribute _name##_interface = __ATTR(_name, 0220, NULL, _name##_store);
+
+#define ATTR_RW(_name)	\
+	static struct kobj_attribute _name##_interface = __ATTR(_name, 0644, _name##_show, _name##_store);
+
+#define INT_PARAM_RW(_name, _variable)  \
+static ssize_t _name##_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)	\
+{	\
+	return sprintf(buf, "%d\n", _variable); \
+}	\
+	\
+static ssize_t _name##_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	\
+{	\
+	if (sscanf(buf, "%d", &_variable)) \
+		return count; \
+	else \
+		return -EINVAL; \
+}	\
+ATTR_RW(_name);
+
+INT_PARAM_RW(wlan_probe_delay, wlan_probe_delay);
+INT_PARAM_RW(wlan_limit, wlan_limit);
+INT_PARAM_RW(wlan_arm_khz, wlan_arm_khz);
+
 /* Sample reads and writes every n ms */
-#define PERF_MMC_PROBE_DELAY 1000
+#define PERF_MMC_PROBE_DELAY_DEFAULT 1000
 /* Read threshold, sectors/second */
-#define PERF_MMC_LIMIT_READ 10240
+#define PERF_MMC_LIMIT_READ_DEFAULT 8192
 /* Write threshold, sectors/second */
-#define PERF_MMC_LIMIT_WRITE 8192
+#define PERF_MMC_LIMIT_WRITE_DEFAULT 4096
 /* Nr of MMC devices */
 #define PERF_MMC_HOSTS 8
 
+int perf_mmc_probe_delay = PERF_MMC_PROBE_DELAY_DEFAULT;
+int perf_mmc_limit_read = PERF_MMC_LIMIT_READ_DEFAULT;
+int perf_mmc_limit_write = PERF_MMC_LIMIT_WRITE_DEFAULT;
+int perf_mmc_limit_combined = 8192;
+int perf_mmc_arm_khz = 400000;
+
+INT_PARAM_RW(mmc_probe_delay, perf_mmc_probe_delay);
+INT_PARAM_RW(mmc_limit_read, perf_mmc_limit_read);
+INT_PARAM_RW(mmc_limit_write, perf_mmc_limit_write);
+INT_PARAM_RW(mmc_limit_combined, perf_mmc_limit_combined);
+INT_PARAM_RW(mmc_arm_khz, perf_mmc_arm_khz);
+
 /*
  * Rescan for new MMC devices every
- * PERF_MMC_PROBE_DELAY * PERF_MMC_RESCAN_CYCLES ms
+ * perf_mmc_probe_delay * perf_mmc_rescan_cycles ms
  */
-#define PERF_MMC_RESCAN_CYCLES 10
+#define PERF_MMC_RESCAN_CYCLES_DEFAULT 10
+
+int perf_mmc_rescan_cycles = PERF_MMC_RESCAN_CYCLES_DEFAULT;
+
+INT_PARAM_RW(mmc_rescan_cycles, perf_mmc_rescan_cycles);
+
+static struct attribute *performance_attrs[] = {
+	&wlan_probe_delay_interface.attr,
+	&wlan_limit_interface.attr,
+	&wlan_arm_khz_interface.attr,
+	&mmc_probe_delay_interface.attr,
+	&mmc_limit_read_interface.attr,
+	&mmc_limit_write_interface.attr,
+	&mmc_limit_combined_interface.attr,
+	&mmc_rescan_cycles_interface.attr,
+	&mmc_arm_khz_interface.attr,
+	NULL,
+};
+
+static struct attribute_group performance_interface_group = {
+	.attrs = performance_attrs,
+};
+
+static struct kobject *performance_kobject;
 
 #ifdef CONFIG_MMC_BLOCK
 static struct delayed_work work_mmc;
@@ -64,12 +131,11 @@ static void wlan_load(struct work_struct *work)
 		num_irqs += kstat_irqs_cpu(IRQ_DB8500_SDMMC1, cpu);
 
 	if ((num_irqs > old_num_irqs) &&
-	    (num_irqs - old_num_irqs) > WLAN_LIMIT) {
-		/*
+	    (num_irqs - old_num_irqs) > wlan_limit) {
+		if (wlan_arm_khz)
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "wlan",
-					     PRCMU_QOS_MAX_VALUE);
-		*/
+					     wlan_arm_khz);
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "wlan",
 					     PRCMU_QOS_MAX_VALUE);
@@ -91,11 +157,9 @@ static void wlan_load(struct work_struct *work)
 			wlan_pm_qos_is_latency_0 = true;
 		}
 	} else {
-		/*
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "wlan",
 					     PRCMU_QOS_DEFAULT_VALUE);
-		*/
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "wlan",
 					     PRCMU_QOS_DEFAULT_VALUE);
@@ -112,7 +176,7 @@ static void wlan_load(struct work_struct *work)
 
 	schedule_delayed_work_on(0,
 				 &work_wlan_workaround,
-				 msecs_to_jiffies(WLAN_PROBE_DELAY));
+				 msecs_to_jiffies(wlan_probe_delay));
 }
 
 #ifdef CONFIG_MMC_BLOCK
@@ -161,11 +225,12 @@ static void mmc_load(struct work_struct *work)
 	unsigned long long sectors;
 	bool new_mode = false;
 	int i;
+	long dr, dw;
 
 	if (!cycle) {
 		memset(&mmc_disks, 0, sizeof(mmc_disks));
 		nrdisk = scan_mmc_devices(mmc_disks);
-		cycle = PERF_MMC_RESCAN_CYCLES;
+		cycle = perf_mmc_rescan_cycles;
 	}
 	cycle--;
 
@@ -173,31 +238,33 @@ static void mmc_load(struct work_struct *work)
 		sectors = part_stat_read(&(mmc_disks[i]->part0),
 						sectors[READ]);
 
+		dr = sectors - old_sectors_read[i];
+		if (dr < 0) dr = 0;
 		if (old_sectors_read[i] &&
-			sectors > old_sectors_read[i] &&
-			(sectors - old_sectors_read[i]) >
-			PERF_MMC_LIMIT_READ)
+			dr > perf_mmc_limit_read*perf_mmc_probe_delay/1000)
 			new_mode = true;
 
 		old_sectors_read[i] = sectors;
 		sectors = part_stat_read(&(mmc_disks[i]->part0),
 						sectors[WRITE]);
 
+		dw = sectors - old_sectors_read[i];
+		if (dw < 0) dw = 0;
 		if (old_sectors_written[i] &&
-			sectors > old_sectors_written[i] &&
-			(sectors - old_sectors_written[i]) >
-			PERF_MMC_LIMIT_WRITE)
+			dw > perf_mmc_limit_write*perf_mmc_probe_delay/1000)
 			new_mode = true;
 
 		old_sectors_written[i] = sectors;
+
+		if (dr + dw > perf_mmc_limit_combined*perf_mmc_probe_delay/1000)
+		       new_mode = true;
 	}
 
 	if (!old_mode && new_mode) {
-		/*
+		if (perf_mmc_arm_khz)
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "mmc",
-					     PRCMU_QOS_MAX_VALUE);
-		*/
+					     perf_mmc_arm_khz);
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "mmc",
 					     PRCMU_QOS_MAX_VALUE);
@@ -207,11 +274,9 @@ static void mmc_load(struct work_struct *work)
 	}
 
 	if (old_mode && !new_mode) {
-		/*
 		prcmu_qos_update_requirement(PRCMU_QOS_ARM_KHZ,
 					     "mmc",
 					     PRCMU_QOS_DEFAULT_VALUE);
-		*/
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
 					     "mmc",
 					     PRCMU_QOS_DEFAULT_VALUE);
@@ -223,7 +288,7 @@ static void mmc_load(struct work_struct *work)
 	old_mode = new_mode;
 
 	schedule_delayed_work(&work_mmc,
-				 msecs_to_jiffies(PERF_MMC_PROBE_DELAY));
+				 msecs_to_jiffies(perf_mmc_probe_delay));
 
 }
 #endif /* CONFIG_MMC_BLOCK */
@@ -232,6 +297,7 @@ static int __init performance_register(void)
 {
 	int ret_mmc;
 	int ret_wlan;
+	int ret;
 
 #ifdef CONFIG_MMC_BLOCK
 	ret_mmc = prcmu_qos_add_requirement(PRCMU_QOS_ARM_KHZ, "mmc",
@@ -250,7 +316,7 @@ static int __init performance_register(void)
 	} else {
 		INIT_DELAYED_WORK_DEFERRABLE(&work_mmc, mmc_load);
 		schedule_delayed_work(&work_mmc,
-				      msecs_to_jiffies(PERF_MMC_PROBE_DELAY));
+				      msecs_to_jiffies(perf_mmc_probe_delay));
 	}
 #endif
 
@@ -270,10 +336,19 @@ static int __init performance_register(void)
 	} else {
 		INIT_DELAYED_WORK_DEFERRABLE(&work_wlan_workaround, wlan_load);
 		schedule_delayed_work_on(0, &work_wlan_workaround,
-					 msecs_to_jiffies(WLAN_PROBE_DELAY));
+					 msecs_to_jiffies(wlan_probe_delay));
+	}
+
+	performance_kobject = kobject_create_and_add("performance", kernel_kobj);
+	if (!performance_kobject) {
+		pr_err("[Performance] Failed to create kobject interface\n");
+	}
+	ret = sysfs_create_group(performance_kobject, &performance_interface_group);
+	if (ret) {
+		kobject_put(performance_kobject);
 	}
 
 	/* Only return one error code */
-	return ret_mmc ? ret_mmc : ret_wlan;
+	return ret_mmc ? ret_mmc : (ret_wlan ? ret_wlan : ret);
 }
 late_initcall(performance_register);
