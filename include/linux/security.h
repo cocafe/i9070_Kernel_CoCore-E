@@ -2039,7 +2039,7 @@ static inline int security_inode_init_security(struct inode *inode,
 						void **value,
 						size_t *len)
 {
-	return -EOPNOTSUPP;
+       return -EOPNOTSUPP;
 }
 
 static inline int security_inode_create(struct inode *dir,
