@@ -9,8 +9,9 @@
  *
  * U8500 PRCM Unit interface driver
  * 
- * DB8500 LiveOPP Supports: 
+ * DB8500 LiveOPP: 
  *         Huang Ji (cocafe@xda-developers.com) <cocafehj@gmail.com>
+ *         mkaluza (mkaluza@xda-developers.com) 
  * 
  */
 
@@ -1088,7 +1089,8 @@ static void db8500_prcmu_get_abb_event_buffer(void __iomem **buf)
 #include <linux/kobject.h>
 #include <linux/mfd/db8500-liveopp.h>
 
-#define LiveOPP_VER		"2.0.0"
+#define LIVEOPP_VER		"2.1"
+/* #define LIVEOPP_DEBUG	1 */
 
 #define NOCHG			0
 #define SET_PLL			1
@@ -1096,6 +1098,10 @@ static void db8500_prcmu_get_abb_event_buffer(void __iomem **buf)
 #define SET_VOLT		1
 
 static unsigned int last_arm_idx = 0;
+
+#if LIVEOPP_DEBUG > 1
+static int liveopp_start = 0;
+#endif
 
 /**
  * PLLARM REGISTER: 0xAABBCCDD
@@ -1107,6 +1113,9 @@ static unsigned int last_arm_idx = 0;
  * when going from OPP100 to  OPP50 mode, it doesn't set BB and DD, only AA to 01
  * and when going 50 -> 100, only AA=00, so from 700MHz it'll do 1.4GHz
  * OPPMAX -> OPP100/50 sets pll BB, DD and optionally AA (for opp 50)
+ * 
+ * cocafe: 
+ * 	References of PLL register bits: dbx500-prcmu-regs.h L#138
  */
 
 /**
@@ -1119,72 +1128,91 @@ static unsigned int last_arm_idx = 0;
  *   - OPP100 -> OPP50
  *   - OPPMAX -> OPP50
  */
+
 /**
  * Hard-coded Custom ARM Frequency and Voltage Table
+ *
+ * PRCMU_QOS_DEFAULT_VALUE 	-1
+ * PRCMU_QOS_MAX_VALUE 		-2
  */
 
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-#define ARM_50_OPP_IDX 3
-#define ARM_100_OPP_IDX 7
-#define ARM_MAX_OPP_IDX 9
-#else
-#define ARM_50_OPP_IDX 2
-#define ARM_100_OPP_IDX 4
-#define ARM_MAX_OPP_IDX 5
-#endif
+#define ARM_50_OPP_IDX 		3	/*  400MHz */
+#define ARM_100_OPP_IDX 	7	/*  800MHz */
+#define ARM_MAX_OPP_IDX 	9	/* 1000MHz */
 
 static struct liveopp_arm_table liveopp_arm[] = {
-//     freq_show, f_raw                                                             varm_sel, varm, vbbx, ddr, ape
 #ifdef CONFIG_MACH_CODINA
-	{100000,    99840, ARM_EXTCLK,  SET_EXT, 0x582, NOCHG,   0x00050168, SET_VOLT, 0x0C, 0x18, 0xDB, PRCMU_QOS_DEFAULT_VALUE, PRCMU_QOS_DEFAULT_VALUE},
-	{200000,   199680, ARM_EXTCLK,  NOCHG,   0x581, NOCHG,   0x00050168, SET_VOLT, 0x0C, 0x18, 0xDB, PRCMU_QOS_DEFAULT_VALUE, PRCMU_QOS_DEFAULT_VALUE},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{300000,   299520, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x00050127, SET_VOLT, 0x0C, 0x18, 0xDB, PRCMU_QOS_DEFAULT_VALUE, PRCMU_QOS_DEFAULT_VALUE},
-#endif
-	{400000,   399360, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x01050168, SET_VOLT, 0x0C, 0x18, 0xDB, PRCMU_QOS_DEFAULT_VALUE, PRCMU_QOS_DEFAULT_VALUE},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{500000,   499200, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0001010D, SET_VOLT, 0x0C, 0x20, 0xDB, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-#endif
-	{600000,   599040, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0005014E, SET_VOLT, 0x0C, 0x20, 0xDB, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{700000,   698880, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0005015B, SET_VOLT, 0x0C, 0x24, 0xDB, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-#endif
-	{800000,   798720, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00050168, NOCHG,    0x0B, 0x24, 0xDB, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{900000,   898560, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00050175, SET_VOLT, 0x0B, 0x2F, 0xDB, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-#endif
-	{1000000,  998400, ARM_MAX_OPP, NOCHG,   0x741, NOCHG,   0x0001011A, NOCHG,    0x0B, 0x2F, 0xDB, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-	{1050000, 1049600, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00030152, SET_VOLT, 0x0B, 0x32, 0xDB, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-	{1100000, 1100800, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00030156, SET_VOLT, 0x0B, 0x36, 0x8F, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-	{1150000, 1152000, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x0001011E, SET_VOLT, 0x0B, 0x36, 0x8F, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-	{1200000, 1200000, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x0004017D, SET_VOLT, 0x0B, 0x39, 0x8F, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
-	{1250000, 1248800, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00040182, SET_VOLT, 0x0B, 0x39, 0x8F, PRCMU_QOS_MAX_VALUE, PRCMU_QOS_MAX_VALUE},
+	{ 100000,   99840,  ARM_EXTCLK, SET_EXT, 0x582,   NOCHG, 0x00050168, SET_VOLT, 0x0C, 0x18, 0xDB,  -1,  -1},
+	{ 200000,  199680,  ARM_EXTCLK,   NOCHG, 0x581,   NOCHG, 0x00050168, SET_VOLT, 0x0C, 0x18, 0xDB,  -1,  -1},
+	{ 300000,  299520,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x00050127, SET_VOLT, 0x0C, 0x18, 0xDB,  -1,  -1},
+	{ 400000,  399360,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x01050168, SET_VOLT, 0x0C, 0x18, 0xDB,  -1,  -1},
+	{ 500000,  499200,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x0001010D, SET_VOLT, 0x0C, 0x20, 0xDB,  -2,  -2},
+	{ 600000,  599040,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x0005014E, SET_VOLT, 0x0C, 0x20, 0xDB,  -2,  -2},
+	{ 700000,  698880,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x0005015B, SET_VOLT, 0x0C, 0x24, 0xDB,  -2,  -2},
+	{ 800000,  798720, ARM_100_OPP,   NOCHG, 0x741, SET_PLL, 0x00050168,    NOCHG, 0x0B, 0x24, 0xDB,  -2,  -2},
+	{ 900000,  898560, ARM_100_OPP,   NOCHG, 0x741, SET_PLL, 0x00050175, SET_VOLT, 0x0B, 0x2F, 0xDB,  -2,  -2},
+	{1000000,  998400, ARM_100_OPP,   NOCHG, 0x741, SET_PLL, 0x0001011A,    NOCHG, 0x0B, 0x2F, 0xDB,  -2,  -2},
+	{1050000, 1049600, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x00030152, SET_VOLT, 0x0B, 0x32, 0xDB,  -2,  -2},
+	{1100000, 1100800, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x00030156, SET_VOLT, 0x0B, 0x36, 0x8F,  -2,  -2},
+	{1150000, 1152000, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x0001011E, SET_VOLT, 0x0B, 0x36, 0x8F,  -2,  -2},
+	{1200000, 1200000, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x0004017D, SET_VOLT, 0x0B, 0x39, 0x8F,  -2,  -2},
+	{1250000, 1248800, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x00040182, SET_VOLT, 0x0B, 0x39, 0x8F,  -2,  -2},
 #else
-	{100000,    99840, ARM_EXTCLK,  SET_EXT, 0x582, NOCHG,   0x00050168, SET_VOLT, 0x0C, 0x12, 0xDB, 25, 25},
-	{200000,   199680, ARM_EXTCLK,  SET_EXT, 0x581, NOCHG,   0x00050168, SET_VOLT, 0x0C, 0x12, 0xDB, 25, 25},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{300000,   299520, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0105014E, SET_VOLT, 0x0C, 0x12, 0xDB, 25, 25},
-#endif
-	{400000,   399360, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x01050168, SET_VOLT, 0x0C, 0x12, 0xDB, 25, 50},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{500000,   499200, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x01050182, SET_VOLT, 0x0C, 0x1B, 0xDB, 25, 50},
-#endif
-	{600000,   599040, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x0105019C, SET_VOLT, 0x0C, 0x20, 0xDB, 50, 50},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{700000,   698880, ARM_50_OPP,  NOCHG,   0x741, SET_PLL, 0x010501B6, SET_VOLT, 0x0C, 0x22, 0xDB, 50, 50},
-#endif
-	{800000,   798720, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00050168, SET_VOLT, 0x0B, 0x24, 0xDB, 100, 50},
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
-	{900000,   898560, ARM_100_OPP, NOCHG,   0x741, SET_PLL, 0x00050175, SET_VOLT, 0x0B, 0x29, 0xDB, 100, 100},
-#endif
-	{1000000,  998400, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x0001011A, SET_VOLT, 0x0B, 0x2F, 0xDB, 100, 100},
-	{1050000, 1049600, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00030152, SET_VOLT, 0x0B, 0x34, 0xDB, 100, 100},
-	{1100000, 1100800, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00030156, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
-	{1150000, 1152000, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x0001011E, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
-	{1200000, 1200000, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x0004017D, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
-	{1250000, 1228000, ARM_MAX_OPP, NOCHG,   0x741, SET_PLL, 0x00040182, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
-#endif
+	{ 100000,   99840,  ARM_EXTCLK, SET_EXT, 0x582,   NOCHG, 0x00050168, SET_VOLT, 0x0C, 0x12, 0xDB,  25,  25},
+	{ 200000,  199680,  ARM_EXTCLK, SET_EXT, 0x581,   NOCHG, 0x00050168, SET_VOLT, 0x0C, 0x12, 0xDB,  25,  25},
+	{ 300000,  299520,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x0105014E, SET_VOLT, 0x0C, 0x13, 0xDB,  25,  25},
+	{ 400000,  399360,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x01050168, SET_VOLT, 0x0C, 0x14, 0xDB,  25,  50},
+	{ 500000,  499200,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x01050182, SET_VOLT, 0x0C, 0x1B, 0xDB,  25,  50},
+	{ 600000,  599040,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x0105019C, SET_VOLT, 0x0C, 0x20, 0xDB,  50,  50},
+	{ 700000,  698880,  ARM_50_OPP,   NOCHG, 0x741, SET_PLL, 0x010501B6, SET_VOLT, 0x0C, 0x22, 0xDB,  50,  50},
+	{ 800000,  798720, ARM_100_OPP,   NOCHG, 0x741, SET_PLL, 0x00050168, SET_VOLT, 0x0B, 0x24, 0xDB, 100,  50},
+	{ 900000,  898560, ARM_100_OPP,   NOCHG, 0x741, SET_PLL, 0x00050175, SET_VOLT, 0x0B, 0x29, 0xDB, 100, 100},
+	{1000000,  998400, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x0001011A, SET_VOLT, 0x0B, 0x2F, 0xDB, 100, 100},
+	{1050000, 1049600, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x00030152, SET_VOLT, 0x0B, 0x34, 0xDB, 100, 100},
+	{1100000, 1100800, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x00030156, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
+	{1150000, 1152000, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x0001011E, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
+	{1200000, 1200000, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x0004017D, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
+	{1250000, 1248000, ARM_MAX_OPP,   NOCHG, 0x741, SET_PLL, 0x00040182, SET_VOLT, 0x0B, 0x3F, 0x8F, 100, 100},
+#endif /* CONFIG_MACH_CODINA */
 };
+
+static const char *armopp_name[] = 
+{
+	"ARM_OPP_INIT",		/* 0x00 */
+	"ARM_NO_CHANGE",	/* 0x01 */
+	"ARM_100_OPP", 		/* 0x02 */
+	"ARM_50_OPP", 		/* 0x03 */
+	"ARM_MAX_OPP", 		/* 0x04 */
+	"ARM_MAX_FREQ100OPP", 	/* 0x05 */
+	"(null)",		/* 0x06 */
+	"ARM_EXTCLK",		/* 0x07 */
+};
+
+static int varm_voltage(u8 raw)
+{
+	if (raw <= 0x35) {
+		return (AB8500_VARM_MIN_UV + (raw * AB8500_VARM_STEP_UV));
+	} else {
+		return AB8500_VARM_MAX_UV;
+	}
+}
+
+static int pllarm_freq(u32 raw)
+{
+	int multiple = raw & 0x000000FF;
+	int divider = (raw & 0x00FF0000) >> 16;
+	int half = (raw & 0x01000000) >> 24;
+	int pll;
+
+	pll = (multiple * PLLARM_FREQ_STEPS);
+	pll /= divider;
+
+	if (half) {
+		pll /= 2;
+	}
+
+	return pll;
+}
 
 static inline void liveopp_set_armvolt(struct liveopp_arm_table table)
 {
@@ -1241,52 +1269,13 @@ static inline void liveopp_update_opp(struct liveopp_arm_table table)
 #define ATTR_RW(_name)	\
 	static struct kobj_attribute _name##_interface = __ATTR(_name, 0644, _name##_show, _name##_store);
 
-
-static const char *armopp_name[] = 
-{
-	"ARM_OPP_INIT",		/* 0x00 */
-	"ARM_NO_CHANGE",	/* 0x01 */
-	"ARM_100_OPP", 		/* 0x02 */
-	"ARM_50_OPP", 		/* 0x03 */
-	"ARM_MAX_OPP", 		/* 0x04 */
-	"ARM_MAX_FREQ100OPP", 	/* 0x05 */
-	"(null)",		/* 0x06 */
-	"ARM_EXTCLK",		/* 0x07 */
-};
-
-static int varm_voltage(u8 raw)
-{
-	if (raw <= 0x35) {
-		return (AB8500_VARM_MIN_UV + (raw * AB8500_VARM_STEP_UV));
-	} else {
-		return AB8500_VARM_MAX_UV;
-	}
-}
-
-static int pllarm_freq(u32 raw)
-{
-	int multiple = raw & 0x000000FF;
-	int divider = (raw & 0x00FF0000) >> 16;
-	int half = (raw & 0x01000000) >> 24;
-	int pll;
-
-	pll = (multiple * PLLARM_FREQ_STEPS);
-	pll /= divider;
-
-	if (half) {
-		pll /= 2;
-	}
-
-	return pll;
-}
-
 /* 
  * LiveOPP sysfs interfaces
  */
 
 static ssize_t version_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	sprintf(buf, "LiveOPP (%s), cocafe\n", LiveOPP_VER);
+	sprintf(buf, "LiveOPP (%s), cocafe\n", LIVEOPP_VER);
 
 	return strlen(buf);
 }
@@ -1315,32 +1304,40 @@ static ssize_t arm_extclk_show(struct kobject *kobj, struct kobj_attribute *attr
 	rate /= r3;
 
 	/* PLLDDR belongs to PLL_FIX branch */
-	return sprintf(buf, "%lu kHz PRCM_ARM_CHGCLKREQ & PRCM_ARM_CHGCLKREQ_PRCM_ARM_DIVSEL: %#08x PRCMU_PLLDDR_REG: %#08x PRCM_ARMCLKFIX_MGT & PRCM_CLK_MGT_CLKPLLDIV_MASK: %#08x\n", rate / 2, r & PRCM_ARM_CHGCLKREQ_PRCM_ARM_DIVSEL, r2, r3);
+	return sprintf(buf, "%lu kHz\n", rate / 2);
 }
 ATTR_RO(arm_extclk);
 
 static ssize_t arm_pllclk_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	u32 reg = db8500_prcmu_readl(PRCMU_PLLARM_REG);
-	return sprintf(buf, "%d kHz %#08x\n", pllarm_freq(reg), reg);
+	return sprintf(buf, "%d kHz\n", pllarm_freq(db8500_prcmu_readl(PRCMU_PLLARM_REG)));
 }
 ATTR_RO(arm_pllclk);
 
 static ssize_t arm_varm_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	u8 varm[3];
+
 	prcmu_abb_read(AB8500_REGU_CTRL2, 0x0A, &varm[0], 1);
 	prcmu_abb_read(AB8500_REGU_CTRL2, 0x0B, &varm[1], 1);
 	prcmu_abb_read(AB8500_REGU_CTRL2, 0x0C, &varm[2], 1);
-	sprintf(buf, "last_arm_idx: %d\n", last_arm_idx);
-	sprintf(buf, "%svarm_sel: 0x%x\n", buf, liveopp_arm[last_arm_idx].varm_sel);
-	return sprintf(buf, "%svarm[0x0A, 0x0B, 0x0C] = [%#04x,%#04x,%#04x]\n", buf, varm[0], varm[1], varm[2]);
+
+	sprintf(buf,   "Last_idx: %d\n", last_arm_idx);
+	sprintf(buf, "%sVarm_sel: %#04x\n", buf, liveopp_arm[last_arm_idx].varm_sel);
+	sprintf(buf, "%sVarm[0x0A, 0x0B, 0x0C] : [%#04x, %#04x ,%#04x]\n", buf, varm[0], varm[1], varm[2]);
+
+	return strlen(buf);
 }
 ATTR_RO(arm_varm);
 
 static ssize_t arm_step_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf, int _index)
 {
-	sprintf(buf, "[LiveOPP ARM Step %d]\n\n", _index);
+	/*
+	if (_index >= ARRAY_SIZE(liveopp_arm))
+		return sprintf(buf, "Not available\n");
+	*/
+
+	sprintf(buf,   "[LiveOPP ARM Step %d]\n\n", _index);
 	sprintf(buf, "%sSet EXTARM:\t\t%s\n", buf, liveopp_arm[_index].set_extarm ? "Enabled" : "Disabled");
 	sprintf(buf, "%sSet PLLARM:\t\t%s\n", buf, liveopp_arm[_index].set_pllarm ? "Enabled" : "Disabled");
 	sprintf(buf, "%sSet Voltage:\t\t%s\n", buf, liveopp_arm[_index].set_volt ? "Enabled" : "Disabled");
@@ -1364,6 +1361,11 @@ static ssize_t arm_step_store(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	int ret;
 	int val;
+
+	/*
+	if (_index >= ARRAY_SIZE(liveopp_arm))
+		return -EINVAL;
+	*/
 
 	if (!strncmp(buf, "set_ext=", 8)) {
 		ret = sscanf(&buf[8], "%d", &val);
@@ -1498,16 +1500,16 @@ static ssize_t arm_step_store(struct kobject *kobj, struct kobj_attribute *attr,
 	return count;
 }
 
-#define ARM_STEP(_name, _index)	\
-static ssize_t _name##_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)	\
-{	\
-	return arm_step_show(kobj, attr, buf, _index);	\
-}	\
-	\
+#define ARM_STEP(_name, _index)											\
+static ssize_t _name##_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)			\
+{														\
+	return arm_step_show(kobj, attr, buf, _index);								\
+}														\
+														\
 static ssize_t _name##_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	\
-{	\
-	return arm_step_store(kobj, attr, buf, count, _index);	\
-}	\
+{														\
+	return arm_step_store(kobj, attr, buf, count, _index);							\
+}														\
 ATTR_RW(_name);
 
 ARM_STEP(arm_step00, 0);
@@ -1521,14 +1523,28 @@ ARM_STEP(arm_step07, 7);
 ARM_STEP(arm_step08, 8);
 ARM_STEP(arm_step09, 9);
 ARM_STEP(arm_step10, 10);
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
 ARM_STEP(arm_step11, 11);
 ARM_STEP(arm_step12, 12);
 ARM_STEP(arm_step13, 13);
 ARM_STEP(arm_step14, 14);
+
+#if LIVEOPP_DEBUG > 1
+static ssize_t liveopp_start_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)		
+{
+	return sprintf(buf, "%d\n", liveopp_start);
+}
+
+static ssize_t liveopp_start_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	
+{
+	return sscanf(buf, "%d", &liveopp_start);
+}
+ATTR_RW(liveopp_start);
 #endif
 
 static struct attribute *liveopp_attrs[] = {
+#if LIVEOPP_DEBUG > 1
+	&liveopp_start_interface.attr, 
+#endif
 	&version_interface.attr, 
 	&arm_extclk_interface.attr, 
 	&arm_pllclk_interface.attr, 
@@ -1543,13 +1559,11 @@ static struct attribute *liveopp_attrs[] = {
 	&arm_step07_interface.attr, 
 	&arm_step08_interface.attr, 
 	&arm_step09_interface.attr, 
-#ifdef CONFIG_LIVEOPP_EXTENDED_FREQ
 	&arm_step10_interface.attr, 
 	&arm_step11_interface.attr, 
 	&arm_step12_interface.attr, 
 	&arm_step13_interface.attr, 
 	&arm_step14_interface.attr, 
-#endif
 	NULL,
 };
 
@@ -1623,7 +1637,6 @@ static inline int db8500_prcmu_set_arm_lopp(u8 opp, int idx)
 {
 	int r;
 	struct liveopp_arm_table table = liveopp_arm[idx];
-	u8 voltage = 0x12;
 	u8 last_opp = liveopp_arm[last_arm_idx].arm_opp;
 	bool voltage_first = (idx > last_arm_idx);
 
@@ -1753,12 +1766,17 @@ static int arm_set_rate(unsigned long rate)
 	unsigned long frequency = rate / 1000;
 	int i;
 
+#if LIVEOPP_DEBUG > 1
+	if (!liveopp_start)
+		return 0;
+#endif
+
+#if LIVEOPP_DEBUG > 0
+	pr_info("kHz: %10lu\n", frequency);
+#endif
+
 	/*  catch early access */
 	BUG_ON(!freq_table);
-
-#ifdef LIVEOPP_DEBUG
-	pr_info("kHz: %lu\n", frequency);
-#endif
 
 	for (i = 0; i < ARRAY_SIZE(liveopp_arm); i++) {
 		if (frequency == freq_table[i].frequency) {
@@ -4408,7 +4426,7 @@ static int __init late(void)
 	if (ret) {
 		kobject_put(liveopp_kobject);
 	}
-	pr_info("[LiveOPP] Initialized: v%s\n", LiveOPP_VER);
+	pr_info("[LiveOPP] Initialized: v%s\n", LIVEOPP_VER);
 	#endif /* CONFIG_DB8500_LIVEOPP */
 
 #ifdef ENABLE_FTRACE_BY_DEFAULT
@@ -4809,24 +4827,21 @@ static struct cpufreq_frequency_table *freq_table;
 static void  db8500_prcmu_update_freq(void *pdata)
 {
 	#ifdef CONFIG_DB8500_LIVEOPP
-	int i;
+	int i, pllclk = pllarm_freq(db8500_prcmu_readl(PRCMU_PLLARM_REG));
 	#endif /* CONFIG_DB8500_LIVEOPP */
+
 	freq_table =
 		(struct cpufreq_frequency_table *)pdata;
+
 	#ifdef CONFIG_DB8500_LIVEOPP
 	pr_info("[LiveOPP] Available freqs: %d\n", ARRAY_SIZE(liveopp_arm));
 	for (i = 0; i < ARRAY_SIZE(liveopp_arm); i++) {
 		freq_table[i].frequency = liveopp_arm[i].freq_show;
 
-		#ifdef CONFIG_MACH_CODINA
-		if (liveopp_arm[i].arm_opp == ARM_MAX_OPP)
-			liveopp_arm[i].arm_opp = ARM_100_OPP;
-
-		if (liveopp_arm[i].freq_show == 1000000) {
-			liveopp_arm[i].set_pllarm = 1;
-			liveopp_arm[i].set_volt = 1;
+		if (liveopp_arm[i].freq_raw == pllclk) {
+			pr_info("[LiveOPP] Boot up -> [%d] %dkHz\n", i, pllclk);
+			last_arm_idx = i;
 		}
-		#endif
 	}
 	#else /* CONFIG_DB8500_LIVEOPP */
 	if  (!db8500_prcmu_has_arm_maxopp())
