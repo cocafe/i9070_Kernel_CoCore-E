@@ -251,19 +251,19 @@ void prcmu_qos_set_cpufreq_opp_delay(unsigned long n)
 }
 
 unsigned int orig_min_freq = 0, last_min_freq = 0;
-bool ignore_cpufreq_notifier = false;
+volatile bool ignore_cpufreq_notifier = false;
 
 static int policy_cpufreq_notifier(struct notifier_block *nb, unsigned long event, void *data)
 {
 	struct cpufreq_policy *policy = data;
 
-	if (ignore_cpufreq_notifier || event != CPUFREQ_NOTIFY || policy->cpu != 0)
+	if (ignore_cpufreq_notifier || event != CPUFREQ_ADJUST || policy->cpu != 0)
 		return 0;
 
+	//FIXME: I don't know why, but CPUFREQ_NOTIFY event never occurs... only _ADJUST(0) and _INCOMPATIBLE(1) - sometimes _START(3)
 	orig_min_freq = policy->min;
-	//if we want to preserve current requirement, we can use CPUFREQ_ADJUST event
-	//FIXME: this doesn't work too well - for some reason it locks min freq at 400MHz (mmc/wlan req)
-	//policy->min = max(orig_min_freq, last_min_freq);
+	policy->min = max(orig_min_freq, last_min_freq);
+	//pr_debug("PRCMU QOS cpufreq notify: req:%d / orig:%d -> %d\n", last_min_freq, orig_min_freq, policy->min);
 	return 0;
 }
 
@@ -277,8 +277,12 @@ static void update_cpu_limits(s32 min_freq)
 	int cpu;
 	struct cpufreq_policy policy;
 	int ret;
+	unsigned int freq = max(min_freq, orig_min_freq);
 
 	ignore_cpufreq_notifier = true;
+	last_min_freq = min_freq;
+
+	//pr_debug("PRCMU QOS update_cpu_limits: req:%d / orig:%d -> %d\n", min_freq, orig_min_freq, freq);
 	for_each_online_cpu(cpu) {
 		ret = cpufreq_get_policy(&policy, cpu);
 		if (ret) {
@@ -287,12 +291,7 @@ static void update_cpu_limits(s32 min_freq)
 			continue;
 		}
 
-		if (policy.cpu == 0) {
-			//since all cpus have the same freq, do calculations only for cpu0
-			last_min_freq = max(min_freq, orig_min_freq);
-		}
-
-		ret = cpufreq_update_freq(cpu, last_min_freq, policy.max);
+		ret = cpufreq_update_freq(cpu, freq, policy.max);
 		if (ret)
 			pr_err("prcmu qos: update cpufreq "
 			       "frequency limits failed\n");
