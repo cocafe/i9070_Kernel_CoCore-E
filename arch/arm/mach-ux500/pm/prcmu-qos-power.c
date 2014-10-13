@@ -251,6 +251,25 @@ void prcmu_qos_set_cpufreq_opp_delay(unsigned long n)
 }
 
 unsigned int orig_min_freq = 0, last_min_freq = 0;
+bool ignore_cpufreq_notifier = false;
+
+static int policy_cpufreq_notifier(struct notifier_block *nb, unsigned long event, void *data)
+{
+	struct cpufreq_policy *policy = data;
+
+	if (ignore_cpufreq_notifier || event != CPUFREQ_NOTIFY || policy->cpu != 0)
+		return 0;
+
+	orig_min_freq = policy->min;
+	//if we want to preserve current requirement, we can use CPUFREQ_ADJUST event
+	//FIXME: this doesn't work too well - for some reason it locks min freq at 400MHz (mmc/wlan req)
+	//policy->min = max(orig_min_freq, last_min_freq);
+	return 0;
+}
+
+static struct notifier_block policy_cpufreq_notifier_block = {
+	.notifier_call = policy_cpufreq_notifier,
+};
 
 #ifdef CONFIG_CPU_FREQ
 static void update_cpu_limits(s32 min_freq)
@@ -259,6 +278,7 @@ static void update_cpu_limits(s32 min_freq)
 	struct cpufreq_policy policy;
 	int ret;
 
+	ignore_cpufreq_notifier = true;
 	for_each_online_cpu(cpu) {
 		ret = cpufreq_get_policy(&policy, cpu);
 		if (ret) {
@@ -269,12 +289,6 @@ static void update_cpu_limits(s32 min_freq)
 
 		if (policy.cpu == 0) {
 			//since all cpus have the same freq, do calculations only for cpu0
-			//FIXME I know it's ugly - feel free to make it better :)
-			if (policy.min != last_min_freq) {
-				//if it's different from what we've set last time,
-				//it has been changed by someone else, so let's assume it's the new 'default'
-				orig_min_freq = policy.min;
-			}
 			last_min_freq = max(min_freq, orig_min_freq);
 		}
 
@@ -283,6 +297,7 @@ static void update_cpu_limits(s32 min_freq)
 			pr_err("prcmu qos: update cpufreq "
 			       "frequency limits failed\n");
 	}
+	ignore_cpufreq_notifier = false;
 }
 #else
 static inline void update_cpu_limits(s32 min_freq) { }
@@ -1007,6 +1022,7 @@ static int __init prcmu_qos_power_init(void)
 	ret = cpufreq_get_policy(&policy, 0);
 	last_min_freq = policy.min;
 	orig_min_freq = policy.min;
+	cpufreq_register_notifier(&policy_cpufreq_notifier_block, CPUFREQ_POLICY_NOTIFIER);
 
 	prcmu_qos_cpufreq_init_done = true;
 
