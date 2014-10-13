@@ -118,7 +118,6 @@ static u32 boost_required 	= 0;
 static u32 boost_delay 		= 500;
 static u32 boost_low 		= 0;
 static u32 boost_high 		= 0;
-static u32 boost_utilization 	= 0;
 static u32 boost_upthreshold 	= 233;
 static u32 boost_downthreshold 	= 64;
 
@@ -333,7 +332,7 @@ void mali_utilization_function(struct work_struct *ptr)
 
 	MALI_DEBUG_PRINT(5, ("MALI GPU utilization: %u\n", mali_last_utilization));
 
-	if (!boost_required && !boost_working && !boost_scheduled || !boost_enable) {
+	if ((!boost_required && !boost_working && !boost_scheduled) || !boost_enable) {
 		// consider power saving mode (APE_50_OPP) only if we're not on boost
 		if (mali_last_utilization > mali_utilization_low_to_high) {
 			if (has_requested_low) {
@@ -461,7 +460,8 @@ static ssize_t mali_gpu_vape_50_opp_store(struct kobject *kobj, struct kobj_attr
 	int val;
 	u8 vape;
 
-	if (sscanf(buf, "%x", &vape)) {
+	if (sscanf(buf, "%x", &val)) {
+		vape = val;
 		prcmu_abb_write(AB8500_REGU_CTRL2,
 			AB8500_VAPE_SEL2,
 			&vape,
