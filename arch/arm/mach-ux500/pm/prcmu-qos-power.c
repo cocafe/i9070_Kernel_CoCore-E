@@ -256,11 +256,23 @@ volatile bool ignore_cpufreq_notifier = false;
 static int policy_cpufreq_notifier(struct notifier_block *nb, unsigned long event, void *data)
 {
 	struct cpufreq_policy *policy = data;
+	struct cpufreq_policy old_policy;
 
 	if (ignore_cpufreq_notifier || event != CPUFREQ_ADJUST || policy->cpu != 0)
 		return 0;
 
 	//FIXME: I don't know why, but CPUFREQ_NOTIFY event never occurs... only _ADJUST(0) and _INCOMPATIBLE(1) - sometimes _START(3)
+
+	if (cpufreq_get_policy(&old_policy, policy->cpu)) {
+		pr_err("prcmu qos notifier: get cpufreq policy failed\n");
+		return 0;
+	}
+
+	if (policy->min == old_policy.min) {
+		//ignore events that don't realy change min freq
+		return 0;
+	}
+
 	orig_min_freq = policy->min;
 	policy->min = max(orig_min_freq, last_min_freq);
 	//pr_debug("PRCMU QOS cpufreq notify: req:%d / orig:%d -> %d\n", last_min_freq, orig_min_freq, policy->min);
