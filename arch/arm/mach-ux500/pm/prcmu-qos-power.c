@@ -153,43 +153,27 @@ static int requirements_print(struct seq_file *s, struct prcmu_qos_object *qo)
 	return 0;
 }
 
-static int ape_requirements_print(struct seq_file *s, void *p)
-{
-	requirements_print(s, prcmu_qos_array[PRCMU_QOS_APE_OPP]);
-	return 0;
-}
-
-static int ddr_requirements_print(struct seq_file *s, void *p)
-{
-	requirements_print(s, prcmu_qos_array[PRCMU_QOS_DDR_OPP]);
-	return 0;
-}
-
-static int ape_requirements_open_file(struct inode *inode, struct file *file)
-{
-	return single_open(file, ape_requirements_print, inode->i_private);
-}
-
-static int ddr_requirements_open_file(struct inode *inode, struct file *file)
-{
-	return single_open(file, ddr_requirements_print, inode->i_private);
-}
-
-static const struct file_operations ape_requirements_fops = {
-	.open = ape_requirements_open_file,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-	.owner = THIS_MODULE,
+#define PRINT_REQUIREMENTS(_name, _requirement) \
+static int _name##_requirements_print(struct seq_file *s, void *p) \
+{ \
+	requirements_print(s, prcmu_qos_array[_requirement]); \
+	return 0; \
+} \
+static int _name##_requirements_open_file(struct inode *inode, struct file *file) \
+{ \
+	return single_open(file, _name##_requirements_print, inode->i_private); \
+} \
+static const struct file_operations _name##_requirements_fops = { \
+	.open = _name##_requirements_open_file, \
+	.read = seq_read, \
+	.llseek = seq_lseek, \
+	.release = single_release, \
+	.owner = THIS_MODULE, \
 };
 
-static const struct file_operations ddr_requirements_fops = {
-	.open = ddr_requirements_open_file,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-	.owner = THIS_MODULE,
-};
+PRINT_REQUIREMENTS(ape, PRCMU_QOS_APE_OPP);
+PRINT_REQUIREMENTS(ddr, PRCMU_QOS_DDR_OPP);
+PRINT_REQUIREMENTS(arm, PRCMU_QOS_ARM_KHZ);
 
 static int setup_debugfs(void)
 {
@@ -202,6 +186,11 @@ static int setup_debugfs(void)
 
 	file = debugfs_create_file("ape_requirements", (S_IRUGO),
 				   dir, NULL, &ape_requirements_fops);
+	if (IS_ERR_OR_NULL(file))
+		goto fail;
+
+	file = debugfs_create_file("arm_requirements", (S_IRUGO),
+				   dir, NULL, &arm_requirements_fops);
 	if (IS_ERR_OR_NULL(file))
 		goto fail;
 
