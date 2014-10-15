@@ -11,7 +11,7 @@
  * 
  * DB8500 LiveOPP: 
  *         Huang Ji (cocafe@xda-developers.com) <cocafehj@gmail.com>
- *         mkaluza (mkaluza@xda-developers.com) 
+ *         Marcin Kaluza (mkaluza@xda-developers.com) <marcin.kaluza@trioptimum.com>
  * 
  */
 
