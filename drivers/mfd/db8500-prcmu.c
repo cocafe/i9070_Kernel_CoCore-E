@@ -1303,13 +1303,22 @@ static ssize_t arm_extclk_show(struct kobject *kobj, struct kobj_attribute *attr
 	rate /= r3;
 
 	/* PLLDDR belongs to PLL_FIX branch */
+#if CONFIG_LIVEOPP_DEBUG > 1
+	return sprintf(buf, "%lu kHz PRCM_ARM_CHGCLKREQ & PRCM_ARM_CHGCLKREQ_PRCM_ARM_DIVSEL: %#08x PRCMU_PLLDDR_REG: %#08x PRCM_ARMCLKFIX_MGT & PRCM_CLK_MGT_CLKPLLDIV_MASK: %#08x\n", rate / 2, r & PRCM_ARM_CHGCLKREQ_PRCM_ARM_DIVSEL, r2, r3);
+#else
 	return sprintf(buf, "%lu kHz\n", rate / 2);
+#endif
 }
 ATTR_RO(arm_extclk);
 
 static ssize_t arm_pllclk_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d kHz\n", pllarm_freq(db8500_prcmu_readl(PRCMU_PLLARM_REG)));
+	u32 reg = db8500_prcmu_readl(PRCMU_PLLARM_REG);
+#if CONFIG_LIVEOPP_DEBUG > 0
+	return sprintf(buf, "%d kHz %#08x\n", pllarm_freq(reg), reg);
+#else
+	return sprintf(buf, "%d kHz\n", pllarm_freq(reg));
+#endif
 }
 ATTR_RO(arm_pllclk);
 
