@@ -1544,7 +1544,8 @@ static ssize_t liveopp_start_show(struct kobject *kobj, struct kobj_attribute *a
 
 static ssize_t liveopp_start_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	
 {
-	return sscanf(buf, "%d", &liveopp_start);
+	sscanf(buf, "%d", &liveopp_start);
+	return count;
 }
 ATTR_RW(liveopp_start);
 #endif
