@@ -1105,31 +1105,11 @@ static int liveopp_start = 0;
 #endif
 
 /**
- * PLLARM REGISTER: 0xAABBCCDD
- * AA - OPP_50_enabled
- * BB - divisor
- * CC - unknown
- * DD - multiplier
- *
- * when going from OPP100 to  OPP50 mode, it doesn't set BB and DD, only AA to 01
- * and when going 50 -> 100, only AA=00, so from 700MHz it'll do 1.4GHz
- * OPPMAX -> OPP100/50 sets pll BB, DD and optionally AA (for opp 50)
- * 
- */
-
-/**
- * VARM REG CHANGES
- * OPP_EXT -> OPP* 0C = 0x12
- * OPP* -> OPPMAX 0B = 0x32
- * OPP* -> OPP100 0B = 0x28
- * NO-OPS:
- *   - OPP* -> OPPEXT
- *   - OPP100 -> OPP50
- *   - OPPMAX -> OPP50
- */
-
-/**
  * Hard-coded Custom ARM Frequency and Voltage Table
+ * 
+ * cocafe: 
+ * 	References of PLL register bits: dbx500-prcmu-regs.h L#138
+ * 
  */
 
 static struct liveopp_arm_table liveopp_arm[] = {
