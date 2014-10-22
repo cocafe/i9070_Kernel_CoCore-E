@@ -33,15 +33,9 @@
  * struct liveopp_arm_table - Custom frequency and voltage table
  * @freq_show:		Frequency(KHz) showed in userspace, no effect on real clock
  * @freq_raw:		Manually calculated frequency(KHz) for showing, no effect on real clock
- * @arm_opp:		STE ARM OPP index to use, we need to setup ARM OPP first
- * @arm_opp_rec(overy):	Workaround to fix dead issue when scales down from overclocked freqs
- * @extarm_raw:		Raw register value of ARMCLKFIX_MGT in PRCMU
  * @pllarm_raw:		Raw register value of PLLARM_FREQ in PRCMU
- * @varm_sel:		Varm voltage selection (1/2/3)
  * @varm_raw:		Raw register value of Varm regulator in AB850x
  * @vbbx_raw:		Raw register value of Vbbp and Vbbn regulator in AB850x
- * @set_pllarm:		Whether override the default PRCMU OPP frequency
- * @set_volt:		Whether override the default PRCMU OPP voltage
  * @ddr_opp		minimum DDR_OPP - valid values are 25/default, 50, 100/max
  * @ape_opp		minimum APE_OPP - valid values are 25/default, 50, 100/max
  * 			25 is actually APE_50_PARTLY_25_OPP - its OPP_50 with some clocks
@@ -54,13 +48,7 @@ struct liveopp_arm_table
 {
 	u32 	freq_show;
 	u32 	freq_raw;
-	u8  	arm_opp;
-	u32 	set_extarm;
-	u32 	extarm_raw;
-	u32 	set_pllarm;
 	u32 	pllarm_raw;
-	u32 	set_volt;
-	u8 	varm_sel;
 	u8 	varm_raw;
 	u8  	vbbx_raw;
 	s8	ddr_opp;
