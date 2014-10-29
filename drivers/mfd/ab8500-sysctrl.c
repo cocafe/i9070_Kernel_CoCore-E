@@ -91,10 +91,6 @@ void ab8500_power_off(void)
 		ret = psy->get_property(psy, POWER_SUPPLY_PROP_TECHNOLOGY,
 					&val);
 		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
-			printk(KERN_INFO
-			       "Charger \"%s\" is connected with known battery."
-			       " Rebooting.\n",
-			       pss[i]);
 			machine_restart("ta");
 		}
 	}

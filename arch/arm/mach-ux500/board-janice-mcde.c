@@ -27,7 +27,8 @@
 #include "pins-db8500.h"
 #include "pins.h"
 #include <mach/db8500-regs.h>
-	 
+#include <linux/ktime.h>
+
 
 #define PRCMU_DPI_CLK_FREQ	49920000
 	 
@@ -315,18 +316,39 @@ static struct notifier_block display_nb = {
 static void update_mcde_opp(struct device *dev,
 					struct mcde_opp_requirements *reqs)
 {
-	static s32 requested_qos;
 	s32 req_ape = PRCMU_QOS_DEFAULT_VALUE;
-
-	if (reqs->num_rot_channels && reqs->num_overlays > 1)
-		req_ape = PRCMU_QOS_MAX_VALUE;
+	s32 req_ddr = PRCMU_QOS_DEFAULT_VALUE;
+	static s32 requested_qos;
+	static u8 prev_rot_channels;
+	static ktime_t rot_time;
+	s64 diff;
+	/* If a rotation is detected, clock up CPU to max */
+	if (reqs->num_rot_channels != prev_rot_channels) {
+		prev_rot_channels = reqs->num_rot_channels;
+		rot_time = ktime_get();
+	}
+		diff = ktime_to_ms(ktime_sub(ktime_get(),rot_time)); 
+	
+	/*	
+		Wait a while before clocking down again
+		unless we have an overlay
+	*/
+	if ((reqs->num_rot_channels && reqs->num_overlays > 1) || (diff < 5000)) { 
+			req_ape = PRCMU_QOS_MAX_VALUE;
+			req_ddr = PRCMU_QOS_MAX_VALUE;
+	} else {
+			req_ape = PRCMU_QOS_DEFAULT_VALUE;
+			req_ddr = PRCMU_QOS_DEFAULT_VALUE;
+	}
 
 	if (req_ape != requested_qos) {
 		requested_qos = req_ape;
 		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
-						dev_name(dev), req_ape);
-		pr_info("Requested APE QOS = %d\n", req_ape);
+			dev_name(dev), req_ape);
+		prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP,
+			dev_name(dev), req_ddr);
 	}
+	prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP, dev_name(dev), req_ape);
 }
 
 int __init init_janice_display_devices(void)
@@ -352,14 +374,15 @@ int __init init_janice_display_devices(void)
 	janice_dpi_pri_display_info.video_mode.pixclock /=
 						port0.phy.dpi.clock_div;
 
-	/* MCDE pixelfetchwtrmrk levels per overlay */
+	/* MCDE pixelfetchwtrmrk levels in pixels per overlay */
 	{
 #if 1 /* 16 bit overlay */
-#define BITS_PER_WORD (4 * 64)
-	u32 fifo = (1024*8 - 8 * BITS_PER_WORD) / 3;
-	fifo &= ~(BITS_PER_WORD - 1);
-	pdata->pixelfetchwtrmrk[0] = fifo * 2 / 32;	/* LCD 32bpp */
-	pdata->pixelfetchwtrmrk[1] = fifo * 1 / 16;	/* LCD 16bpp */
+
+	/* The pixel fetcher FIFO is 128*64bit = 8192bits = 1024bytes.
+	* Overlay 0 is assumed 32bpp and overlay 1 is assumed 16bpp
+	*/
+	pdata->pixelfetchwtrmrk[0] = 160; /* 160 -> 160px*32bpp/8=640bytes */
+	pdata->pixelfetchwtrmrk[1] = 192; /* 192 -> 192px*16bpp/8=384bytes */
 #else /* 24 bit overlay */
 	u32 fifo = (1024*8 - 8 * BITS_PER_WORD) / 7;
 	fifo &= ~(BITS_PER_WORD - 1);
