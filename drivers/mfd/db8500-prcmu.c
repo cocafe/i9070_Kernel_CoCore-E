@@ -1172,22 +1172,40 @@ static inline void liveopp_update_cpuhw(struct liveopp_arm_table table,
 					int last_idx, 
 					int next_idx)
 {
+	u8 vdd;
+	u8 vbb;
+	bool update_vdd;
+	bool update_vbb;
+
 	mutex_lock(&liveopp_lock);
 
 	if (last_idx == next_idx)
 		goto out;
 
+	prcmu_abb_read(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &vdd, 1);
+	prcmu_abb_read(AB8500_REGU_CTRL2, AB8500_VBBX_REG,  &vbb, 1);
+
+	update_vdd = (table.varm_raw != vdd) ? 1 : 0;
+	update_vbb = (table.vbbx_raw != vbb) ? 1 : 0;
+
 	if (last_idx < next_idx) {
-		prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VBBX_REG,  &table.vbbx_raw, 1);
-		prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
-		udelay(80);
+		if (update_vbb)
+			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VBBX_REG,  &table.vbbx_raw, 1);
+		if (update_vdd)
+			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
+
+		udelay(70);
 		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
 	} else {
 		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
-		udelay(20);
-		prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
-		prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VBBX_REG,  &table.vbbx_raw, 1);
 		udelay(40);
+
+		if (update_vdd)
+			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
+		if (update_vbb)
+			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VBBX_REG,  &table.vbbx_raw, 1);
+
+		udelay(20);
 	}
 
 	/*
