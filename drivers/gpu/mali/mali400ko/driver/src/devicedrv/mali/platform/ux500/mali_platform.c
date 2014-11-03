@@ -120,6 +120,8 @@ static u32 boost_low 		= 0;
 static u32 boost_high 		= 0;
 static u32 boost_upthreshold 	= 233;
 static u32 boost_downthreshold 	= 64;
+//mutex to protect above variables
+static DEFINE_MUTEX(mali_boost_lock);
 
 static struct delayed_work mali_boost_delayedwork;
 
@@ -213,8 +215,10 @@ static void mali_clock_apply(u32 idx)
 
 static void mali_boost_work(struct work_struct *work)
 {
+	mutex_lock(&mali_boost_lock);
 	mali_boost_update();
 	boost_scheduled = false;
+	mutex_unlock(&mali_boost_lock);
 }
 
 static void mali_boost_init(void)
@@ -332,6 +336,7 @@ void mali_utilization_function(struct work_struct *ptr)
 
 	MALI_DEBUG_PRINT(5, ("MALI GPU utilization: %u\n", mali_last_utilization));
 
+	mutex_lock(&mali_boost_lock);
 	if ((!boost_required && !boost_working && !boost_scheduled) || !boost_enable) {
 		// consider power saving mode (APE_50_OPP) only if we're not on boost
 		if (mali_last_utilization > mali_utilization_low_to_high) {
@@ -345,6 +350,7 @@ void mali_utilization_function(struct work_struct *ptr)
 				*/
 				prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP, "mali", PRCMU_QOS_MAX_VALUE);
 				has_requested_low = 0;
+				mutex_unlock(&mali_boost_lock);
 				return;		//After we switch to APE_100_OPP we want to measure utilization once again before entering boost logic
 			}
 		} else {
@@ -389,6 +395,7 @@ void mali_utilization_function(struct work_struct *ptr)
 			}
 		}
 	}
+	mutex_unlock(&mali_boost_lock);
 
 }
 
