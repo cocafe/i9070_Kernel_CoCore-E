@@ -123,23 +123,23 @@ extern int mali_debug_level;
 #endif
 
 #define MALI_DEBUG_CODE(code) code
-#define MALI_DEBUG_PRINT(level, args) NULL
+#define MALI_DEBUG_PRINT(level, args)
 
 /* Keep tracking errors */
 #define MALI_DEBUG_PRINT_ERROR(args) MALI_PRINT_ERROR(args)
 
-#define MALI_DEBUG_PRINT_IF(level,condition,args) NULL
+#define MALI_DEBUG_PRINT_IF(level,condition,args)
 
-#define MALI_DEBUG_PRINT_ELSE(level, args) NULL
+#define MALI_DEBUG_PRINT_ELSE(level, args)
 
 /**
  * @note these variants of DEBUG ASSERTS will cause a debugger breakpoint
  * to be entered (see _mali_osk_break() ). An alternative would be to call
  * _mali_osk_abort(), on OSs that support it.
  */
-#define MALI_DEBUG_PRINT_ASSERT(condition, args) NULL
-#define MALI_DEBUG_ASSERT_POINTER(pointer) NULL
-#define MALI_DEBUG_ASSERT(condition) NULL
+#define MALI_DEBUG_PRINT_ASSERT(condition, args)
+#define MALI_DEBUG_ASSERT_POINTER(pointer)
+#define MALI_DEBUG_ASSERT(condition)
 
 #else /* DEBUG */
 
