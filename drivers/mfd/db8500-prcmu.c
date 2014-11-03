@@ -80,6 +80,7 @@ static char *fw_project_name(u8 project);
 #define PRCM_AVS_VMOD_100_OPP	(PRCM_AVS_BASE + 0xA)
 #define PRCM_AVS_VMOD_50_OPP	(PRCM_AVS_BASE + 0xB)
 #define PRCM_AVS_VSAFE		(PRCM_AVS_BASE + 0xC)
+#define PRCM_AVS_VSAFE_RET	(PRCM_AVS_BASE + 0xD)
 
 #define PRCM_AVS_VOLTAGE		0
 #define PRCM_AVS_VOLTAGE_MASK		0x3f
@@ -1157,24 +1158,6 @@ struct liveopp_arm_table
 #define PLLARM_MAXOPP			0x0001011A
 #define PLLARM_FREQ100OPP		0x00050168
 
-/* PRCMU AVS registers */
-#define PRCM_AVS_BASE			0x2FC
-#define AVS_VBB_RET			0x0
-#define AVS_VBB_MAX_OPP			0x1
-#define AVS_VBB_100_OPP			0x2
-#define AVS_VBB_50_OPP			0x3
-#define AVS_VARM_MAX_OPP		0x4
-#define AVS_VARM_100_OPP		0x5
-#define AVS_VARM_50_OPP			0x6
-#define AVS_VARM_RET			0x7
-#define AVS_VAPE_100_OPP		0x8
-#define AVS_VAPE_50_OPP			0x9
-#define AVS_VMOD_100_OPP		0xA
-#define AVS_VMOD_50_OPP			0xB
-#define AVS_VSAFE			0xC
-#define AVS_VSAFE_RET			0xD
-#define AVS_SIZE			14
-
 struct mutex liveopp_lock;
 
 static unsigned int last_arm_idx = 0;
@@ -1220,19 +1203,6 @@ static const char *armopp_name[] =
 	"(null)",		/* 0x06 */
 	"ARM_EXTCLK",		/* 0x07 */
 };
-
-static u32 avs_read(u32 reg)
-{
-
-	u8 avs[AVS_SIZE];
-	void __iomem *tcdm_base;
-
-	tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
-
-	memcpy_fromio(avs, tcdm_base + PRCM_AVS_BASE, AVS_SIZE);
-
-	return avs[reg];
-}
 
 static int varm_uv(u8 raw)
 {
@@ -1445,20 +1415,20 @@ ATTR_RO(arm_vbb);
 
 static ssize_t prcmu_avs_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	sprintf(buf,   "VBB_RET        0x%02x\n", avs_read(AVS_VBB_RET));
-	sprintf(buf, "%sVBB_MAX_OPP    0x%02x\n", buf, avs_read(AVS_VBB_MAX_OPP));
-	sprintf(buf, "%sVBB_100_OPP    0x%02x\n", buf, avs_read(AVS_VBB_100_OPP));
-	sprintf(buf, "%sVBB_50_OPP     0x%02x\n", buf, avs_read(AVS_VBB_50_OPP));
-	sprintf(buf, "%sVARM_MAX_OPP   0x%02x\n", buf, avs_read(AVS_VARM_MAX_OPP));
-	sprintf(buf, "%sVARM_100_OPP   0x%02x\n", buf, avs_read(AVS_VARM_100_OPP));
-	sprintf(buf, "%sVARM_50_OPP    0x%02x\n", buf, avs_read(AVS_VARM_50_OPP));
-	sprintf(buf, "%sVARM_RET       0x%02x\n", buf, avs_read(AVS_VARM_RET));
-	sprintf(buf, "%sVAPE_100_OPP   0x%02x\n", buf, avs_read(AVS_VAPE_100_OPP));
-	sprintf(buf, "%sVAPE_50_OPP    0x%02x\n", buf, avs_read(AVS_VAPE_50_OPP));
-	sprintf(buf, "%sVMOD_100_OPP   0x%02x\n", buf, avs_read(AVS_VMOD_100_OPP));
-	sprintf(buf, "%sVMOD_50_OPP    0x%02x\n", buf, avs_read(AVS_VMOD_50_OPP));
-	sprintf(buf, "%sVSAFE          0x%02x\n", buf, avs_read(AVS_VSAFE));
-	sprintf(buf, "%sVSAFE_RET      0x%02x\n", buf, avs_read(AVS_VSAFE_RET));
+	sprintf(buf,   "VBB_RET        %#04x\n",      readb(tcdm_base + PRCM_AVS_VBB_RET));
+	sprintf(buf, "%sVBB_MAX_OPP    %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VBB_MAX_OPP));
+	sprintf(buf, "%sVBB_100_OPP    %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VBB_100_OPP));
+	sprintf(buf, "%sVBB_50_OPP     %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VBB_50_OPP));
+	sprintf(buf, "%sVARM_MAX_OPP   %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VARM_MAX_OPP));
+	sprintf(buf, "%sVARM_100_OPP   %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VARM_100_OPP));
+	sprintf(buf, "%sVARM_50_OPP    %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VARM_50_OPP));
+	sprintf(buf, "%sVARM_RET       %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VARM_RET));
+	sprintf(buf, "%sVAPE_100_OPP   %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VAPE_100_OPP));
+	sprintf(buf, "%sVAPE_50_OPP    %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VAPE_50_OPP));
+	sprintf(buf, "%sVMOD_100_OPP   %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VMOD_100_OPP));
+	sprintf(buf, "%sVMOD_50_OPP    %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VMOD_50_OPP));
+	sprintf(buf, "%sVSAFE          %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VSAFE));
+	sprintf(buf, "%sVSAFE_RET      %#04x\n", buf, readb(tcdm_base + PRCM_AVS_VSAFE_RET));
 
 	return strlen(buf);
 }
