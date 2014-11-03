@@ -373,14 +373,14 @@ void mali_utilization_function(struct work_struct *ptr)
 				boost_scheduled = false;
 				cancel_delayed_work(&mali_boost_delayedwork);
 			}
-		} else if (boost_required && !boost_working && mali_last_utilization < mali_utilization_high_to_low) {
+		} else if (boost_required && !boost_working && mali_last_utilization < boost_downthreshold) {
 			boost_required = false;
 			if (boost_scheduled) {
 				//if it's not working yet, but is scheduled to be turned on, than cancel scheduled job
 				cancel_delayed_work(&mali_boost_delayedwork);
 				boost_scheduled = false;
 			}
-		} else if (boost_required && boost_working && mali_last_utilization < boost_downthreshold) {
+		} else if (boost_working && mali_last_utilization < boost_downthreshold) {
 			boost_required = false;
 			if (!boost_scheduled) {
 				// if boost is on and isn't yet scheduled to be turned off then schedule it
