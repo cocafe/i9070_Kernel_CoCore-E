@@ -1617,6 +1617,51 @@ static ssize_t liveopp_start_store(struct kobject *kobj, struct kobj_attribute *
 ATTR_RW(liveopp_start);
 #endif
 
+static ssize_t pllddr_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	u32 val;
+	val = readl(prcmu_base + PRCMU_PLLDDR_REG);
+	
+	return sprintf(buf, "PLLDDR: %#010x (%d kHz)\n", val,  pllarm_freq(val));
+}
+
+static ssize_t pllddr_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	u32 i, old_val, new_val;
+	int old_divider, new_divider;
+
+	old_val = readl(prcmu_base + PRCMU_PLLDDR_REG);
+	ret = sscanf(buf, "%x", &new_val);
+		
+	if (!ret)
+		return -EINVAL;
+	
+	old_divider = (old_val & 0x00FF0000) >> 16;
+	new_divider = (new_val & 0x00FF0000) >> 16;
+	
+	if (new_divider != old_divider) { 
+		/* changing divider is unstable */
+		return -EINVAL;
+	}
+
+	if (new_val) {
+		 /*
+		  * I don't know why, but if we immediately set new value to PRCMU_PLLDDR_REG,
+		  * it'll cause reboot. Only following way works properly.
+		  */
+		for (i = old_val;
+		     (new_val > old_val) ? (i <= new_val) : (i >= new_val); 
+		     (new_val > old_val) ? i++ : i--) {
+				writel_relaxed(i, prcmu_base + PRCMU_PLLDDR_REG);
+				udelay(100);
+		}
+	}
+
+	return count;
+}
+ATTR_RW(pllddr);
+
 static struct attribute *liveopp_attrs[] = {
 #if CONFIG_LIVEOPP_DEBUG > 1
 	&liveopp_start_interface.attr, 
@@ -1643,6 +1688,7 @@ static struct attribute *liveopp_attrs[] = {
 	&arm_step12_interface.attr,
 	&arm_step13_interface.attr,
 	&arm_step14_interface.attr,
+	&pllddr_interface.attr, 
 	NULL,
 };
 
