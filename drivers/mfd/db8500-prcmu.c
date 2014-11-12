@@ -26,6 +26,7 @@
 #include <linux/cpufreq.h>
 #include <linux/clk.h>
 #include <linux/mutex.h>
+#include <linux/kthread.h>
 #include <linux/completion.h>
 #include <linux/irq.h>
 #include <linux/jiffies.h>
@@ -1282,6 +1283,23 @@ static int pllarm_freq(u32 raw)
 	return pll;
 }
 
+static liveopp_arm_table curr_table;
+
+static void requirements_update_thread(struct work_struct *requirements_update_work)
+{
+	if (curr_table) {
+		prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP,
+						"cpufreq",
+						(signed char)curr_table.ddr_opp);
+		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
+						"cpufreq",
+						(signed char)curr_table.ape_opp);
+	} else {
+		pr_err("LiveOPP: null pointer dereference (curr_table)\n");
+	}
+}
+static DECLARE_WORK(requirements_update_work, requirements_update_thread);
+
 static inline void liveopp_update_cpuhw(struct liveopp_arm_table table, 
 					int last_idx, 
 					int next_idx)
@@ -1325,16 +1343,8 @@ static inline void liveopp_update_cpuhw(struct liveopp_arm_table table,
 		udelay(40);
 	}
 
-	/*
-	 * FIXME: Using another thread here would be better?
-	 */
-	prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP,
-					"cpufreq",
-					(signed char)table.ddr_opp);
-	prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
-					"cpufreq",
-					(signed char)table.ape_opp);
-
+	curr_table = table;
+	schedule_work(&requirements_update_work);
 out:
 	mutex_unlock(&liveopp_lock);
 }
