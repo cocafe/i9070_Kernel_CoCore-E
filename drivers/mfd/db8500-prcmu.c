@@ -1179,9 +1179,9 @@ static struct liveopp_arm_table liveopp_arm[] = {
 	{ 800000,  798720, 0x00050168, 0x24, 0xDB, 100,  50},
 	{ 900000,  898560, 0x00050175, 0x29, 0xDB, 100,  50},
 	{1000000,  998400, 0x00050182, 0xAF, 0xDB, 100, 100},
-	{1100000, 1098240, 0x0005018F, 0xB4, 0xCD, 100, 100},
-	{1200000, 1198080, 0x0005019C, 0xB5, 0xCD, 100, 100},
-	{1250000, 1228800, 0x000501A0, 0xB5, 0xCD, 100, 100},
+	{1100000, 1098240, 0x0005018F, 0xB4, 0x8F, 100, 100},
+	{1200000, 1198080, 0x0005019C, 0xB5, 0x8F, 100, 100},
+	{1250000, 1228800, 0x000501A0, 0xB5, 0x8F, 100, 100},
 };
 
 static const char *armopp_name[] = 
@@ -1641,15 +1641,10 @@ static ssize_t pllddr_store(struct kobject *kobj, struct kobj_attribute *attr, c
 	new_divider = (new_val & 0x00FF0000) >> 16;
 	
 	if (new_divider != old_divider) { 
-		/* changing divider is unstable */
 		return -EINVAL;
 	}
 
 	if (new_val) {
-		 /*
-		  * I don't know why, but if we immediately set new value to PRCMU_PLLDDR_REG,
-		  * it'll cause reboot. Only following way works properly.
-		  */
 		for (i = old_val;
 		     (new_val > old_val) ? (i <= new_val) : (i >= new_val); 
 		     (new_val > old_val) ? i++ : i--) {
