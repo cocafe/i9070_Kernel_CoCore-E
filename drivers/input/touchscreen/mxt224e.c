@@ -209,6 +209,9 @@ static pin_cfg_t janice_mxt224e_pins_wakeup[] =
 };
 */
 
+static bool touch_size_enabled = 0;
+static bool touch_pressure_enabled = 1;
+
 /* cocafe: Debugging Prints */
 static bool debug_mask = false;
 module_param(debug_mask, bool, 0644);
@@ -1135,14 +1138,24 @@ static void report_input_data(struct mxt224_data *data)
 				ABS_MT_POSITION_X, data->fingers[id].x);
 		input_report_abs(data->input_dev,
 				ABS_MT_POSITION_Y, data->fingers[id].y);
-		input_report_abs(data->input_dev,
+		if(likely(touch_pressure_enabled)) {
+			input_report_abs(data->input_dev,
 				ABS_MT_PRESSURE, data->fingers[id].z);
-		input_report_abs(data->input_dev,
+		} else {
+			input_report_abs(data->input_dev,
+				ABS_MT_PRESSURE, 0);
+		}
+		if(unlikely(touch_size_enabled)) {
+			input_report_abs(data->input_dev,
 				ABS_MT_TOUCH_MAJOR, data->fingers[id].w);
+		} else {
+			input_report_abs(data->input_dev,
+				ABS_MT_TOUCH_MAJOR, 0);
+		}
 	}
 
 	#ifdef TOUCH_DEBUGGER
-	if (debug_mask) {	/* This is noisy */	/* But helpful in debugging */
+	if (debug_mask) {
 		if (data->fingers[id].state == MXT224_STATE_PRESS || data->fingers[id].state == MXT224_STATE_RELEASE) {
 			printk("[TSP] id[%d] x=%d y=%d z=%d w=%d\n",
 				id , data->fingers[id].x, data->fingers[id].y,
@@ -2669,6 +2682,35 @@ static const struct attribute_group mxt224_attr_group = {
 };
 
 /* mxT224E kobjects */
+static ssize_t mxt224e_touch_config_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	sprintf(buf,   "pressure=%d\n", touch_pressure_enabled);
+	sprintf(buf, "%ssize=%d\n", buf, touch_size_enabled);
+
+	return strlen(buf);
+}
+
+static ssize_t mxt224e_touch_config_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int tmp;
+
+	if (sscanf(buf, "pressure=%d", &tmp)) {
+		touch_pressure_enabled = tmp;
+
+		return count;
+	}
+
+	if (sscanf(buf, "size=%d", &tmp)) {
+		touch_size_enabled = tmp;
+
+		return count;
+	}
+
+	return -EINVAL;
+}
+
+static struct kobj_attribute mxt224e_touch_config_interface = __ATTR(touch_config, 0644, mxt224e_touch_config_show, mxt224e_touch_config_store);
+
 static ssize_t mxt224e_sweep2wake_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	sprintf(buf, "status: %s\n", sweep2wake ? "on" : "off");
@@ -3779,6 +3821,7 @@ static ssize_t mxt224e_parameter3_t48_store(struct kobject *kobj, struct kobj_at
 static struct kobj_attribute mxt224e_parameter3_t48_interface = __ATTR(parameter3_t48, 0644, mxt224e_parameter3_t48_show, mxt224e_parameter3_t48_store);
 
 static struct attribute *mxt224e_attrs[] = {
+	&mxt224e_touch_config_interface.attr,
 	&mxt224e_sweep2wake_interface.attr, 
 #ifdef TOUCH_S2S
 	&mxt224e_sweep2sleep_interface.attr, 
