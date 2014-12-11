@@ -101,7 +101,7 @@
 #define ID_BLOCK_SIZE			7
 
 #define DRIVER_FILTER
-#define SHAPE_TOUCH
+/* #define SHAPE_TOUCH */
 
 #define MXT224_STATE_INACTIVE		-1
 #define MXT224_STATE_RELEASE		0
