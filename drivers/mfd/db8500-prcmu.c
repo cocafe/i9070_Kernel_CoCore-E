@@ -1310,12 +1310,11 @@ static inline void liveopp_update_cpuhw(struct liveopp_arm_table table,
 			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
 
 		udelay(80);
-		mb();
 		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
-
+		mb();
 	} else {
-		mb();
 		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
+		mb();
 		udelay(40);
 
 		if (update_vdd)
