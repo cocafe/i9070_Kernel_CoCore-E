@@ -101,6 +101,7 @@
 #define ID_BLOCK_SIZE			7
 
 #define DRIVER_FILTER
+#define SHAPE_TOUCH
 
 #define MXT224_STATE_INACTIVE		-1
 #define MXT224_STATE_RELEASE		0
@@ -211,6 +212,7 @@ static pin_cfg_t janice_mxt224e_pins_wakeup[] =
 
 static bool touch_size_enabled = 0;
 static bool touch_pressure_enabled = 1;
+static bool touch_component_enabled = 1;
 
 /* cocafe: Debugging Prints */
 static bool debug_mask = false;
@@ -1152,6 +1154,12 @@ static void report_input_data(struct mxt224_data *data)
 			input_report_abs(data->input_dev,
 				ABS_MT_TOUCH_MAJOR, 0);
 		}
+		#ifdef SHAPE_TOUCH
+		if(likely(touch_component_enabled)) {
+			input_report_abs(data->input_dev,
+				ABS_MT_COMPONENT, data->fingers[id].component);
+		}
+		#endif
 	}
 
 	#ifdef TOUCH_DEBUGGER
@@ -1491,7 +1499,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 					equalize_coordinate(0, id, &data->fingers[id].x, &data->fingers[id].y);
 
 #endif
-#if defined(CONFIG_SHAPE_TOUCH)
+#if defined(SHAPE_TOUCH)
 				data->fingers[id].component = msg[7];
 #endif
 			} else if ((msg[1] & SUPPRESS_MSG_MASK) && (data->fingers[id].state != MXT224_STATE_INACTIVE)) {
@@ -2684,8 +2692,11 @@ static const struct attribute_group mxt224_attr_group = {
 /* mxT224E kobjects */
 static ssize_t mxt224e_touch_config_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	sprintf(buf,   "pressure=%d\n", touch_pressure_enabled);
-	sprintf(buf, "%ssize=%d\n", buf, touch_size_enabled);
+	sprintf(buf,   "size=%d\n", touch_size_enabled);
+	sprintf(buf, "%spressure=%d\n", buf, touch_pressure_enabled);
+	#ifdef SHAPE_TOUCH
+	sprintf(buf, "%scomponent=%d\n", buf, touch_component_enabled);
+	#endif
 
 	return strlen(buf);
 }
@@ -2693,6 +2704,14 @@ static ssize_t mxt224e_touch_config_show(struct kobject *kobj, struct kobj_attri
 static ssize_t mxt224e_touch_config_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
 	int tmp;
+
+	#ifdef SHAPE_TOUCH
+	if (sscanf(buf, "component=%d", &tmp)) {
+		touch_component_enabled = tmp;
+
+		return count;
+	}
+	#endif
 
 	if (sscanf(buf, "pressure=%d", &tmp)) {
 		touch_pressure_enabled = tmp;
@@ -3918,7 +3937,7 @@ static int __devinit mxt224_probe(struct i2c_client *client,
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, pdata->min_w,
 			pdata->max_w, 0, 0);
 
-#if defined(CONFIG_SHAPE_TOUCH)
+#if defined(SHAPE_TOUCH)
 	input_set_abs_params(input_dev, ABS_MT_COMPONENT, 0, 255, 0, 0);
 #endif
 	ret = input_register_device(input_dev);
