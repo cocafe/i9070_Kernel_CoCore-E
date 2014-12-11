@@ -1108,7 +1108,7 @@ static void report_input_data(struct mxt224_data *data)
 		goto out;
 
 	#if defined(TOUCH_BOOSTER)
-	if (touchboost) {
+	if (unlikely(touchboost)) {
 		if (data->fingers[id].state == MXT224_STATE_PRESS) {
 			if (data->finger_cnt == 0) {
 				cancel_delayed_work(&mxt224e_touchbooster_off);
@@ -1165,7 +1165,7 @@ static void report_input_data(struct mxt224_data *data)
 	#endif
 
 	if (is_suspend) {
-		if (sweep2wake) {
+		if (unlikely(sweep2wake)) {
 			if (data->fingers[0].state == MXT224_STATE_PRESS) {
 				x_press = data->fingers[0].x;
 				y_press = data->fingers[0].y;
@@ -1183,7 +1183,7 @@ static void report_input_data(struct mxt224_data *data)
 	
 	#ifdef TOUCH_S2S
 	if (!is_suspend) {
-		if (sweep2sleep) {
+		if (unlikely(sweep2sleep)) {
 			if (data->fingers[S2S_FINGERS_USING].state == MXT224_STATE_PRESS) {
 				sweep2sleep_y = data->fingers[S2S_FINGERS_USING].y;
 			}
