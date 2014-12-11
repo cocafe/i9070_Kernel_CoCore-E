@@ -212,7 +212,9 @@ static pin_cfg_t janice_mxt224e_pins_wakeup[] =
 
 static bool touch_size_enabled = 0;
 static bool touch_pressure_enabled = 1;
+#ifdef SHAPE_TOUCH
 static bool touch_component_enabled = 1;
+#endif
 
 /* cocafe: Debugging Prints */
 static bool debug_mask = false;
