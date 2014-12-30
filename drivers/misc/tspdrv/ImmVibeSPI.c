@@ -126,6 +126,8 @@ static VibeUInt32 g_nPWM_Period = PWM_PERIOD_DEFAULT;
 static VibeUInt32 g_nPWM_Duty = PWM_DUTY_DEFAULT;
 static VibeUInt32 g_nLDO_Voltage = LDO_VOLTAGE_DEFAULT;
 
+extern u32 vibrator_enable;
+
 /*
 ** This SPI supports only one actuator.
 */
@@ -175,6 +177,9 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex
 */
 IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 {
+	if (!vibrator_enable)
+		return VIBE_S_SUCCESS;
+
 	if (g_bAmpEnabled == false) {
 		clk_enable(isa_data->mot_clk);
 

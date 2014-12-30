@@ -50,6 +50,7 @@
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
 #include <asm/uaccess.h>
+#include <linux/kobject.h>
 #include <linux/interrupt.h>	/* request_irq(), free_irq(),
 							enable_irq(), disable_irq(), */
 #include "tspdrv.h"
@@ -65,6 +66,8 @@
 #include "../../staging/android/timed_output.h"
 
 #define MAX_TIMEOUT		10000 /* 10s */
+
+u32 vibrator_enable = 1;
 
 static struct vibrator {
 	struct wake_lock wklock;
@@ -212,6 +215,9 @@ static void vibrator_work(struct work_struct *work)
 
 static void janice_vibrator_enable(struct timed_output_dev *dev, int value)
 {
+	if (!vibrator_enable)
+		return;
+
 	mutex_lock(&vibdata.lock);
 
 	/* cancel previous timer and set GPIO according to value */
@@ -808,3 +814,48 @@ module_exit(immvibe_exit);
 MODULE_AUTHOR("Immersion Corporation");
 MODULE_DESCRIPTION("TouchSense Kernel Module");
 MODULE_LICENSE("GPL v2");
+
+static ssize_t vib_enable_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", vibrator_enable);
+}
+
+static ssize_t vib_enable_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	u32 val;
+
+	if (sscanf(buf, "%u", &val)) {
+		vibrator_enable = val;
+	}
+
+	return count;
+}
+static struct kobj_attribute vib_enable_interface = __ATTR(enable, 0644, vib_enable_show, vib_enable_store);
+
+static struct attribute *tspdrv_attrs[] = {
+	&vib_enable_interface.attr, 
+	NULL,
+};
+
+static struct attribute_group tspdrv_interface_group = {
+	.attrs = tspdrv_attrs,
+};
+
+static struct kobject *tspdrv_kobject;
+
+static int __init tspdrv_sysfs_init(void)
+{
+	int ret;
+
+	tspdrv_kobject = kobject_create_and_add("tspdrv", kernel_kobj);
+	if (!tspdrv_kobject) {
+		pr_err("tspdrv: Failed to create kobject interface\n");
+	}
+	ret = sysfs_create_group(tspdrv_kobject, &tspdrv_interface_group);
+	if (ret) {
+		kobject_put(tspdrv_kobject);
+	}
+
+        return 0;
+}
+late_initcall(tspdrv_sysfs_init);
