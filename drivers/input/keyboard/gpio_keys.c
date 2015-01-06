@@ -26,14 +26,6 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/pm_runtime.h>
-#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
-#include <mach/sec_common.h>
-#include <mach/sec_param.h>
-
-struct timer_list debug_timer;
-struct gpio_keys_platform_data *g_pdata;
-extern int jack_is_detected;
-#endif
 
 extern struct class *sec_class;
 
@@ -401,42 +393,6 @@ static struct attribute_group sec_key_attr_group = {
 	.attrs = sec_key_attrs,
 };
 
-#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
-extern void dump_all_task_info(void);
-extern void dump_cpu_stat(void);
-void enter_upload_mode(unsigned long val)
-{
-	bool uploadmode = true;
-	int i;
-	struct gpio_keys_button *pButton;
-	if (g_bVolUp && jack_is_detected && g_bPower) {
-		dump_all_task_info();
-		dump_cpu_stat();
-		panic("__forced_upload");
-	}
-}
-bool gpio_keys_getstate(int keycode)
-{
-	switch (keycode) {
-	case KEY_VOLUMEUP:
-		return g_bVolUp;
-	case KEY_POWER:
-		return g_bPower;
-	case KEY_HOME:
-		return g_bHome;
-	default:
-		break;
-	}
-	return 0;
-}
-EXPORT_SYMBOL(gpio_keys_getstate);
-void gpio_keys_start_upload_modtimer(void)
-{
-	mod_timer(&debug_timer, jiffies + HZ*2);
-	printk(KERN_WARNING "[Key] Waiting for upload mode for 2 seconds.\n");
-}
-EXPORT_SYMBOL(gpio_keys_start_upload_modtimer);
-#endif //CONFIG_SAMSUNG_PRODUCT_SHIP
 void gpio_keys_setstate(int keycode, bool bState)
 {
 	switch (keycode) {
@@ -468,26 +424,6 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	printk(KERN_DEBUG "[KEY] key: %s gpio_keys_report_event state = %d \n",
-		button->desc, state);
-
-	/* Forced Upload Mode checker */
-	bool bState = false;
-
-	bState = state ? true : false;
-
-	switch (button->code) {
-	case KEY_VOLUMEUP:
-		g_bVolUp = bState;
-		break;
-	case KEY_HOME:
-		g_bHome = bState;
-		break;
-	default:
-		break;
-	}
-#endif
 
 	if (type == EV_ABS) {
 		if (state)
@@ -710,13 +646,6 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	input_sync(input);
 
 	device_init_wakeup(&pdev->dev, wakeup);
-
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	/* Initialize for Forced Upload mode */
-	g_pdata = pdata;
-	init_timer(&debug_timer);
-	debug_timer.function = enter_upload_mode;
-#endif
 
 	return 0;
 
