@@ -359,5 +359,6 @@ config SEC_PARAM_DEBUG
 source "arch/arm/mach-ux500/Kconfig-arch"
 source "arch/arm/mach-ux500/pm/Kconfig"
 source "arch/arm/mach-ux500/test/Kconfig"
+source "arch/arm/mach-ux500/khb/Kconfig"
 
 endif

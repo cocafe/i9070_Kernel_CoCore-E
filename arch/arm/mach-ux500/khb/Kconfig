@@ -1,0 +1,5 @@
+config LCD_KHB_DEBUG
+	bool "Display char on screen"
+	default n
+	help
+
