@@ -349,8 +349,32 @@ static DEVICE_ATTR(disabled_switches, S_IWUSR | S_IRUGO,
 		   gpio_keys_store_disabled_switches);
 static DEVICE_ATTR(wakeup_keys, 0664, NULL, wakeup_enable);
 
+static ssize_t keys_pressed_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+
+	struct platform_device *pdev = to_platform_device(dev);
+	struct gpio_keys_drvdata *ddata = platform_get_drvdata(pdev);
+	struct gpio_button_data *bdata = NULL;
+	int state;
+	int i;
+
+	for (i = 0; i < ddata->n_buttons; i++) {
+		bdata = &ddata->data[i];
+		state = (gpio_get_value_cansleep(bdata->button->gpio) ? 1 : 0) ^ bdata->button->active_low;
+
+		if (state)
+			sprintf(buf, "%s%d\n", buf, bdata->button->code);
+	}
+
+	return strlen(buf);
+}
+
+static DEVICE_ATTR(keys_pressed, 0664, keys_pressed_show, NULL);
+
 static struct attribute *gpio_keys_attrs[] = {
 	&dev_attr_keys.attr,
+	&dev_attr_keys_pressed.attr,
 	&dev_attr_switches.attr,
 	&dev_attr_disabled_keys.attr,
 	&dev_attr_disabled_switches.attr,
@@ -362,7 +386,7 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
-static ssize_t key_pressed_show(struct device *dev,
+static ssize_t sec_key_pressed_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
@@ -382,7 +406,7 @@ static ssize_t key_pressed_show(struct device *dev,
 	return strlen(buf);
 }
 
-static DEVICE_ATTR(sec_key_pressed, 0664, key_pressed_show, NULL);
+static DEVICE_ATTR(sec_key_pressed, 0664, sec_key_pressed_show, NULL);
 
 static struct attribute *sec_key_attrs[] = {
 	&dev_attr_sec_key_pressed.attr,
