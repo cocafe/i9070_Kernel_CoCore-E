@@ -1283,20 +1283,14 @@ static int pllarm_freq(u32 raw)
 	return pll;
 }
 
-static liveopp_arm_table curr_table;
-
 static void requirements_update_thread(struct work_struct *requirements_update_work)
 {
-	if (curr_table) {
-		prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP,
-						"cpufreq",
-						(signed char)curr_table.ddr_opp);
-		prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
-						"cpufreq",
-						(signed char)curr_table.ape_opp);
-	} else {
-		pr_err("LiveOPP: null pointer dereference (curr_table)\n");
-	}
+	prcmu_qos_update_requirement(PRCMU_QOS_DDR_OPP,
+					"cpufreq",
+					(signed char)liveopp_arm[last_arm_idx].ddr_opp);
+	prcmu_qos_update_requirement(PRCMU_QOS_APE_OPP,
+					"cpufreq",
+					(signed char)liveopp_arm[last_arm_idx].ape_opp);
 }
 static DECLARE_WORK(requirements_update_work, requirements_update_thread);
 
@@ -1343,8 +1337,6 @@ static inline void liveopp_update_cpuhw(struct liveopp_arm_table table,
 		udelay(40);
 	}
 
-	curr_table = table;
-	schedule_work(&requirements_update_work);
 out:
 	mutex_unlock(&liveopp_lock);
 }
@@ -1830,8 +1822,8 @@ static int arm_set_rate(unsigned long rate)
 			liveopp_update_cpuhw(liveopp_arm[i],
 						last_arm_idx,
 						i);
-
 			last_arm_idx = i;
+			schedule_work(&requirements_update_work);
 
 			break;
 		}
