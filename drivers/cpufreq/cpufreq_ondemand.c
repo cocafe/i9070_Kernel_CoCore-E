@@ -31,9 +31,9 @@
 
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
 #define DEF_FREQUENCY_UP_THRESHOLD		(80)
-#define DEF_SAMPLING_DOWN_FACTOR		(2)
+#define DEF_SAMPLING_DOWN_FACTOR		(4)
 #define MAX_SAMPLING_DOWN_FACTOR		(100000)
-#define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
+#define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(5)
 #define MICRO_FREQUENCY_UP_THRESHOLD		(75)
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
@@ -255,6 +255,7 @@ show_one(sampling_rate, sampling_rate);
 show_one(io_is_busy, io_is_busy);
 show_one(up_threshold, up_threshold);
 show_one(sampling_down_factor, sampling_down_factor);
+show_one(down_differential, down_differential);
 show_one(ignore_nice_load, ignore_nice);
 show_one(powersave_bias, powersave_bias);
 
@@ -318,6 +319,18 @@ static ssize_t store_sampling_down_factor(struct kobject *a,
 	return count;
 }
 
+static ssize_t store_down_differential(struct kobject *a, struct attribute *b,
+				       const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.down_differential = min(input, 100u);
+	return count;
+}
+
 static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
 				      const char *buf, size_t count)
 {
@@ -373,6 +386,7 @@ define_one_global_rw(sampling_rate);
 define_one_global_rw(io_is_busy);
 define_one_global_rw(up_threshold);
 define_one_global_rw(sampling_down_factor);
+define_one_global_rw(down_differential);
 define_one_global_rw(ignore_nice_load);
 define_one_global_rw(powersave_bias);
 
@@ -381,6 +395,7 @@ static struct attribute *dbs_attributes[] = {
 	&sampling_rate.attr,
 	&up_threshold.attr,
 	&sampling_down_factor.attr,
+	&down_differential.attr,
 	&ignore_nice_load.attr,
 	&powersave_bias.attr,
 	&io_is_busy.attr,

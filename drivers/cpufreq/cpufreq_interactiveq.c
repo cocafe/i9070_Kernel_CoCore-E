@@ -124,8 +124,6 @@ static void cpu_up_work(void)
 	int cpu;
 
 	for_each_cpu_not(cpu, cpu_online_mask) {
-	if (cpu == 0)
-		continue;
 		cpu_up(cpu);
 	}
 }
@@ -144,7 +142,7 @@ static void cpu_down_work(void)
 static void interactiveq_cpu_wakeup_thread(struct work_struct *interactiveq_cpu_wakeup_work)
 {
 	if (!is_suspend) {
-		msleep(3000);
+		msleep(2000);
 		cpu_up_work();
 	}
 }

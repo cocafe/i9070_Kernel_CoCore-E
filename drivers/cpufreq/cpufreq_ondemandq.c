@@ -46,9 +46,9 @@
 
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
 #define DEF_FREQUENCY_UP_THRESHOLD		(80)
-#define DEF_SAMPLING_DOWN_FACTOR		(2)
+#define DEF_SAMPLING_DOWN_FACTOR		(4)
 #define MAX_SAMPLING_DOWN_FACTOR		(100000)
-#define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
+#define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(5)
 #define MICRO_FREQUENCY_UP_THRESHOLD		(75)
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
@@ -729,8 +729,6 @@ static void cpu_up_work(void)
 	int cpu;
 
 	for_each_cpu_not(cpu, cpu_online_mask) {
-	if (cpu == 0)
-		continue;
 		cpu_up(cpu);
 		pr_info ("ondemandq: CPU%d up.\n", cpu);
 	}
@@ -751,9 +749,7 @@ static void cpu_down_work(void)
 static void ondemandq_cpu_wakeup_thread(struct work_struct *ondemandq_cpu_wakeup_work)
 {
 	pr_err("ondemandq: wake up CPU1 at starting\n");
-
-	msleep(3000);
-
+	msleep(2000);
 	cpu_up_work();
 }
 static DECLARE_WORK(ondemandq_cpu_wakeup_work, ondemandq_cpu_wakeup_thread);
@@ -872,7 +868,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		pr_info ("ondemandq: earlysuspend registered.\n");
 		#endif
 
-		/* TODO: Wakeup CPU1 when governor starts */
 		if (!is_suspend)
 			schedule_work(&ondemandq_cpu_wakeup_work);
 
