@@ -1167,7 +1167,9 @@ static unsigned int last_arm_idx = 0;
 static int liveopp_start = 0;
 #endif
 
-static struct liveopp_arm_table liveopp_arm[] = {
+static u32 __read_mostly liveopp_varm_us = 50;
+
+static struct liveopp_arm_table liveopp_arm[] __read_mostly = {
 //	| CLK            | PLL       | VDD | VBB | DDR | APE |
 //	{  50000,   46080, 0x00050106, 0x16, 0xDB,  25,  25},
 	{ 100000,   99840, 0x0005010D, 0x17, 0xDB,  25,  25},
@@ -1294,14 +1296,12 @@ static void requirements_update_thread(struct work_struct *requirements_update_w
 }
 static DECLARE_WORK(requirements_update_work, requirements_update_thread);
 
-static inline void liveopp_update_cpuhw(struct liveopp_arm_table table, 
-					int last_idx, 
-					int next_idx)
+static void liveopp_update_cpuhw(struct liveopp_arm_table table, int last_idx, int next_idx)
 {
 	u8 vdd;
 	u8 vbb;
-	bool update_vdd;
-	bool update_vbb;
+	u8 update_vdd;
+	u8 update_vbb;
 
 	mutex_lock(&liveopp_lock);
 
@@ -1321,20 +1321,26 @@ static inline void liveopp_update_cpuhw(struct liveopp_arm_table table,
 		if (update_vdd)
 			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
 
-		udelay(80);
-		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
 		mb();
+		udelay(liveopp_varm_us);
+
+		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
+
+		mb();
+		udelay(5);
 	} else {
 		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
+
 		mb();
-		udelay(40);
+		udelay(5);
 
 		if (update_vdd)
 			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
 		if (update_vbb)
 			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VBBX_REG,  &table.vbbx_raw, 1);
 
-		udelay(40);
+		mb();
+		udelay(liveopp_varm_us);
 	}
 
 out:
@@ -1618,6 +1624,19 @@ static ssize_t liveopp_start_store(struct kobject *kobj, struct kobj_attribute *
 ATTR_RW(liveopp_start);
 #endif
 
+static ssize_t varm_delay_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)		
+{
+	return sprintf(buf, "%u usecs\n", liveopp_varm_us);
+}
+
+static ssize_t varm_delay_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	
+{
+	sscanf(buf, "%u", &liveopp_varm_us);
+
+	return count;
+}
+ATTR_RW(varm_delay);
+
 static ssize_t pllddr_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	u32 val;
@@ -1669,6 +1688,7 @@ static struct attribute *liveopp_attrs[] = {
 	&arm_pllclk_interface.attr,
 	&arm_varm_interface.attr,
 	&arm_vbb_interface.attr,
+	&varm_delay_interface.attr,
 	&arm_step00_interface.attr,
 	&arm_step01_interface.attr,
 	&arm_step02_interface.attr,
@@ -1684,7 +1704,7 @@ static struct attribute *liveopp_attrs[] = {
 	&arm_step12_interface.attr,
 	&arm_step13_interface.attr,
 	&arm_step14_interface.attr,
-	&pllddr_interface.attr, 
+	&pllddr_interface.attr,
 	NULL,
 };
 
