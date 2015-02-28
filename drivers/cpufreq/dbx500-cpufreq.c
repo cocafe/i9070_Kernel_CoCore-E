@@ -98,7 +98,7 @@ static int __cpuinit dbx500_cpufreq_init(struct cpufreq_policy *policy)
 	}
 
 	#ifdef CONFIG_DB8500_LIVEOPP
-	policy->min = 200  * 1000;
+	policy->min = policy->cpuinfo.min_freq;
 	#ifdef CONFIG_MACH_CODINA
 	policy->max = 800  * 1000;
 	#else
