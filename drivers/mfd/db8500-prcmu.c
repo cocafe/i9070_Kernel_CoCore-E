@@ -4947,10 +4947,10 @@ static void  db8500_prcmu_update_freq(void *pdata)
 				liveopp_arm[i].varm_raw = avs_varm_50  + 3;
 				break;
 			case 600000:
-				liveopp_arm[i].varm_raw = avs_varm_100 - 3;
+				liveopp_arm[i].varm_raw = avs_varm_100 - 2;
 				break;
 			case 700000:
-				liveopp_arm[i].varm_raw = avs_varm_100 - 2;
+				liveopp_arm[i].varm_raw = avs_varm_100 - 1;
 				break;
 			case 800000:
 				liveopp_arm[i].varm_raw = avs_varm_100;
