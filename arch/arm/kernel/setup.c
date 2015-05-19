@@ -672,6 +672,22 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 	strlcpy(default_command_line, tag->u.cmdline.cmdline,
 		COMMAND_LINE_SIZE);
 #endif
+
+	pr_err("Bootloader command line: %s\n", tag->u.cmdline.cmdline);
+	strlcat(default_command_line, " ", COMMAND_LINE_SIZE);
+
+	if (strstr(tag->u.cmdline.cmdline, "lpm_boot=1") != NULL) {
+		pr_err("LPM boot from bootloader\n");
+		strlcat(default_command_line, "lpm_boot=1 ", COMMAND_LINE_SIZE);
+	} else {
+		strlcat(default_command_line, "lpm_boot=0 ", COMMAND_LINE_SIZE);
+	}
+
+	if (strstr(tag->u.cmdline.cmdline, "bootmode=2") != NULL) {
+		pr_err("Recovery boot from bootloader\n");
+		strlcat(default_command_line, "bootmode=2 ", COMMAND_LINE_SIZE);
+	}
+
 	return 0;
 }
 
