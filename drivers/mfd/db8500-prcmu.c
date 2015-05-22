@@ -1167,11 +1167,12 @@ static unsigned int last_arm_idx = 0;
 static int liveopp_start = 0;
 #endif
 
-static u32 __read_mostly liveopp_varm_us = 50;
+static u32 __read_mostly liveopp_delay_in  = 60;
+static u32 __read_mostly liveopp_delay_out = 30;
 
 static struct liveopp_arm_table liveopp_arm[] __read_mostly = {
 //	| CLK            | PLL       | VDD | VBB | DDR | APE |
-//	{  50000,   46080, 0x00050106, 0x16, 0xDB,  25,  25},
+#if 0
 	{ 100000,   99840, 0x0005010D, 0x17, 0xDB,  25,  25},
 	{ 200000,  199680, 0x0005011A, 0x18, 0xDB,  25,  25},
 	{ 300000,  299520, 0x00050127, 0x19, 0xDB,  25,  25},
@@ -1184,7 +1185,22 @@ static struct liveopp_arm_table liveopp_arm[] __read_mostly = {
 	{1000000,  998400, 0x00050182, 0xAF, 0xDB, 100, 100},
 	{1100000, 1098240, 0x0005018F, 0xB4, 0x8F, 100, 100},
 	{1200000, 1198080, 0x0005019C, 0xB5, 0x8F, 100, 100},
-	{1250000, 1228800, 0x000501A0, 0xB5, 0x8F, 100, 100},
+//	{1250000, 1228800, 0x000501A0, 0xB5, 0x8F, 100, 100},
+#else
+	{ 115200,  115200, 0x00010103, 0x17, 0xDB,  25,  25},
+	{ 192000,  192000, 0x00010105, 0x18, 0xDB,  25,  25},
+	{ 307200,  307200, 0x00010108, 0x19, 0xDB,  25,  25},
+	{ 384000,  384000, 0x0001010A, 0x1A, 0xDB,  25,  50},
+	{ 499200,  499200, 0x0001010D, 0x1E, 0xDB,  25,  50},
+	{ 614400,  614400, 0x00010110, 0x20, 0xDB,  50,  50},
+	{ 691200,  691200, 0x00010112, 0x22, 0xDB,  50,  50},
+	{ 806400,  806400, 0x00010115, 0x24, 0xDB, 100,  50},
+	{ 883200,  883200, 0x00010117, 0x29, 0xDB, 100,  50},
+	{ 998400,  998400, 0x0001011A, 0xAF, 0xDB, 100, 100},
+	{1075200, 1075200, 0x0001011C, 0xB4, 0x8F, 100, 100},
+	{1190400, 1190400, 0x0001011F, 0xB5, 0x8F, 100, 100},
+//	{1228800, 1228800, 0x00010120, 0xB5, 0x8F, 100, 100},
+#endif
 };
 
 static const char *armopp_name[] = 
@@ -1322,17 +1338,17 @@ static void liveopp_update_cpuhw(struct liveopp_arm_table table, int last_idx, i
 			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
 
 		mb();
-		udelay(liveopp_varm_us);
+		udelay(liveopp_delay_in);
 
 		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
 
 		mb();
-		udelay(5);
+		udelay(liveopp_delay_out);
 	} else {
 		db8500_prcmu_writel(PRCMU_PLLARM_REG, table.pllarm_raw);
 
 		mb();
-		udelay(5);
+		udelay(liveopp_delay_in);
 
 		if (update_vdd)
 			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VARM_SEL1, &table.varm_raw, 1);
@@ -1340,7 +1356,7 @@ static void liveopp_update_cpuhw(struct liveopp_arm_table table, int last_idx, i
 			prcmu_abb_write(AB8500_REGU_CTRL2, AB8500_VBBX_REG,  &table.vbbx_raw, 1);
 
 		mb();
-		udelay(liveopp_varm_us);
+		udelay(liveopp_delay_out);
 	}
 
 out:
@@ -1624,18 +1640,31 @@ static ssize_t liveopp_start_store(struct kobject *kobj, struct kobj_attribute *
 ATTR_RW(liveopp_start);
 #endif
 
-static ssize_t varm_delay_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)		
+static ssize_t liveopp_delay_in_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)		
 {
-	return sprintf(buf, "%u usecs\n", liveopp_varm_us);
+	return sprintf(buf, "%u usecs\n", liveopp_delay_in);
 }
 
-static ssize_t varm_delay_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	
+static ssize_t liveopp_delay_in_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	
 {
-	sscanf(buf, "%u", &liveopp_varm_us);
+	sscanf(buf, "%u", &liveopp_delay_in);
 
 	return count;
 }
-ATTR_RW(varm_delay);
+ATTR_RW(liveopp_delay_in);
+
+static ssize_t liveopp_delay_out_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)		
+{
+	return sprintf(buf, "%u usecs\n", liveopp_delay_out);
+}
+
+static ssize_t liveopp_delay_out_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)	
+{
+	sscanf(buf, "%u", &liveopp_delay_out);
+
+	return count;
+}
+ATTR_RW(liveopp_delay_out);
 
 static ssize_t pllddr_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
@@ -1688,7 +1717,8 @@ static struct attribute *liveopp_attrs[] = {
 	&arm_pllclk_interface.attr,
 	&arm_varm_interface.attr,
 	&arm_vbb_interface.attr,
-	&varm_delay_interface.attr,
+	&liveopp_delay_in_interface.attr,
+	&liveopp_delay_out_interface.attr,
 	&arm_step00_interface.attr,
 	&arm_step01_interface.attr,
 	&arm_step02_interface.attr,
@@ -4956,7 +4986,7 @@ static void  db8500_prcmu_update_freq(void *pdata)
 				liveopp_arm[i].varm_raw = avs_varm_100;
 				break;
 			case 900000:
-				liveopp_arm[i].varm_raw = avs_varm_100 + 4;
+				liveopp_arm[i].varm_raw = avs_varm_100 + 6;
 				break;
 			case 1000000:
 				liveopp_arm[i].varm_raw = avs_varm_max;
